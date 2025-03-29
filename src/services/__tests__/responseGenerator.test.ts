@@ -1,12 +1,16 @@
 
 import { generateResponse } from "../responseGenerator";
-import { callChatApi } from "../chatApiService";
+import { callChatApi } from "../api/chatService";
 import { generateLocalResponse } from "../../utils/localResponseGenerator";
 import { toast } from "@/hooks/use-toast";
+import { createMessageObject } from "../messages/messageUtils";
 
 // Mock dependencies
-jest.mock("../chatApiService", () => ({
-  callChatApi: jest.fn(),
+jest.mock("../api/chatService", () => ({
+  callChatApi: jest.fn()
+}));
+
+jest.mock("../messages/messageUtils", () => ({
   convertMessagesToApiFormat: jest.fn(),
   createMessageObject: jest.fn().mockImplementation((text, isUser) => ({
     id: "test-id",
