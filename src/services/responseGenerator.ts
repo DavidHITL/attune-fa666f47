@@ -22,7 +22,7 @@ export const generateResponse = async (
     
     if (!useLocalFallback) {
       try {
-        // Prepare conversation history for the API
+        // Prepare conversation history for the API - include all previous messages
         const conversationHistory = convertMessagesToApiFormat(messages);
 
         // Call the Supabase Edge Function

@@ -53,6 +53,7 @@ export function useChatMessages() {
         return;
       }
       
+      // Get all previous messages for this user
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -67,7 +68,7 @@ export function useChatMessages() {
           variant: "destructive"
         });
         
-        // If no messages, add a welcome message
+        // If error, add a welcome message
         setMessages([{
           id: "welcome",
           text: "Hi there. How are you feeling today?",
@@ -75,31 +76,33 @@ export function useChatMessages() {
           timestamp: new Date()
         }]);
         
+        setIsLoading(false);
+        setIsInitialLoad(false);
         return;
       }
       
       if (data && data.length > 0) {
         // Transform database messages to our app format
         const formattedMessages: Message[] = data.map(dbMessage => ({
-          id: dbMessage.id.toString(), // Ensure ID is a string
+          id: dbMessage.id.toString(),
           text: dbMessage.content || '',
           isUser: dbMessage.sender_type === 'user',
           timestamp: new Date(dbMessage.created_at)
         }));
         setMessages(formattedMessages);
       } else {
-        // If no messages, add a welcome message
-        const welcomeMsg = {
+        // If no messages, add a welcome message and save it
+        const welcomeMessage = {
           id: "welcome",
           text: "Hi there. How are you feeling today?",
           isUser: false,
           timestamp: new Date()
         };
         
-        setMessages([welcomeMsg]);
+        setMessages([welcomeMessage]);
         
         // Save the welcome message to database
-        await saveMessageToDatabase("Hi there. How are you feeling today?", false);
+        await saveMessageToDatabase(welcomeMessage.text, false);
       }
     } catch (error) {
       console.error("Error in fetchMessages:", error);
@@ -126,7 +129,6 @@ export function useChatMessages() {
     try {
       if (!user) return null; // Don't save if no user is logged in
       
-      // Just for debugging, we'll try to save but won't block on failure
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -138,14 +140,12 @@ export function useChatMessages() {
       
       if (error) {
         console.error("Error saving message to database:", error);
-        // We'll continue with local message handling without showing an error to the user
         return null;
       }
       
       return data?.[0]?.id;
     } catch (error) {
       console.error("Failed to save message:", error);
-      // Continue with local message handling even if database save fails
       return null;
     }
   };
