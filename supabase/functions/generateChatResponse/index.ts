@@ -7,15 +7,16 @@ interface RequestBody {
   conversationHistory?: Array<{ role: string; content: string }>;
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 serve(async (req) => {
-  // Set up CORS to allow requests from your app
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
+      headers: corsHeaders,
     });
   }
 
@@ -38,6 +39,9 @@ serve(async (req) => {
       throw new Error("Message is required");
     }
 
+    console.log("Received message:", message);
+    console.log("Conversation history length:", conversationHistory.length);
+
     // Prepare messages for Anthropic API
     // If there's conversation history, use it; otherwise, start fresh
     const messages = conversationHistory.length > 0 
@@ -55,13 +59,17 @@ serve(async (req) => {
       content: message
     });
 
-    // Send request to Anthropic's Claude API (using Claude 3 Opus for best reasoning)
+    console.log("Sending request to Anthropic API");
+
+    // Send request to Anthropic's Claude API
     const response = await anthropic.messages.create({
       model: "claude-3-opus-20240229",
       max_tokens: 1000,
       messages: messages,
       system: "You are a supportive, empathetic, and thoughtful AI assistant. Your purpose is to help the user reflect on their feelings and experiences. Respond with warmth and understanding. Keep responses concise and conversational.",
     });
+
+    console.log("Received response from Anthropic API");
 
     // Return the response
     return new Response(
@@ -72,12 +80,12 @@ serve(async (req) => {
       {
         headers: {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          ...corsHeaders,
         },
       }
     );
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Error in generateChatResponse function:", error);
     
     return new Response(
       JSON.stringify({
@@ -88,7 +96,7 @@ serve(async (req) => {
         status: 500,
         headers: {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          ...corsHeaders,
         },
       }
     );

@@ -14,9 +14,25 @@ const initialMessages: Message[] = [
   }
 ];
 
+// Simple fallback function for local message processing
+const generateLocalResponse = (message: string): string => {
+  if (message.toLowerCase().includes("hello") || message.toLowerCase().includes("hi")) {
+    return "Hello! How are you feeling today?";
+  } else if (message.toLowerCase().includes("good") || message.toLowerCase().includes("fine")) {
+    return "I'm glad to hear that! Is there anything specific you'd like to talk about?";
+  } else if (message.toLowerCase().includes("bad") || message.toLowerCase().includes("not good")) {
+    return "I'm sorry to hear that. Would you like to share more about what's bothering you?";
+  } else if (message.toLowerCase().includes("thank")) {
+    return "You're welcome! I'm here to support you.";
+  } else {
+    return "Thank you for sharing. I'm listening and here to support you. Feel free to tell me more.";
+  }
+};
+
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
+  const [useLocalFallback, setUseLocalFallback] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleSendMessage = async (text: string) => {
@@ -32,38 +48,65 @@ const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Prepare conversation history for the API
-      const conversationHistory = messages.map(msg => ({
-        role: msg.isUser ? "user" : "assistant",
-        content: msg.text
-      }));
+      let botResponse: Message;
+      
+      if (!useLocalFallback) {
+        try {
+          // Prepare conversation history for the API
+          const conversationHistory = messages.map(msg => ({
+            role: msg.isUser ? "user" : "assistant",
+            content: msg.text
+          }));
 
-      console.log("Calling generateChatResponse function");
+          console.log("Calling generateChatResponse function");
 
-      // Call the Supabase Edge Function using the supabase client
-      const { data, error } = await supabase.functions.invoke('generateChatResponse', {
-        body: {
-          message: text,
-          conversationHistory
+          // Call the Supabase Edge Function using the supabase client
+          const { data, error } = await supabase.functions.invoke('generateChatResponse', {
+            body: {
+              message: text,
+              conversationHistory
+            }
+          });
+
+          if (error) {
+            console.error("Supabase Function Error:", error);
+            throw new Error(`Error calling function: ${error.message}`);
+          }
+
+          if (!data || !data.success) {
+            throw new Error(data?.error || "Failed to get response");
+          }
+
+          // Add AI response to chat
+          botResponse = {
+            id: (Date.now() + 1).toString(),
+            text: data.reply,
+            isUser: false,
+            timestamp: new Date()
+          };
+        } catch (error) {
+          console.error("Error with Supabase function, falling back to local processing:", error);
+          setUseLocalFallback(true);
+          
+          // Generate local response as fallback
+          const localReply = generateLocalResponse(text);
+          botResponse = {
+            id: (Date.now() + 1).toString(),
+            text: localReply,
+            isUser: false,
+            timestamp: new Date()
+          };
         }
-      });
-
-      if (error) {
-        console.error("Supabase Function Error:", error);
-        throw new Error(`Error calling function: ${error.message}`);
+      } else {
+        // Use local response generation
+        const localReply = generateLocalResponse(text);
+        botResponse = {
+          id: (Date.now() + 1).toString(),
+          text: localReply,
+          isUser: false,
+          timestamp: new Date()
+        };
       }
-
-      if (!data || !data.success) {
-        throw new Error(data?.error || "Failed to get response");
-      }
-
-      // Add AI response to chat
-      const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: data.reply,
-        isUser: false,
-        timestamp: new Date()
-      };
 
       setMessages((prevMessages) => [...prevMessages, botResponse]);
     } catch (error) {
