@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import ChatMessageList from "./ChatMessageList";
 import ChatInput from "./ChatInput";
@@ -6,9 +5,9 @@ import { useChatMessages } from "@/hooks/useChatMessages";
 import { useSendMessage } from "@/hooks/useSendMessage";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { DatabaseIcon, AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { calculateSessionProgress } from "@/utils/sessionUtils";
+import DatabaseConnectionAlert from "./chat/DatabaseConnectionAlert";
+import ChatLoadingState from "./chat/ChatLoadingState";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
@@ -25,20 +24,8 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const didInitialFetchRef = useRef(false);
   
-  // Calculate session progress (0-100%)
-  const calculateSessionProgress = () => {
-    if (!sessionStarted || !sessionEndTime) return 0;
-    
-    const now = Date.now();
-    const sessionDuration = 25 * 60 * 1000; // 25 minutes in ms
-    const sessionStartTime = sessionEndTime - sessionDuration;
-    const elapsed = now - sessionStartTime;
-    
-    // Return percentage of session completed (0-100)
-    return Math.min(100, Math.max(0, (elapsed / sessionDuration) * 100));
-  };
-  
-  const sessionProgress = calculateSessionProgress();
+  // Calculate session progress using the utility function
+  const sessionProgress = calculateSessionProgress(sessionStarted, sessionEndTime);
   
   const {
     messages,
@@ -62,7 +49,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
     setUseLocalFallback,
     saveMessageToDatabase,
     isSpeechEnabled,
-    sessionProgress // Pass session progress to useSendMessage
+    sessionProgress
   });
 
   // Log session progress for debugging
@@ -99,7 +86,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
     }
   }, [user, useLocalFallback]);
 
-  // Fetch messages when component mounts or user changes
+  // Handle messages fetching
   useEffect(() => {
     // Don't attempt to fetch messages while auth state is still loading
     if (isAuthLoading) {
@@ -148,43 +135,15 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
 
   const isLoading = isLoadingMessages || isSendingMessage || isAuthLoading;
 
-  // Show appropriate error or loading state
+  // Show loading state
   if (isAuthLoading) {
-    return (
-      <div className="flex flex-col h-full items-center justify-center">
-        <div className="text-center p-4">
-          <div className="spinner mb-4">Loading...</div>
-          <p>Checking authentication...</p>
-        </div>
-      </div>
-    );
+    return <ChatLoadingState />;
   }
 
   return (
     <div className="flex flex-col h-full">
       {useLocalFallback && (
-        <Alert variant="destructive" className="m-4">
-          <DatabaseIcon className="h-4 w-4 mr-2" />
-          <div className="flex-1">
-            <AlertTitle>Database Connection Issue</AlertTitle>
-            <AlertDescription className="flex flex-col gap-2">
-              <p>Unable to save messages to the database due to permissions. Your messages will be stored locally only for this session.</p>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                <AlertTriangleIcon className="h-3 w-3" />
-                <span>Note: These messages will be lost when you close your browser.</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="mt-2 self-start flex items-center gap-2"
-                onClick={handleRetryDatabaseConnection}
-              >
-                <RefreshCwIcon className="h-3 w-3" /> 
-                Retry Database Connection
-              </Button>
-            </AlertDescription>
-          </div>
-        </Alert>
+        <DatabaseConnectionAlert onRetryConnection={handleRetryDatabaseConnection} />
       )}
       
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
