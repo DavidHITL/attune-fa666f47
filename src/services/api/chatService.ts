@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { ChatMessage } from "../messages/messageUtils";
 
 // Function to call the Supabase Edge Function
 export const callChatApi = async (
