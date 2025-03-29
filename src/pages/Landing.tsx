@@ -19,12 +19,12 @@ const Landing: React.FC = () => {
         </p>
         
         <div className="flex flex-col items-center gap-4">
-          <Link to="/chat">
+          <Link to="/signin">
             <Button className="px-8 py-6 text-lg bg-black hover:bg-gray-800 rounded-full">
               Sign In
             </Button>
           </Link>
-          <Link to="/chat" className="text-gray-500 hover:text-gray-700 hover:underline">
+          <Link to="/signup" className="text-gray-500 hover:text-gray-700 hover:underline">
             Create Account
           </Link>
         </div>
