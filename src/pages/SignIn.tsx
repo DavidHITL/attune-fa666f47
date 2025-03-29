@@ -1,6 +1,6 @@
 
 import React from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,8 +28,12 @@ type FormData = z.infer<typeof formSchema>;
 const SignIn: React.FC = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  // Get the redirect path from location state or default to "/you"
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/you";
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -46,7 +50,7 @@ const SignIn: React.FC = () => {
     const { success, error } = await signIn(data.email, data.password);
     
     if (success) {
-      navigate("/you");
+      navigate(from, { replace: true });
     } else if (error) {
       setError(error.message);
     }
