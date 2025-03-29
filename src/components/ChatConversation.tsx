@@ -1,10 +1,11 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import ChatMessageList from "./ChatMessageList";
 import ChatInput from "./ChatInput";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { useSendMessage } from "@/hooks/useSendMessage";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
@@ -12,6 +13,7 @@ interface ChatConversationProps {
 
 const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) => {
   const { user } = useAuth();
+  const didInitialFetchRef = useRef(false);
   
   const {
     messages,
@@ -36,15 +38,27 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     isSpeechEnabled
   });
 
-  // This effect ensures we refresh messages when the component mounts
-  // or when the user changes, which is crucial for persistence across navigations
+  // Fetch messages when the component mounts or user changes
   useEffect(() => {
-    console.log("ChatConversation mounted, user:", user?.id);
-    if (user && messages.length === 0) {
-      console.log("No messages in state, fetching messages...");
+    // This prevents fetchMessages from being called on every render
+    if (!user) return;
+    
+    console.log("ChatConversation effect: User detected:", user.id);
+    
+    // Only fetch messages once per component mount
+    if (!didInitialFetchRef.current) {
+      console.log("ChatConversation: Performing initial message fetch");
       fetchMessages();
+      didInitialFetchRef.current = true;
     }
-  }, [user, messages.length, fetchMessages]);
+  }, [user, fetchMessages]);
+
+  // Reset the ref when user changes
+  useEffect(() => {
+    return () => {
+      didInitialFetchRef.current = false;
+    };
+  }, [user?.id]);
 
   const isLoading = isLoadingMessages || isSendingMessage;
 

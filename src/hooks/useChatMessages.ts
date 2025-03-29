@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -11,17 +11,12 @@ export function useChatMessages() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [useLocalFallback, setUseLocalFallback] = useState(false);
   const { user } = useAuth();
+  const [hasError, setHasError] = useState(false);
 
-  // Fetch messages from Supabase whenever the component mounts or user changes
-  useEffect(() => {
-    // Set loading state at the beginning of the effect
-    setIsLoading(true);
-    console.log("useChatMessages effect triggered, user:", user?.id);
-    
-    if (user) {
-      fetchMessages();
-    } else {
-      // If no user, still show initial welcome message
+  // Create a memoized fetchMessages function that won't change on re-renders
+  const fetchMessages = useCallback(async () => {
+    if (!user) {
+      console.log("No user, not fetching messages");
       setMessages([{
         id: "welcome",
         text: "Hi there. How are you feeling today?",
@@ -30,18 +25,19 @@ export function useChatMessages() {
       }]);
       setIsLoading(false);
       setIsInitialLoad(false);
+      return;
     }
-  }, [user]); // Only re-run when user changes
 
-  const fetchMessages = async () => {
     try {
-      console.log("Fetching messages for user:", user?.id);
+      setIsLoading(true);
+      setHasError(false);
+      console.log("Fetching messages for user:", user.id);
       
       // First try to get user profile to ensure it exists
       const { data: userProfile, error: profileError } = await supabase
         .from('users_profile')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single();
       
       if (profileError) {
@@ -64,7 +60,7 @@ export function useChatMessages() {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
       
       if (error) {
@@ -74,6 +70,7 @@ export function useChatMessages() {
           description: "Could not load your chat history. Using local storage instead.",
           variant: "destructive"
         });
+        setHasError(true);
         
         // If error, add a welcome message
         setMessages([{
@@ -118,6 +115,7 @@ export function useChatMessages() {
       }
     } catch (error) {
       console.error("Error in fetchMessages:", error);
+      setHasError(true);
       toast({
         title: "Error loading messages",
         description: "Could not load your chat history. Using local storage instead.",
@@ -135,9 +133,9 @@ export function useChatMessages() {
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-  };
+  }, [user]);
 
-  const saveMessageToDatabase = async (text: string, isUser: boolean) => {
+  const saveMessageToDatabase = useCallback(async (text: string, isUser: boolean) => {
     try {
       if (!user) return null; // Don't save if no user is logged in
       
@@ -163,7 +161,7 @@ export function useChatMessages() {
       console.error("Failed to save message:", error);
       return null;
     }
-  };
+  }, [user]);
 
   return {
     messages,
@@ -174,6 +172,7 @@ export function useChatMessages() {
     useLocalFallback,
     setUseLocalFallback,
     saveMessageToDatabase,
-    fetchMessages // Export fetchMessages so it can be called manually if needed
+    fetchMessages,
+    hasError
   };
 }

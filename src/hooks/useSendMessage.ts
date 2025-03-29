@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { generateResponse } from "@/services/responseGenerator";
 import { speakMessage } from "@/components/ChatSpeech";
@@ -28,7 +28,7 @@ export function useSendMessage({
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
-  const checkMessageAnalysisThreshold = async (userId: string) => {
+  const checkMessageAnalysisThreshold = useCallback(async (userId: string) => {
     try {
       // Get the current user's profile to check message count
       const { data: profile, error: profileError } = await supabase
@@ -52,9 +52,9 @@ export function useSendMessage({
     } catch (error) {
       console.error("Error checking message threshold:", error);
     }
-  };
+  }, []);
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = useCallback(async (text: string) => {
     if (!user) {
       toast({
         title: "Authentication required",
@@ -69,7 +69,7 @@ export function useSendMessage({
 
     // Create new user message
     const newUserMessage: Message = {
-      id: Date.now().toString(), // Convert to string
+      id: Date.now().toString(),
       text,
       isUser: true,
       timestamp: new Date()
@@ -122,7 +122,7 @@ export function useSendMessage({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, messages, useLocalFallback, setUseLocalFallback, saveMessageToDatabase, setMessages, isSpeechEnabled, checkMessageAnalysisThreshold]);
 
   return {
     isLoading,

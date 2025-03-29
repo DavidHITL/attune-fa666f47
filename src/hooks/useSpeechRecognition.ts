@@ -1,81 +1,88 @@
 
-import { useState, useEffect } from "react";
-import { toast } from "@/hooks/use-toast";
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-type UseSpeechRecognitionProps = {
-  onTranscript?: (transcript: string) => void;
-};
+interface UseSpeechRecognitionOptions {
+  lang?: string;
+}
 
-export function useSpeechRecognition({ onTranscript }: UseSpeechRecognitionProps = {}) {
+export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) {
+  const { lang = 'en-US' } = options;
+  
   const [isListening, setIsListening] = useState(false);
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [transcript, setTranscript] = useState('');
   const [isSupported, setIsSupported] = useState(false);
+  
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Initialize speech recognition on component mount
+  // Initialize speech recognition
   useEffect(() => {
-    const isBrowserSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
-    setIsSupported(isBrowserSupported);
-
-    if (isBrowserSupported) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognitionInstance = new SpeechRecognition();
+    if (typeof window !== 'undefined' && 
+        ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
       
-      recognitionInstance.continuous = false;
-      recognitionInstance.interimResults = false;
-      recognitionInstance.lang = 'en-US';
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognitionAPI();
       
-      recognitionInstance.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        if (onTranscript) {
-          onTranscript(transcript.trim());
+      const recognition = recognitionRef.current;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = lang;
+      
+      recognition.onresult = (event) => {
+        const current = event.resultIndex;
+        const result = event.results[current];
+        const transcriptValue = result[0].transcript;
+        
+        if (result.isFinal) {
+          setTranscript(prev => {
+            // Only update if there's new content
+            if (transcriptValue && transcriptValue !== prev) {
+              return transcriptValue;
+            }
+            return prev;
+          });
         }
       };
       
-      recognitionInstance.onend = () => {
-        setIsListening(false);
-      };
-      
-      recognitionInstance.onerror = (event) => {
+      recognition.onerror = (event) => {
         console.error('Speech recognition error', event.error);
         setIsListening(false);
       };
       
-      setRecognition(recognitionInstance);
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+      
+      setIsSupported(true);
+    } else {
+      console.warn('Speech recognition not supported in this browser');
+      setIsSupported(false);
     }
     
     return () => {
-      if (recognition) {
-        recognition.abort();
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
       }
     };
-  }, [onTranscript]);
-
-  const toggleListening = () => {
-    if (!recognition) {
-      toast({
-        title: "Not supported",
-        description: "Speech recognition is not supported in your browser.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  }, [lang]);
+  
+  const toggleListening = useCallback(() => {
+    if (!recognitionRef.current) return;
+    
     if (isListening) {
-      recognition.stop();
+      recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      try {
-        recognition.start();
-        setIsListening(true);
-      } catch (error) {
-        console.error('Speech recognition error:', error);
-      }
+      // Clear previous transcript when starting new listening session
+      setTranscript('');
+      recognitionRef.current.start();
+      setIsListening(true);
     }
-  };
-
+  }, [isListening]);
+  
   return {
     isListening,
+    transcript,
+    isSupported,
     toggleListening,
-    isSupported
   };
 }

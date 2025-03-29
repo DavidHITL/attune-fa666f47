@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Send, Mic, MicOff } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
@@ -11,18 +11,27 @@ interface ChatInputProps {
 
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false }) => {
   const [message, setMessage] = useState("");
+  const previousTranscriptRef = useRef("");
   
-  const { isListening, toggleListening, isSupported } = useSpeechRecognition({
-    onTranscript: (transcript) => {
-      setMessage((prev) => prev + ' ' + transcript);
+  const { isListening, toggleListening, isSupported, transcript } = useSpeechRecognition();
+
+  // Use an effect to handle transcript updates instead of using the callback directly
+  useEffect(() => {
+    if (transcript && transcript !== previousTranscriptRef.current) {
+      setMessage(prev => {
+        const newMessage = prev + (prev ? ' ' : '') + transcript;
+        return newMessage;
+      });
+      previousTranscriptRef.current = transcript;
     }
-  });
+  }, [transcript]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !isLoading) {
       onSendMessage(message);
       setMessage("");
+      previousTranscriptRef.current = "";
     }
   };
 

@@ -47,8 +47,8 @@ export const callChatApi = async (
 
 // Convert app messages to API format
 export const convertMessagesToApiFormat = (messages: Message[]): ChatMessage[] => {
-  // Filter out any empty or undefined messages
-  const validMessages = messages.filter(msg => msg && msg.text);
+  // Filter out any empty, undefined messages or messages with invalid format
+  const validMessages = messages.filter(msg => msg && msg.text && typeof msg.isUser === 'boolean');
   console.log(`Converting ${validMessages.length} messages to API format`);
   
   return validMessages.map(msg => ({
