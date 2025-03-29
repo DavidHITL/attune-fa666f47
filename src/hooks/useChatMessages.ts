@@ -14,6 +14,8 @@ export function useChatMessages() {
 
   // Fetch messages from Supabase when component mounts
   useEffect(() => {
+    // Always fetch messages when the hook is initialized
+    // This ensures we get fresh data when navigating back to the chat page
     if (user) {
       fetchMessages();
     } else {
@@ -26,11 +28,12 @@ export function useChatMessages() {
       }]);
       setIsInitialLoad(false);
     }
-  }, [user]);
+  }, [user]); // Only re-run when user changes
 
   const fetchMessages = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching messages for user:", user?.id);
       
       // First try to get user profile to ensure it exists
       const { data: userProfile, error: profileError } = await supabase
@@ -52,6 +55,8 @@ export function useChatMessages() {
         setIsInitialLoad(false);
         return;
       }
+      
+      console.log("User profile found, fetching messages");
       
       // Get all previous messages for this user
       const { data, error } = await supabase
@@ -81,6 +86,8 @@ export function useChatMessages() {
         return;
       }
       
+      console.log(`Found ${data?.length || 0} messages in database`);
+      
       if (data && data.length > 0) {
         // Transform database messages to our app format
         const formattedMessages: Message[] = data.map(dbMessage => ({
@@ -91,6 +98,7 @@ export function useChatMessages() {
         }));
         setMessages(formattedMessages);
       } else {
+        console.log("No messages found, creating welcome message");
         // If no messages, add a welcome message and save it
         const welcomeMessage = {
           id: "welcome",
@@ -129,6 +137,8 @@ export function useChatMessages() {
     try {
       if (!user) return null; // Don't save if no user is logged in
       
+      console.log("Saving message to database:", { text, isUser, userId: user.id });
+      
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -143,6 +153,7 @@ export function useChatMessages() {
         return null;
       }
       
+      console.log("Message saved successfully:", data?.[0]?.id);
       return data?.[0]?.id;
     } catch (error) {
       console.error("Failed to save message:", error);

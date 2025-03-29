@@ -22,6 +22,9 @@ export const generateResponse = async (
     
     if (!useLocalFallback) {
       try {
+        // Log message history being sent to AI
+        console.log(`Sending ${messages.length} messages to AI service`);
+        
         // Prepare conversation history for the API - include all previous messages
         const conversationHistory = convertMessagesToApiFormat(messages);
 
