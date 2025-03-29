@@ -4,14 +4,15 @@ import { Send } from "lucide-react";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
+  isLoading?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false }) => {
   const [message, setMessage] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
+    if (message.trim() && !isLoading) {
       onSendMessage(message);
       setMessage("");
     }
@@ -29,11 +30,16 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Type a message..."
           className="w-full rounded-full border border-gray-300 py-3 px-4 pr-10 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          disabled={isLoading}
         />
         <button
           type="submit"
-          className="absolute right-3 text-blue-500 hover:text-blue-700"
-          disabled={!message.trim()}
+          className={`absolute right-3 ${
+            isLoading || !message.trim() 
+              ? "text-gray-400 cursor-not-allowed" 
+              : "text-blue-500 hover:text-blue-700"
+          }`}
+          disabled={isLoading || !message.trim()}
         >
           <Send size={18} />
         </button>
