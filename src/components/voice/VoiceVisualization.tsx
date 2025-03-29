@@ -42,25 +42,27 @@ const VoiceVisualization: React.FC<VoiceVisualizationProps> = ({ isActive, class
         )}
       </div>
 
-      {/* Add keyframes for animations */}
-      <style jsx>{`
-        @keyframes ripple {
-          0% {
-            transform: scale(0.8);
-            opacity: 0.7;
+      {/* Add keyframes for animations using standard style element */}
+      <style>
+        {`
+          @keyframes ripple {
+            0% {
+              transform: scale(0.8);
+              opacity: 0.7;
+            }
+            100% {
+              transform: scale(1.4);
+              opacity: 0;
+            }
           }
-          100% {
-            transform: scale(1.4);
-            opacity: 0;
+          
+          @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
           }
-        }
-        
-        @keyframes gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };
