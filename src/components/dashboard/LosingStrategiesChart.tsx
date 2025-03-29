@@ -31,10 +31,10 @@ const LosingStrategiesChart: React.FC<LosingStrategiesChartProps> = ({ chartData
   };
 
   return (
-    <div className="h-[300px] w-full">
-      <ChartContainer config={chartConfig} className="h-full">
+    <div className="h-[300px] w-full flex justify-center items-center">
+      <ChartContainer config={chartConfig} className="h-full w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={chartData}>
+          <RadarChart data={chartData} cx="50%" cy="50%">
             <PolarGrid />
             <PolarAngleAxis dataKey="subject" />
             <PolarRadiusAxis domain={[0, 5]} />
