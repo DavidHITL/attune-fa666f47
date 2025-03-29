@@ -1,6 +1,5 @@
 
-import React, { useState, useEffect } from "react";
-import ChatSpeech from "./ChatSpeech";
+import React from "react";
 import ChatConversation from "./ChatConversation";
 
 interface ChatInterfaceProps {
@@ -12,10 +11,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   sessionStarted = false,
   sessionEndTime = null
 }) => {
-  const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
-
   // Listen for session timeout event
-  useEffect(() => {
+  React.useEffect(() => {
     const handleSessionTimeout = (event: CustomEvent) => {
       // Get the closing message
       const message = event.detail?.message;
@@ -35,14 +32,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="max-w-2xl mx-auto w-full flex flex-col px-6">
-        <ChatSpeech 
-          isSpeechEnabled={isSpeechEnabled}
-          setIsSpeechEnabled={setIsSpeechEnabled}
-        />
-      </div>
       <ChatConversation 
-        isSpeechEnabled={isSpeechEnabled} 
+        isSpeechEnabled={false} 
         sessionStarted={sessionStarted}
         sessionEndTime={sessionEndTime}
       />
