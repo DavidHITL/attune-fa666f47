@@ -88,6 +88,18 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
         title: "Voice chat active",
         description: "You can now speak with the AI assistant."
       });
+
+      // Set up listener for AI responses
+      if (chatRef.current) {
+        // Listen for AI responses
+        chatRef.current.addEventListener('response', async (response: string) => {
+          // Add AI response to local state
+          setMessages(prev => [...prev, { role: 'assistant', text: response }]);
+          
+          // Save AI response to database
+          await saveMessageToDatabase(response, false);
+        });
+      }
     } catch (error) {
       console.error("Failed to start voice chat:", error);
       toast({
@@ -125,21 +137,6 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
     // Clear transcript for next input
     setTranscript("");
   };
-
-  // Process AI response
-  useEffect(() => {
-    // This would handle incoming AI responses from the voice chat
-    // Assuming chatRef.current has a way to listen for responses
-    if (chatRef.current && chatRef.current.onResponse) {
-      chatRef.current.onResponse = async (response: string) => {
-        // Add AI response to local state
-        setMessages(prev => [...prev, { role: 'assistant', text: response }]);
-        
-        // Save AI response to database
-        await saveMessageToDatabase(response, false);
-      };
-    }
-  }, [chatRef.current]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
