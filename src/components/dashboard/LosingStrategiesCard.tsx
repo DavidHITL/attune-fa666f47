@@ -1,12 +1,13 @@
 
 import React from "react";
-import { Radar } from "lucide-react";
+import { Radar, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import LosingStrategiesChart, { StrategyChartData } from "./LosingStrategiesChart";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { formatDistanceToNow } from "date-fns";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Interface for the profile data from users_profile table
 interface UserProfileData {
@@ -36,6 +37,48 @@ interface AnalysisResultData {
   losing_strategy_flags: LosingStrategyFlags | null;
 }
 
+// Healthy coping strategies mapping
+const healthyAlternatives = {
+  beingRight: [
+    "Focus on understanding rather than proving your point",
+    "Ask curious questions instead of stating facts"
+  ],
+  unbridledSelfExpression: [
+    "Express feelings with 'I' statements",
+    "Take a pause before responding when emotional"
+  ],
+  controlling: [
+    "Offer suggestions only when asked",
+    "Respect others' autonomy in decisions"
+  ],
+  retaliation: [
+    "Address issues directly without bringing up past wrongs",
+    "Focus on resolution rather than revenge"
+  ],
+  withdrawal: [
+    "Stay present even when uncomfortable",
+    "Express need for space explicitly rather than disconnecting"
+  ]
+};
+
+// Behavioral indicators for each strategy
+const behavioralIndicators = {
+  beingRight: "needing to win arguments, dismissing other perspectives",
+  unbridledSelfExpression: "emotional dumping, verbal attacks, blame",
+  controlling: "giving unsolicited advice, micromanaging, 'should' statements",
+  retaliation: "passive-aggressive remarks, contempt, keeping score",
+  withdrawal: "stonewalling, avoiding issues, emotional distancing"
+};
+
+// Full names for strategies
+const strategyNames = {
+  beingRight: "Being Right",
+  unbridledSelfExpression: "Unbridled Self Expression",
+  controlling: "Controlling",
+  retaliation: "Retaliation",
+  withdrawal: "Withdrawal"
+};
+
 interface LosingStrategiesCardProps {
   profileData?: UserProfileData;
 }
@@ -44,7 +87,7 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
   const { user } = useAuth();
   
   // Fetch the latest analysis results if available
-  const { data: analysisData } = useQuery({
+  const { data: analysisData, isLoading } = useQuery({
     queryKey: ['analysisResults', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -55,7 +98,7 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
         .eq('user_id', user.id)
         .order('timestamp', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       
       if (error) {
         if (error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
@@ -162,7 +205,23 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
     }
   };
   
+  // Find the top 1-2 losing strategies
+  const getTopLosingStrategies = () => {
+    if (!analysisData?.losing_strategy_flags) return [];
+    
+    const flags = analysisData.losing_strategy_flags;
+    const strategies = Object.entries(flags)
+      .filter(([_, value]) => value !== undefined && value > 0)
+      .sort(([_, valueA], [__, valueB]) => (valueB as number) - (valueA as number))
+      .slice(0, 2)
+      .map(([key]) => key as keyof typeof strategyNames);
+    
+    return strategies;
+  };
+  
+  const hasData = analysisData?.losing_strategy_flags || profileData;
   const lastUpdated = getLastUpdated();
+  const topStrategies = getTopLosingStrategies();
 
   return (
     <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
@@ -178,18 +237,62 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
         )}
       </CardHeader>
       <CardContent>
-        <LosingStrategiesChart chartData={chartData} />
+        {!hasData && !isLoading ? (
+          <Alert className="bg-slate-50 border border-slate-200 mb-4">
+            <Info className="h-4 w-4 text-slate-500" />
+            <AlertDescription>
+              Insufficient data for accurate analysis. Complete more chat sessions for personalized insights.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            <LosingStrategiesChart chartData={chartData} />
+            
+            <div className="mt-6 space-y-4">
+              {topStrategies.length > 0 ? (
+                topStrategies.map((strategy, index) => (
+                  <div key={strategy} className="p-4 bg-slate-50 rounded-md">
+                    <h3 className="font-medium text-base">
+                      Losing Strategy {index + 1}: {strategyNames[strategy]}
+                    </h3>
+                    <p className="text-sm text-slate-600 mt-1">
+                      <span className="italic">{behavioralIndicators[strategy]}</span>
+                    </p>
+                    <div className="mt-2">
+                      <p className="text-sm font-medium text-slate-700">Healthy Alternatives:</p>
+                      <ul className="text-sm mt-1 space-y-1 list-disc pl-5">
+                        {healthyAlternatives[strategy].map((alt, i) => (
+                          <li key={i}>{alt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                hasData && (
+                  <div className="p-4 bg-slate-50 rounded-md">
+                    <p className="text-sm">
+                      No significant losing strategies detected. Keep practicing healthy communication!
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+            
+            {analysisData?.summary_text && (
+              <div className="mt-4 p-3 bg-slate-50 rounded-md">
+                <p className="text-sm font-medium">Analysis Summary:</p>
+                <p className="text-sm">{analysisData.summary_text}</p>
+              </div>
+            )}
+          </>
+        )}
+        
         <div className="mt-4">
           <p className="text-sm text-muted-foreground">
             This visualization shows your tendency toward five losing strategies in communication.
             Lower scores indicate healthier communication patterns.
           </p>
-          {analysisData?.summary_text && (
-            <div className="mt-3 p-3 bg-slate-50 rounded-md">
-              <p className="text-sm font-medium">Analysis Summary:</p>
-              <p className="text-sm">{analysisData.summary_text}</p>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
