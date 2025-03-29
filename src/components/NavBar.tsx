@@ -15,7 +15,7 @@ const NavBar: React.FC = () => {
             to="/learn" 
             className={cn(
               "text-apple-gray hover:text-apple-gray-3 transition-colors",
-              currentPath === "/learn" && "text-black"
+              currentPath === "/learn" && "invisible"
             )}
           >
             Learn
@@ -23,15 +23,20 @@ const NavBar: React.FC = () => {
         </div>
         
         <div className="text-center flex-1">
-          <Link 
-            to="/you" 
-            className={cn(
-              "text-apple-gray hover:text-apple-gray-3 transition-colors",
-              currentPath === "/you" && "text-black text-xl font-medium"
-            )}
-          >
-            You
-          </Link>
+          {currentPath === "/learn" && (
+            <span className="text-xl font-medium">Learn</span>
+          )}
+          {currentPath === "/you" && (
+            <span className="text-xl font-medium">You</span>
+          )}
+          {currentPath === "/chat" && (
+            <span className="text-xl font-medium">Chat</span>
+          )}
+          {currentPath !== "/learn" && currentPath !== "/you" && currentPath !== "/chat" && (
+            <Link to="/you" className="text-apple-gray hover:text-apple-gray-3 transition-colors">
+              You
+            </Link>
+          )}
         </div>
         
         <div className="flex-1 text-right">
@@ -39,7 +44,7 @@ const NavBar: React.FC = () => {
             to="/chat" 
             className={cn(
               "text-apple-gray hover:text-apple-gray-3 transition-colors",
-              currentPath === "/chat" && "text-black"
+              currentPath === "/chat" && "invisible"
             )}
           >
             Chat
