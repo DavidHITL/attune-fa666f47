@@ -1,7 +1,6 @@
 
 import React from "react";
 import { Container } from "@/components/ui/Container";
-import KnowledgeBaseExplorer from "@/components/learn/KnowledgeBaseExplorer";
 import { useAuth } from "@/context/auth";
 import NavBar from "@/components/NavBar";
 import HarmonySection from "@/components/learn/HarmonySection";
@@ -23,11 +22,6 @@ export default function Learn() {
           <RelationalReckoningSection />
           <AdaptiveChildSection />
           <LosingStrategiesSection />
-        </div>
-        
-        {/* Knowledge Base Explorer - visible to all users */}
-        <div className="mt-6">
-          <KnowledgeBaseExplorer />
         </div>
       </Container>
     </>
