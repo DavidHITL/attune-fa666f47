@@ -21,10 +21,10 @@ serve(async (req) => {
 
   try {
     // Get the Anthropic API key from environment variables
-    const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const anthropicApiKey = Deno.env.get("anthropic-attune-api-key");
     
     if (!anthropicApiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is not set");
+      throw new Error("anthropic-attune-api-key environment variable is not set");
     }
 
     const anthropic = new Anthropic({
