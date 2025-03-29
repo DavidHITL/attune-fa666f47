@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
@@ -24,7 +25,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // List of admin emails - normally this would be in a database
 const ADMIN_EMAILS = [
-  // Add your email here to grant yourself admin access
+  "david@humaneintheloop.com"
 ];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
