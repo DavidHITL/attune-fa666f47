@@ -10,6 +10,9 @@ import LosingStrategiesSection from "@/components/learn/LosingStrategiesSection"
 import StrategiesSection from "@/components/learn/StrategiesSection";
 import DeepTherapySection from "@/components/learn/DeepTherapySection";
 import KnowledgeContentForm from "@/components/learn/KnowledgeContentForm";
+import KnowledgeBaseVerifier from "@/components/learn/KnowledgeBaseVerifier";
+import KnowledgeBaseExplorer from "@/components/learn/KnowledgeBaseExplorer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // The Learn page - showcasing Terry Real's methodologies and concepts
 export default function Learn() {
@@ -35,11 +38,30 @@ export default function Learn() {
           </div>
         </div>
         
-        {/* Knowledge Content Form - for adding new content */}
+        {/* Knowledge Base Management - for authenticated users */}
         {user && (
           <div className="mt-10 mb-8">
             <h2 className="text-2xl font-semibold mb-4">Knowledge Base Management</h2>
-            <KnowledgeContentForm />
+            
+            <Tabs defaultValue="explorer" className="mb-6">
+              <TabsList className="mb-4">
+                <TabsTrigger value="explorer">Knowledge Explorer</TabsTrigger>
+                <TabsTrigger value="verifier">Content Verification</TabsTrigger>
+                <TabsTrigger value="add">Add Knowledge</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="explorer">
+                <KnowledgeBaseExplorer />
+              </TabsContent>
+              
+              <TabsContent value="verifier">
+                <KnowledgeBaseVerifier />
+              </TabsContent>
+              
+              <TabsContent value="add">
+                <KnowledgeContentForm />
+              </TabsContent>
+            </Tabs>
           </div>
         )}
       </Container>
