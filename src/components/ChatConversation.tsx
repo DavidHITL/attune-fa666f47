@@ -4,28 +4,124 @@ import MessageBubble, { Message } from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import { generateResponse } from "./ChatResponseGenerator";
 import { speakMessage } from "./ChatSpeech";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
 }
 
-const initialMessages: Message[] = [
-  {
-    id: "1",
-    text: "Hi there. How are you feeling today?",
-    isUser: false,
-    timestamp: new Date()
-  }
-];
-
 const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) => {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [useLocalFallback, setUseLocalFallback] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+
+  // Fetch messages from Supabase when component mounts
+  useEffect(() => {
+    if (user) {
+      fetchMessages();
+    }
+  }, [user]);
+
+  const fetchMessages = async () => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error("Error fetching messages:", error);
+        toast({
+          title: "Error loading messages",
+          description: "Could not load your chat history.",
+          variant: "destructive"
+        });
+        
+        // If no messages, add a welcome message
+        setMessages([{
+          id: "welcome",
+          text: "Hi there. How are you feeling today?",
+          isUser: false,
+          timestamp: new Date()
+        }]);
+        
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        // Transform database messages to our app format
+        const formattedMessages: Message[] = data.map(dbMessage => ({
+          id: dbMessage.id,
+          text: dbMessage.content || '',
+          isUser: dbMessage.sender_type === 'user',
+          timestamp: new Date(dbMessage.created_at)
+        }));
+        setMessages(formattedMessages);
+      } else {
+        // If no messages, add a welcome message
+        setMessages([{
+          id: "welcome",
+          text: "Hi there. How are you feeling today?",
+          isUser: false,
+          timestamp: new Date()
+        }]);
+        
+        // Save the welcome message to database
+        saveMessageToDatabase("Hi there. How are you feeling today?", false);
+      }
+    } catch (error) {
+      console.error("Error in fetchMessages:", error);
+      toast({
+        title: "Error loading messages",
+        description: "Could not load your chat history. Using local messages instead.",
+        variant: "destructive"
+      });
+      
+      // Set a welcome message if we can't load from the database
+      setMessages([{
+        id: "welcome",
+        text: "Hi there. How are you feeling today?",
+        isUser: false,
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsLoading(false);
+      setIsInitialLoad(false);
+    }
+  };
+
+  const saveMessageToDatabase = async (text: string, isUser: boolean) => {
+    try {
+      if (!user) return; // Don't save if no user is logged in
+      
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          content: text,
+          user_id: user.id,
+          sender_type: isUser ? 'user' : 'bot'
+        });
+      
+      if (error) {
+        console.error("Error saving message to database:", error);
+        throw error;
+      }
+    } catch (error) {
+      console.error("Failed to save message:", error);
+      // Continue with local message handling even if database save fails
+    }
+  };
 
   const handleSendMessage = async (text: string) => {
-    // Add user message to chat
+    // Create new user message
     const newUserMessage: Message = {
       id: Date.now().toString(),
       text,
@@ -33,7 +129,12 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
       timestamp: new Date()
     };
 
+    // Add user message to local state
     setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+    
+    // Save user message to database
+    await saveMessageToDatabase(text, true);
+    
     setIsLoading(true);
 
     try {
@@ -44,7 +145,11 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
         setUseLocalFallback
       );
 
+      // Add bot response to local state
       setMessages((prevMessages) => [...prevMessages, botResponse]);
+      
+      // Save bot response to database
+      await saveMessageToDatabase(botResponse.text, false);
       
       // Speak the bot's response if speech is enabled
       speakMessage(botResponse.text, isSpeechEnabled);
@@ -63,9 +168,19 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
         <div className="max-w-2xl mx-auto">
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
+          {isInitialLoad ? (
+            <div className="flex justify-center items-center h-full">
+              <div className="animate-pulse flex flex-col space-y-4">
+                <div className="h-4 bg-gray-200 rounded w-32"></div>
+                <div className="h-4 bg-gray-200 rounded w-48"></div>
+                <div className="h-4 bg-gray-200 rounded w-40"></div>
+              </div>
+            </div>
+          ) : (
+            messages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
+            ))
+          )}
           {isLoading && (
             <div className="flex items-center justify-start mb-4">
               <div className="bg-gray-200 text-gray-800 px-4 py-3 rounded-2xl rounded-bl-none">

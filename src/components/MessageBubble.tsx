@@ -14,6 +14,11 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+  // Format time to display
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div
       className={cn(
@@ -30,6 +35,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         )}
       >
         {message.text}
+      </div>
+      <div 
+        className={cn(
+          "text-xs mt-1 text-gray-500",
+          message.isUser ? "text-right" : "text-left"
+        )}
+      >
+        {formatTime(message.timestamp)}
       </div>
     </div>
   );
