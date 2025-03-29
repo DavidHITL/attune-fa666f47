@@ -15,27 +15,36 @@ const NavBar: React.FC = () => {
 
   return (
     <nav className="w-full backdrop-blur-md bg-white/90 border-b border-apple-gray-5 sticky top-0 z-10">
-      <div className="max-w-2xl mx-auto py-4 px-6 flex justify-between items-center">
-        <ul className="flex space-x-6">
-          {navItems.map((item) => (
-            <li key={item.path}>
-              <Link
-                to={item.path}
-                className={cn(
-                  "font-medium text-base transition-colors relative py-1",
-                  currentPath === item.path 
-                    ? "text-apple-blue" 
-                    : "text-apple-gray hover:text-apple-blue"
-                )}
-              >
-                {item.name}
-                {currentPath === item.path && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-apple-blue rounded-full" />
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
+      <div className="max-w-4xl mx-auto py-4 px-6 flex justify-between items-center">
+        <div className="flex-1">
+          <Link 
+            to="/learn" 
+            className={cn(
+              "text-apple-gray hover:text-apple-blue transition-colors",
+              currentPath === "/learn" && "text-apple-blue"
+            )}
+          >
+            Learn
+          </Link>
+        </div>
+        
+        <div className="text-center flex-1">
+          <Link to="/you" className="text-xl font-medium">
+            Attune
+          </Link>
+        </div>
+        
+        <div className="flex-1 text-right">
+          <Link 
+            to="/chat" 
+            className={cn(
+              "text-apple-gray hover:text-apple-blue transition-colors",
+              currentPath === "/chat" && "text-apple-blue"
+            )}
+          >
+            Chat
+          </Link>
+        </div>
       </div>
     </nav>
   );
