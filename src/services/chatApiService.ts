@@ -1,3 +1,4 @@
+
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -27,7 +28,10 @@ export const createMessageObject = (text: string, isUser: boolean): Message => {
 // Function to save a message to the database
 export const saveMessage = async (text: string, isUser: boolean): Promise<string | null> => {
   try {
-    const userId = supabase.auth.currentUser?.id;
+    // Get current user from session
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    
     if (!userId) {
       console.error("No user ID found, cannot save message");
       return null;
@@ -38,8 +42,8 @@ export const saveMessage = async (text: string, isUser: boolean): Promise<string
       .insert([
         {
           user_id: userId,
-          text: text,
-          is_user: isUser,
+          content: text,
+          sender_type: isUser ? 'user' : 'bot',
         },
       ])
       .select('id') // Only select the ID
@@ -66,7 +70,10 @@ export const saveMessage = async (text: string, isUser: boolean): Promise<string
 // Function to fetch messages from the database
 export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => {
   try {
-    const userId = supabase.auth.currentUser?.id;
+    // Get current user from session
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    
     if (!userId) {
       console.log("No user ID found, not fetching messages");
       return null;
@@ -91,8 +98,8 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
     // Convert database messages to the Message interface
     const messages: Message[] = data.map(msg => ({
       id: msg.id.toString(),
-      text: msg.text,
-      isUser: msg.is_user,
+      text: msg.content || '', // Map content to text
+      isUser: msg.sender_type === 'user', // Map sender_type to isUser
       timestamp: new Date(msg.created_at)
     }));
 
