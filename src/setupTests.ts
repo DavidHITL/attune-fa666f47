@@ -30,6 +30,11 @@ if (typeof window !== 'undefined') {
     pause: jest.fn(),
     resume: jest.fn(),
     getVoices: jest.fn().mockReturnValue([]),
+    // Add the missing properties required by the SpeechSynthesis interface
+    onvoiceschanged: null,
+    paused: false,
+    pending: false,
+    speaking: false
   };
 }
 
