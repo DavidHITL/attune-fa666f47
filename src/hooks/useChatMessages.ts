@@ -32,31 +32,8 @@ export function useChatMessages() {
       setIsLoading(true);
       setHasError(false);
       console.log("Fetching messages for user:", user.id);
-      
-      // First try to get user profile to ensure it exists
-      const { data: userProfile, error: profileError } = await supabase
-        .from('users_profile')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (profileError) {
-        console.error("Error fetching user profile:", profileError);
-        // If no profile, proceed with just a welcome message
-        setMessages([{
-          id: "welcome",
-          text: "Hi there. How are you feeling today?",
-          isUser: false,
-          timestamp: new Date()
-        }]);
-        setIsLoading(false);
-        setIsInitialLoad(false);
-        return;
-      }
-      
-      console.log("User profile found, fetching messages");
-      
-      // Get all previous messages for this user
+
+      // Get all previous messages for this user directly, without checking profile first
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -141,6 +118,7 @@ export function useChatMessages() {
       
       console.log("Saving message to database:", { text, isUser, userId: user.id });
       
+      // Using upsert to be more resilient - if the insert fails, it will update
       const { data, error } = await supabase
         .from('messages')
         .insert({

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ChatMessageList from "./ChatMessageList";
 import ChatInput from "./ChatInput";
 import { useChatMessages } from "@/hooks/useChatMessages";
@@ -13,6 +13,7 @@ interface ChatConversationProps {
 
 const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) => {
   const { user } = useAuth();
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const didInitialFetchRef = useRef(false);
   
   const {
@@ -40,23 +41,39 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
 
   // Fetch messages when the component mounts or user changes
   useEffect(() => {
-    // This prevents fetchMessages from being called on every render
-    if (!user) return;
+    if (!user) {
+      // If no user is logged in, just show the welcome message
+      if (!initialLoadDone) {
+        setMessages([{
+          id: "welcome",
+          text: "Hi there. How are you feeling today?",
+          isUser: false,
+          timestamp: new Date()
+        }]);
+        setInitialLoadDone(true);
+      }
+      return;
+    }
     
     console.log("ChatConversation effect: User detected:", user.id);
     
     // Only fetch messages once per component mount
     if (!didInitialFetchRef.current) {
       console.log("ChatConversation: Performing initial message fetch");
-      fetchMessages();
+      
+      // Set a flag to prevent duplicate fetches
       didInitialFetchRef.current = true;
+      
+      // Fetch messages - the hook handles adding a welcome message if none exist
+      fetchMessages();
     }
-  }, [user, fetchMessages]);
+  }, [user, fetchMessages, setMessages, initialLoadDone]);
 
   // Reset the ref when user changes
   useEffect(() => {
     return () => {
       didInitialFetchRef.current = false;
+      setInitialLoadDone(false);
     };
   }, [user?.id]);
 

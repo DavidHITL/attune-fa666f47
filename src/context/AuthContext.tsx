@@ -33,28 +33,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, currentSession) => {
+        console.log("Auth state changed:", event);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
 
         if (event === "SIGNED_OUT") {
+          console.log("User signed out, navigating to landing page");
           navigate("/");
+        } else if (event === "TOKEN_REFRESHED") {
+          console.log("Token refreshed successfully");
+        } else if (event === "USER_UPDATED") {
+          console.log("User data updated");
         }
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+    const checkSession = async () => {
+      try {
+        console.log("Checking for existing session");
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        
+        if (existingSession) {
+          console.log("Existing session found:", existingSession.user.id);
+          setSession(existingSession);
+          setUser(existingSession.user);
+          
+          // Attempt to refresh the token if it's close to expiring
+          const expiresAt = existingSession.expires_at;
+          if (expiresAt) {
+            const expiresIn = expiresAt - Math.floor(Date.now() / 1000);
+            // If token expires in less than 60 minutes, refresh it
+            if (expiresIn < 3600) {
+              console.log("Token expiring soon, refreshing...");
+              const { data } = await supabase.auth.refreshSession();
+              if (data.session) {
+                console.log("Session refreshed successfully");
+                setSession(data.session);
+                setUser(data.session.user);
+              }
+            }
+          }
+        } else {
+          console.log("No existing session found");
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
 
     return () => subscription.unsubscribe();
   }, [navigate]);
 
   const signUp = async (email: string, password: string) => {
     try {
+      setIsLoading(true);
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -81,11 +119,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         description: "Please try again later.",
       });
       return { error: err as Error, success: false };
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      setIsLoading(true);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -112,15 +153,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         description: "Please try again later.",
       });
       return { error: err as Error, success: false };
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    toast({
-      title: "Signed out",
-      description: "You have been logged out.",
-    });
+    setIsLoading(true);
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been logged out.",
+      });
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast({
+        variant: "destructive",
+        title: "Error signing out",
+        description: "An error occurred while signing out.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

@@ -18,6 +18,13 @@ export const callChatApi = async (
   console.log("Conversation history length:", conversationHistory.length);
   
   try {
+    // Check if the session is valid before making the request
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error("No valid session found before API call");
+      throw new Error("You need to be logged in to use the chat");
+    }
+    
     const { data, error } = await supabase.functions.invoke('generateChatResponse', {
       body: {
         message,
