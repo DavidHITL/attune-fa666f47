@@ -7,6 +7,7 @@ import HarmonySection from "@/components/learn/HarmonySection";
 import RelationalReckoningSection from "@/components/learn/RelationalReckoningSection";
 import AdaptiveChildSection from "@/components/learn/AdaptiveChildSection";
 import LosingStrategiesSection from "@/components/learn/LosingStrategiesSection";
+import KnowledgeContentForm from "@/components/learn/KnowledgeContentForm";
 
 // The Learn page - showcasing Terry Real's methodologies and concepts
 export default function Learn() {
@@ -23,6 +24,14 @@ export default function Learn() {
           <AdaptiveChildSection />
           <LosingStrategiesSection />
         </div>
+        
+        {/* Knowledge Content Form - for adding new content */}
+        {user && (
+          <div className="mt-10 mb-8">
+            <h2 className="text-2xl font-semibold mb-4">Knowledge Base Management</h2>
+            <KnowledgeContentForm />
+          </div>
+        )}
       </Container>
     </>
   );
