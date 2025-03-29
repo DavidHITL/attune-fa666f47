@@ -115,7 +115,7 @@ const SignIn: React.FC = () => {
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full px-8 py-6 text-lg bg-black hover:bg-gray-800 rounded-full"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? "Signing in..." : "Sign in"}
