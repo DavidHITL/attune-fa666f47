@@ -79,6 +79,27 @@ export const createMessageObject = (text: string, isUser: boolean): Message => {
   };
 };
 
+// Helper function to verify database access before saving
+export const testDatabaseAccess = async (): Promise<boolean> => {
+  try {
+    // First check if we can access the messages table
+    const { error: testError } = await supabase
+      .from('messages')
+      .select('id')
+      .limit(1);
+      
+    if (testError) {
+      console.error("Database access test failed:", testError);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error testing database access:", error);
+    return false;
+  }
+};
+
 // Save message to database with explicit error handling for RLS policy issues
 export const saveMessage = async (text: string, isUser: boolean): Promise<string | null> => {
   try {
@@ -90,14 +111,14 @@ export const saveMessage = async (text: string, isUser: boolean): Promise<string
     }
     
     // First check if we can access the messages table
-    const { error: testError } = await supabase
-      .from('messages')
-      .select('id')
-      .limit(1);
-      
-    if (testError) {
-      console.error("Error testing access to messages table:", testError);
-      // If we can't access the table, don't try to insert
+    const hasAccess = await testDatabaseAccess();
+    if (!hasAccess) {
+      // Show a more helpful message about RLS issues
+      toast({
+        title: "Database Access Issue",
+        description: "Could not save your message to the database due to permissions. Using local mode.",
+        variant: "destructive"
+      });
       return null;
     }
     
@@ -144,13 +165,8 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
     }
 
     // First test if we can access the messages table
-    const { data: testData, error: testError } = await supabase
-      .from('messages')
-      .select('count')
-      .limit(1);
-      
-    if (testError) {
-      console.error("Error testing access to messages table:", testError);
+    const hasAccess = await testDatabaseAccess();
+    if (!hasAccess) {
       toast({
         title: "Database Access Issue",
         description: "Could not fetch your chat history. Using local storage instead.",

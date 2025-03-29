@@ -7,7 +7,8 @@ import { useSendMessage } from "@/hooks/useSendMessage";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { DatabaseIcon } from "lucide-react";
+import { DatabaseIcon, AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
@@ -26,7 +27,8 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     useLocalFallback,
     setUseLocalFallback,
     saveMessageToDatabase,
-    fetchMessages
+    fetchMessages,
+    hasError
   } = useChatMessages();
 
   const {
@@ -40,6 +42,20 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     saveMessageToDatabase,
     isSpeechEnabled
   });
+
+  // Function to retry database connection
+  const handleRetryDatabaseConnection = () => {
+    if (!user) return;
+    
+    toast({
+      title: "Retrying database connection",
+      description: "Attempting to reconnect to the database...",
+    });
+    
+    setUseLocalFallback(false);
+    didInitialFetchRef.current = false;
+    fetchMessages();
+  };
 
   // Fetch messages when component mounts or user changes
   useEffect(() => {
@@ -106,11 +122,26 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     <div className="flex flex-col h-full">
       {useLocalFallback && (
         <Alert variant="destructive" className="m-4">
-          <DatabaseIcon className="h-4 w-4" />
-          <AlertTitle>Database Connection Issue</AlertTitle>
-          <AlertDescription>
-            Unable to save messages to the database. Your messages will be stored locally only for this session.
-          </AlertDescription>
+          <DatabaseIcon className="h-4 w-4 mr-2" />
+          <div className="flex-1">
+            <AlertTitle>Database Connection Issue</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              <p>Unable to save messages to the database due to permissions. Your messages will be stored locally only for this session.</p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                <AlertTriangleIcon className="h-3 w-3" />
+                <span>Note: These messages will be lost when you close your browser.</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="mt-2 self-start flex items-center gap-2"
+                onClick={handleRetryDatabaseConnection}
+              >
+                <RefreshCwIcon className="h-3 w-3" /> 
+                Retry Database Connection
+              </Button>
+            </AlertDescription>
+          </div>
         </Alert>
       )}
       
