@@ -6,7 +6,7 @@ import { Book } from "lucide-react";
 import KnowledgeBaseExplorer from "@/components/learn/KnowledgeBaseExplorer";
 import KnowledgeImportForm from "@/components/learn/KnowledgeImportForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import NavBar from "@/components/NavBar";
 
 // The Learn page - showcasing Terry Real's methodologies and concepts
