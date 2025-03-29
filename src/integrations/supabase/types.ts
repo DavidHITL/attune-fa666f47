@@ -30,6 +30,36 @@ export type Database = {
         }
         Relationships: []
       }
+      analysis_results: {
+        Row: {
+          created_at: string | null
+          id: string
+          keywords: string[] | null
+          losing_strategy_flags: Json | null
+          summary_text: string | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          keywords?: string[] | null
+          losing_strategy_flags?: Json | null
+          summary_text?: string | null
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          keywords?: string[] | null
+          losing_strategy_flags?: Json | null
+          summary_text?: string | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string | null

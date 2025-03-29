@@ -6,6 +6,7 @@ import { speakMessage } from "@/components/ChatSpeech";
 import { createMessageObject } from "@/services/chatApiService";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UseSendMessageProps {
   messages: Message[];
@@ -40,6 +41,10 @@ export function useSendMessage({
           title: "Analyzing your communication patterns",
           description: "We'll process your messages to provide insights on your communication style.",
         });
+        
+        // Queue analysis via analysis_queue table
+        // The database trigger will pick this up and create an entry in analysis_queue
+        // We don't need to do anything else here as the queue processing function will handle the rest
       }
     } catch (error) {
       console.error("Error checking message threshold:", error);

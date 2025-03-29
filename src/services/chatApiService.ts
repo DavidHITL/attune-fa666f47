@@ -143,3 +143,28 @@ export const callChatApi = async (
     throw error;
   }
 }
+
+// Function to trigger user message analysis
+export const triggerUserAnalysis = async (userId: string): Promise<boolean> => {
+  try {
+    if (!userId) {
+      console.error("No user ID provided for analysis");
+      return false;
+    }
+    
+    // Add an entry to the analysis_queue table
+    const { error } = await supabase
+      .from('analysis_queue')
+      .insert([{ user_id: userId }]);
+      
+    if (error) {
+      console.error("Error queueing user analysis:", error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error triggering user analysis:", error);
+    return false;
+  }
+};

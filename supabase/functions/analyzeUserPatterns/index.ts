@@ -10,9 +10,8 @@ interface AnalysisRequest {
 
 interface AnalysisResponse {
   summary: string;
-  full_analysis: string;
   keywords: string[];
-  scores: {
+  losing_strategy_flags: {
     beingRight: number;
     unbridledSelfExpression: number;
     controlling: number;
@@ -43,7 +42,6 @@ if (!anthropicApiKey) {
 
 // Create a Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
-const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") as string;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
 
 // Create a Supabase client with service role key for elevated access
@@ -68,7 +66,7 @@ const createSystemPrompt = () => {
 
 5. Withdrawal: Signs include avoidance language, stonewalling, minimizing issues, changing subjects, vague/non-committal responses, emotional distancing, reluctance to engage.
 
-Analyze the provided messages for patterns of these five losing strategies. For each strategy, provide:
+Analyze the provided messages for patterns of these five losing strategies. Consider recency - more recent messages should be weighted more heavily than older ones. For each strategy, provide:
 1. A score from 0-5 (0 = not present, 1-2 = mildly present, 3 = moderately present, 4-5 = strongly present)
 2. Evidence from the text
 3. Specific phrases or patterns that indicate each strategy
@@ -76,17 +74,15 @@ Analyze the provided messages for patterns of these five losing strategies. For 
 Provide your analysis in this JSON format:
 {
   "summary": "A 2-3 sentence summary of the dominant communication patterns",
-  "full_analysis": "Detailed analysis of all five strategies, with specific examples and explanations",
   "keywords": ["list", "of", "key", "terms", "or", "phrases"],
-  "scores": {
+  "losing_strategy_flags": {
     "beingRight": 0-5,
     "unbridledSelfExpression": 0-5, 
     "controlling": 0-5,
     "retaliation": 0-5,
     "withdrawal": 0-5
   }
-}
-`;
+}`;
 };
 
 serve(async (req) => {
@@ -212,26 +208,20 @@ serve(async (req) => {
 
     console.log("Successfully analyzed user patterns");
     
-    // Store the analysis results in the users_profile table
-    const { error: updateError } = await supabaseAdmin
-      .from('users_profile')
-      .update({
-        timestamp: new Date().toISOString(),
+    // Store the analysis results in the analysis_results table
+    const { error: insertError } = await supabaseAdmin
+      .from('analysis_results')
+      .insert({
+        user_id: user_id,
         summary_text: analysisResult.summary,
-        full_text: analysisResult.full_analysis,
         keywords: analysisResult.keywords,
-        beingright_value: analysisResult.scores.beingRight,
-        unbridledselfexpression_value: analysisResult.scores.unbridledSelfExpression,
-        controlling_value: analysisResult.scores.controlling,
-        retaliation_value: analysisResult.scores.retaliation,
-        withdrawal_value: analysisResult.scores.withdrawal
-      })
-      .eq('user_id', user_id);
+        losing_strategy_flags: analysisResult.losing_strategy_flags
+      });
 
-    if (updateError) {
-      console.error("Error updating user profile:", updateError);
+    if (insertError) {
+      console.error("Error storing analysis results:", insertError);
       return new Response(
-        JSON.stringify({ error: "Failed to store analysis results", details: updateError }),
+        JSON.stringify({ error: "Failed to store analysis results", details: insertError }),
         { 
           status: 500, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 

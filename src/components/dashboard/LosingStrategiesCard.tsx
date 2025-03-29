@@ -3,6 +3,9 @@ import React from "react";
 import { Radar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import LosingStrategiesChart, { StrategyChartData } from "./LosingStrategiesChart";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 // Interface for the profile data from users_profile table
 interface UserProfileData {
@@ -18,50 +21,113 @@ interface LosingStrategiesCardProps {
 }
 
 const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData }) => {
+  const { user } = useAuth();
+  
+  // Fetch the latest analysis results if available
+  const { data: analysisData } = useQuery({
+    queryKey: ['analysisResults', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('analysis_results')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) {
+        if (error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+          console.error("Error fetching analysis results:", error);
+        }
+        return null;
+      }
+      
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+  
   // Dummy data for the radar chart (if no real data available)
   const dummyChartData: StrategyChartData[] = [
-    { subject: 'Being Right', value: 3.5, fullMark: 5 },
-    { subject: 'Unbridled Self Expression', value: 2.7, fullMark: 5 },
-    { subject: 'Controlling', value: 4.2, fullMark: 5 },
-    { subject: 'Retaliation', value: 1.8, fullMark: 5 },
-    { subject: 'Withdrawal', value: 3.1, fullMark: 5 },
+    { subject: 'Being Right', value: 0, fullMark: 5 },
+    { subject: 'Unbridled Self Expression', value: 0, fullMark: 5 },
+    { subject: 'Controlling', value: 0, fullMark: 5 },
+    { subject: 'Retaliation', value: 0, fullMark: 5 },
+    { subject: 'Withdrawal', value: 0, fullMark: 5 },
   ];
 
   // Prepare data for the radar chart
-  const prepareChartData = (data: UserProfileData | undefined): StrategyChartData[] => {
-    if (!data) return dummyChartData;
-
-    // Replace null values with 0 and prepare data structure for the chart
-    return [
-      {
-        subject: 'Being Right',
-        value: data.beingright_value ?? 0,
-        fullMark: 5,
-      },
-      {
-        subject: 'Unbridled Self Expression',
-        value: data.unbridledselfexpression_value ?? 0,
-        fullMark: 5,
-      },
-      {
-        subject: 'Controlling',
-        value: data.controlling_value ?? 0,
-        fullMark: 5,
-      },
-      {
-        subject: 'Retaliation',
-        value: data.retaliation_value ?? 0,
-        fullMark: 5,
-      },
-      {
-        subject: 'Withdrawal',
-        value: data.withdrawal_value ?? 0,
-        fullMark: 5,
-      },
-    ];
+  const prepareChartData = (): StrategyChartData[] => {
+    // First try to use the analysis results if available
+    if (analysisData?.losing_strategy_flags) {
+      const flags = analysisData.losing_strategy_flags;
+      return [
+        {
+          subject: 'Being Right',
+          value: flags.beingRight || 0,
+          fullMark: 5,
+        },
+        {
+          subject: 'Unbridled Self Expression',
+          value: flags.unbridledSelfExpression || 0,
+          fullMark: 5,
+        },
+        {
+          subject: 'Controlling',
+          value: flags.controlling || 0,
+          fullMark: 5,
+        },
+        {
+          subject: 'Retaliation',
+          value: flags.retaliation || 0,
+          fullMark: 5,
+        },
+        {
+          subject: 'Withdrawal',
+          value: flags.withdrawal || 0,
+          fullMark: 5,
+        },
+      ];
+    }
+    
+    // Fall back to profile data if analysis results not available
+    if (profileData) {
+      return [
+        {
+          subject: 'Being Right',
+          value: profileData.beingright_value ?? 0,
+          fullMark: 5,
+        },
+        {
+          subject: 'Unbridled Self Expression',
+          value: profileData.unbridledselfexpression_value ?? 0,
+          fullMark: 5,
+        },
+        {
+          subject: 'Controlling',
+          value: profileData.controlling_value ?? 0,
+          fullMark: 5,
+        },
+        {
+          subject: 'Retaliation',
+          value: profileData.retaliation_value ?? 0,
+          fullMark: 5,
+        },
+        {
+          subject: 'Withdrawal',
+          value: profileData.withdrawal_value ?? 0,
+          fullMark: 5,
+        },
+      ];
+    }
+    
+    // Return dummy data if nothing else is available
+    return dummyChartData;
   };
 
-  const chartData = prepareChartData(profileData);
+  const chartData = prepareChartData();
 
   return (
     <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
@@ -76,6 +142,12 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
             This visualization shows your tendency toward five losing strategies in communication.
             Lower scores indicate healthier communication patterns.
           </p>
+          {analysisData?.summary_text && (
+            <div className="mt-3 p-3 bg-slate-50 rounded-md">
+              <p className="text-sm font-medium">Analysis Summary:</p>
+              <p className="text-sm">{analysisData.summary_text}</p>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
