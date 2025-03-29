@@ -3,6 +3,11 @@
 
 type TranscriptCallback = (text: string) => void;
 
+// Interface for audio chunks in the queue
+interface AudioChunk {
+  buffer: AudioBuffer;
+}
+
 export class RealtimeChat {
   private websocket: WebSocket | null = null;
   private transcriptCallback: TranscriptCallback;
@@ -176,11 +181,6 @@ export class RealtimeChat {
     }
     
     return audioBuffer;
-  }
-  
-  // Interface for audio chunks in the queue
-  interface AudioChunk {
-    buffer: AudioBuffer;
   }
   
   // Queue audio for sequential playback
