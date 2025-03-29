@@ -12,6 +12,7 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { X } from "lucide-react";
+import AvailableSessions from "./AvailableSessions";
 
 interface SessionStartModalProps {
   open: boolean;
@@ -37,14 +38,20 @@ const SessionStartModal: React.FC<SessionStartModalProps> = ({
       onOpenChange(isOpen);
     }}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Start Your Session</DialogTitle>
+        <DialogHeader className="text-center">
+          <DialogTitle className="text-xl">Start Your Session</DialogTitle>
           <DialogDescription>
             You're about to begin a 25-minute therapeutic chat session. 
             During this time, you can discuss anything that's on your mind.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col space-y-4 mt-4">
+        
+        {/* Available Sessions Component */}
+        <div className="flex justify-center mt-2 mb-4">
+          <AvailableSessions />
+        </div>
+        
+        <div className="flex flex-col space-y-4">
           <p>Sessions are limited to 25 minutes to create a focused, effective therapeutic framework.</p>
           <p>You can end your session early if needed, but the timer cannot be paused.</p>
         </div>
