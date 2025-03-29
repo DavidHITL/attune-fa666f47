@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Send, Mic, MicOff } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 // Define the interface for chat input props
 interface ChatInputProps {
@@ -11,65 +11,12 @@ interface ChatInputProps {
 
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false }) => {
   const [message, setMessage] = useState("");
-  const [isListening, setIsListening] = useState(false);
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
-
-  // Initialize speech recognition on component mount
-  useEffect(() => {
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognitionInstance = new SpeechRecognition();
-      
-      recognitionInstance.continuous = false;
-      recognitionInstance.interimResults = false;
-      recognitionInstance.lang = 'en-US';
-      
-      recognitionInstance.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setMessage((prev) => prev + ' ' + transcript.trim());
-      };
-      
-      recognitionInstance.onend = () => {
-        setIsListening(false);
-      };
-      
-      recognitionInstance.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setIsListening(false);
-      };
-      
-      setRecognition(recognitionInstance);
+  
+  const { isListening, toggleListening, isSupported } = useSpeechRecognition({
+    onTranscript: (transcript) => {
+      setMessage((prev) => prev + ' ' + transcript);
     }
-    
-    return () => {
-      if (recognition) {
-        recognition.abort();
-      }
-    };
-  }, []);
-
-  const toggleListening = () => {
-    if (!recognition) {
-      toast({
-        title: "Not supported",
-        description: "Speech recognition is not supported in your browser.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (isListening) {
-      recognition.stop();
-      setIsListening(false);
-    } else {
-      try {
-        recognition.start();
-        setIsListening(true);
-      } catch (error) {
-        console.error('Speech recognition error:', error);
-      }
-    }
-  };
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +49,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
                 ? "bg-red-500 text-white" 
                 : "text-gray-500 hover:text-blue-500"
             }`}
-            disabled={isLoading}
+            disabled={isLoading || !isSupported}
+            title={isListening ? "Stop listening" : "Start listening"}
           >
             {isListening ? <MicOff size={18} /> : <Mic size={18} />}
           </button>
