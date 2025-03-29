@@ -89,10 +89,14 @@ export type Database = {
           beingright_value: number | null
           controlling_value: number | null
           created_at: string
+          full_text: string | null
           id: string
+          keywords: string[] | null
           linked_partner_id: string | null
           partner_code: string | null
           retaliation_value: number | null
+          summary_text: string | null
+          timestamp: string | null
           unbridledselfexpression_value: number | null
           user_id: string
           withdrawal_value: number | null
@@ -101,10 +105,14 @@ export type Database = {
           beingright_value?: number | null
           controlling_value?: number | null
           created_at?: string
+          full_text?: string | null
           id?: string
+          keywords?: string[] | null
           linked_partner_id?: string | null
           partner_code?: string | null
           retaliation_value?: number | null
+          summary_text?: string | null
+          timestamp?: string | null
           unbridledselfexpression_value?: number | null
           user_id: string
           withdrawal_value?: number | null
@@ -113,10 +121,14 @@ export type Database = {
           beingright_value?: number | null
           controlling_value?: number | null
           created_at?: string
+          full_text?: string | null
           id?: string
+          keywords?: string[] | null
           linked_partner_id?: string | null
           partner_code?: string | null
           retaliation_value?: number | null
+          summary_text?: string | null
+          timestamp?: string | null
           unbridledselfexpression_value?: number | null
           user_id?: string
           withdrawal_value?: number | null
