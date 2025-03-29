@@ -4,6 +4,7 @@ import MessageBubble, { Message } from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Volume2, VolumeX } from "lucide-react";
 
 const initialMessages: Message[] = [
   {
@@ -33,7 +34,74 @@ const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
   const [useLocalFallback, setUseLocalFallback] = useState(false);
+  const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check if speech synthesis is available
+  const speechAvailable = 'speechSynthesis' in window;
+
+  // Function to speak the text using the Web Speech API
+  const speakMessage = (text: string) => {
+    if (!speechAvailable || !isSpeechEnabled) return;
+    
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Set voice properties for a calm, friendly voice
+    utterance.rate = 1.0; // Normal speaking rate
+    utterance.pitch = 1.0; // Normal pitch
+    utterance.volume = 1.0; // Full volume
+    
+    // Try to get a female voice in English
+    const voices = window.speechSynthesis.getVoices();
+    const femaleVoice = voices.find(voice => 
+      voice.name.includes('female') || 
+      voice.name.includes('Female') || 
+      voice.name.includes('woman') ||
+      voice.name.includes('Samantha') ||
+      voice.name.includes('Google UK English Female')
+    );
+    
+    if (femaleVoice) {
+      utterance.voice = femaleVoice;
+    }
+    
+    // Speak the message
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Toggle speech functionality
+  const toggleSpeech = () => {
+    if (!speechAvailable) {
+      toast({
+        title: "Not supported",
+        description: "Speech synthesis is not supported in your browser.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSpeechEnabled(!isSpeechEnabled);
+    
+    toast({
+      title: isSpeechEnabled ? "Voice feedback disabled" : "Voice feedback enabled",
+      description: isSpeechEnabled ? "The assistant will no longer speak responses." : "The assistant will now speak responses aloud.",
+    });
+
+    // If enabling speech, load voices immediately for browsers that need it
+    if (!isSpeechEnabled) {
+      window.speechSynthesis.getVoices();
+    }
+  };
+
+  useEffect(() => {
+    // Preload voices when component mounts
+    if (speechAvailable) {
+      window.speechSynthesis.getVoices();
+    }
+  }, []);
 
   const handleSendMessage = async (text: string) => {
     // Add user message to chat
@@ -109,6 +177,10 @@ const ChatInterface: React.FC = () => {
       }
 
       setMessages((prevMessages) => [...prevMessages, botResponse]);
+      
+      // Speak the bot's response if speech is enabled
+      speakMessage(botResponse.text);
+      
     } catch (error) {
       console.error("Error getting chat response:", error);
       toast({
@@ -157,7 +229,20 @@ const ChatInterface: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
       </div>
-      <div className="max-w-2xl mx-auto w-full">
+      <div className="max-w-2xl mx-auto w-full flex flex-col">
+        <div className="flex justify-end p-2">
+          <button
+            onClick={toggleSpeech}
+            className={`p-2 rounded-full ${
+              !speechAvailable ? 'opacity-50 cursor-not-allowed' : 
+              isSpeechEnabled ? 'text-blue-600 hover:bg-blue-100' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+            disabled={!speechAvailable}
+            title={isSpeechEnabled ? "Disable voice feedback" : "Enable voice feedback"}
+          >
+            {isSpeechEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+          </button>
+        </div>
         <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
     </div>
