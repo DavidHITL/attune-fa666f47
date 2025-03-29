@@ -16,12 +16,14 @@ export async function processUserMessages(userId: string): Promise<AnalysisRespo
     throw new Error("No messages found for this user");
   }
 
+  console.log(`Analyzing ${userMessages.length} messages from user ${userId} (filtered out AI messages)`);
+
   // Create a text corpus from the messages for Claude to analyze
   const messageCorpus = userMessages
     .map(msg => `[${new Date(msg.created_at).toLocaleString()}] ${msg.content}`)
     .join("\n\n");
 
-  console.log(`Found ${userMessages.length} messages to analyze`);
+  console.log(`Found ${userMessages.length} user messages to analyze`);
 
   // Call Claude API to analyze the messages
   const claudeData = await analyzeWithAnthropic(messageCorpus);

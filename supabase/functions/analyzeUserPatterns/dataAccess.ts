@@ -17,6 +17,12 @@ export async function fetchUserMessages(userId: string): Promise<Message[]> {
     throw new Error(`Failed to fetch user messages: ${messagesError.message}`);
   }
 
+  const userMessageCount = messages ? messages.filter(msg => msg.sender_type === 'user').length : 0;
+  const botMessageCount = messages ? messages.filter(msg => msg.sender_type === 'bot').length : 0;
+  
+  console.log(`Retrieved ${messages?.length || 0} total messages: ${userMessageCount} from user, ${botMessageCount} from bot`);
+  console.log('Analysis will ONLY focus on the user messages, not bot responses');
+
   return messages;
 }
 
@@ -37,4 +43,6 @@ export async function storeAnalysisResults(userId: string, analysisResult: Analy
     console.error("Error storing analysis results:", insertError);
     throw new Error(`Failed to store analysis results: ${insertError.message}`);
   }
+  
+  console.log(`Successfully saved analysis results for user ${userId}`);
 }

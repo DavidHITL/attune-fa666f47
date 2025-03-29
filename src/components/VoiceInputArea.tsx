@@ -29,8 +29,9 @@ const VoiceInputArea: React.FC<VoiceInputAreaProps> = ({
         return;
       }
 
-      // If message count is 19 (will become 20 with this message)
-      // No toast notification is shown anymore
+      // If message count reaches threshold, it will be handled by the database trigger
+      // No need for toast notification anymore, the trigger will add to analysis queue
+      console.log(`Current message count for user ${userId}: ${profile?.message_count || 0}`);
     } catch (error) {
       console.error("Error checking message threshold:", error);
     }
@@ -43,6 +44,9 @@ const VoiceInputArea: React.FC<VoiceInputAreaProps> = ({
     if (user) {
       // Check message count before sending
       await checkMessageAnalysisThreshold(user.id);
+      console.log(`Sending message as user ${user.id}, will be saved with sender_type='user'`);
+    } else {
+      console.log("User not authenticated, message will not be attributed");
     }
     
     // Call the original onSend function
