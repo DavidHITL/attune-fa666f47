@@ -37,14 +37,26 @@ const ChatInterface: React.FC = () => {
         content: msg.text
       }));
 
+      // Get the Supabase URL and anon key from environment variables
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error("Supabase URL or anon key is missing:", { 
+          supabaseUrl: supabaseUrl ? "set" : "missing", 
+          supabaseAnonKey: supabaseAnonKey ? "set" : "missing" 
+        });
+        throw new Error("Supabase configuration is missing");
+      }
+
       // Call the Supabase Edge Function
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generateChatResponse`,
+        `${supabaseUrl}/functions/v1/generateChatResponse`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+            "Authorization": `Bearer ${supabaseAnonKey}`
           },
           body: JSON.stringify({
             message: text,
@@ -53,9 +65,19 @@ const ChatInterface: React.FC = () => {
         }
       );
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
+        });
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+
       const data = await response.json();
 
-      if (!response.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.error || "Failed to get response");
       }
 
