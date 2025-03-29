@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
+const ANTHROPIC_API_KEY = Deno.env.get("anthropic") || "";
 
 interface RequestBody {
   text: string;
@@ -34,41 +34,38 @@ serve(async (req) => {
       );
     }
 
-    // Prepare the prompt for OpenAI
-    const prompt = `
-      Create a concise summary (maximum 200 words) of the following text about therapeutic concepts.
-      Focus on the core ideas, techniques, and principles, especially those related to Terry Real's work on relationships.
-      The summary should be clear, informative, and highlight the most important concepts.
-      
-      Text: ${text}
-    `;
-
-    // Call OpenAI API
-    const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    // Call Claude API instead of OpenAI
+    const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "gpt-4",
+        model: "claude-3-opus-20240229",
+        max_tokens: 600,
         messages: [
           {
             role: "user",
-            content: prompt,
-          },
+            content: `Create a concise summary (maximum 200 words) of the following text about therapeutic concepts.
+            Focus on the core ideas, techniques, and principles, especially those related to Terry Real's work on relationships.
+            The summary should be clear, informative, and highlight the most important concepts.
+            
+            Text: ${text}`
+          }
         ],
         temperature: 0.3,
       }),
     });
 
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text();
-      throw new Error(`OpenAI API error: ${errorText}`);
+    if (!claudeResponse.ok) {
+      const errorText = await claudeResponse.text();
+      throw new Error(`Claude API error: ${errorText}`);
     }
 
-    const openAIData = await openAIResponse.json();
-    const summary = openAIData.choices[0].message.content.trim();
+    const claudeData = await claudeResponse.json();
+    const summary = claudeData.content[0].text.trim();
 
     return new Response(
       JSON.stringify({
