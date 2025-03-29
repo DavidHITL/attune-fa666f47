@@ -2,13 +2,13 @@
 import { useState, useRef, useEffect } from "react";
 import { RealtimeChat } from "@/utils/RealtimeAudio";
 import { supabase } from "@/integrations/supabase/client";
-import { useSpeechRecognition } from "./useSpeechRecognition";
 
 export function useVoiceChat(user: any | null) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', text: string, timestamp?: Date}>>([]);
   const chatRef = useRef<RealtimeChat | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Save message to database
   const saveMessageToDatabase = async (text: string, isUser: boolean) => {
@@ -80,6 +80,12 @@ export function useVoiceChat(user: any | null) {
       chatRef.current = null;
     }
     setTranscript("");
+    
+    // Clear any pending timeouts
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   };
 
   // Send user message

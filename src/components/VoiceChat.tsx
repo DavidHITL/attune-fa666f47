@@ -1,8 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { X, Phone, Mic, MicOff } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Phone } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
@@ -56,6 +55,20 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     };
   }, [open, connect, disconnect, chatRef]);
 
+  // Start listening when the dialog opens
+  useEffect(() => {
+    if (open && isSupported && !isListening) {
+      setTimeout(() => {
+        toggleListening();
+      }, 500);
+    }
+    return () => {
+      if (isListening) {
+        toggleListening();
+      }
+    };
+  }, [open, isSupported, isListening, toggleListening]);
+
   const handleClose = () => {
     if (isListening) {
       toggleListening();
@@ -64,17 +77,16 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     onOpenChange(false);
   };
 
-  const handleSendMessage = () => {
-    if (transcript.trim()) {
+  // Auto-send message when there's a pause in speaking
+  useEffect(() => {
+    if (!transcript.trim() || !open) return;
+    
+    const timer = setTimeout(() => {
       sendMessage();
-      if (isListening) {
-        toggleListening(); // Stop listening after sending
-        setTimeout(() => {
-          toggleListening(); // Start listening again after a short delay
-        }, 1000);
-      }
-    }
-  };
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [transcript, open, sendMessage]);
 
   // Determine if the voice assistant is actively speaking
   const isAssistantActive = messages.length > 0 && messages[messages.length - 1].role === 'assistant';
@@ -110,29 +122,6 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
               {isConnecting ? "Connecting to voice service..." : 
               chatRef.current?.isConnected ? "Voice service connected" : 
               "Voice service disconnected"}
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className={`rounded-full ${isListening ? 'bg-red-100 hover:bg-red-200 border-red-300' : 'hover:bg-blue-100 border-blue-300'}`}
-                onClick={toggleListening}
-                disabled={!isSupported || !chatRef.current?.isConnected}
-                title={isListening ? "Stop listening" : "Start listening"}
-              >
-                {isListening ? <MicOff className="text-red-600" size={20} /> : <Mic className="text-blue-600" size={20} />}
-              </Button>
-              
-              <Button 
-                onClick={handleSendMessage} 
-                disabled={!transcript.trim() || !chatRef.current?.isConnected}
-              >
-                Send
-              </Button>
-              
-              <Button variant="outline" onClick={handleClose}>
-                <X size={16} className="mr-1" /> Close
-              </Button>
             </div>
           </div>
         </DialogFooter>

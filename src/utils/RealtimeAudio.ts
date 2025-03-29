@@ -8,6 +8,8 @@ export class RealtimeChat {
   private transcriptCallback: TranscriptCallback;
   private eventListeners: Map<string, Function[]> = new Map();
   isConnected: boolean = false;
+  private lastTranscriptUpdate: number = 0;
+  private processingTimeout: NodeJS.Timeout | null = null;
 
   constructor(transcriptCallback: TranscriptCallback) {
     this.transcriptCallback = transcriptCallback;
@@ -35,7 +37,6 @@ export class RealtimeChat {
   
   // Setup mock event handlers for development/testing
   private setupMockEventHandlers() {
-    // This would be replaced with real WebSocket event handlers in production
     console.log("Voice service connected and ready");
   }
   
@@ -48,24 +49,45 @@ export class RealtimeChat {
     
     console.log("Sending message to voice service:", message);
     
+    // Clear any processing timeout
+    if (this.processingTimeout) {
+      clearTimeout(this.processingTimeout);
+    }
+    
     // For demo/mock purposes: simulate AI response
-    setTimeout(() => {
+    this.processingTimeout = setTimeout(() => {
       const responses = [
         "I understand what you're saying. How can I help with that?",
         "That's an interesting thought. Could you tell me more?",
         "I'm here to assist with your questions. What else would you like to know?",
         "Thanks for sharing that with me. Is there anything specific you'd like to discuss?",
-        `I hear you. Regarding "${message.substring(0, 20)}...", what are your thoughts?`
+        `I hear you. Regarding "${message.substring(0, 20)}...", what are your thoughts?`,
+        "I'm analyzing what you've said. Can you elaborate further?",
+        "That's a great point. Let me think about how I can best help you with this.",
+        "I appreciate you sharing that. What would be most helpful for you right now?",
+        `Let me respond to your comment about "${message.substring(0, 15)}..." - what's your main concern here?`
       ];
       
       const randomResponse = responses[Math.floor(Math.random() * responses.length)];
       this.dispatchEvent('response', randomResponse);
-    }, 1500);
+    }, 1000);
+  }
+  
+  // Update transcript with new text
+  updateTranscript(text: string): void {
+    this.lastTranscriptUpdate = Date.now();
+    this.transcriptCallback(text);
   }
   
   // Disconnect from the realtime chat service
   disconnect(): void {
     console.log("Disconnecting from voice service");
+    
+    if (this.processingTimeout) {
+      clearTimeout(this.processingTimeout);
+      this.processingTimeout = null;
+    }
+    
     this.isConnected = false;
   }
 
