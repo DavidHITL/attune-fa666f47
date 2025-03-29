@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import MessageBubble, { Message } from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const initialMessages: Message[] = [
   {
@@ -37,48 +38,23 @@ const ChatInterface: React.FC = () => {
         content: msg.text
       }));
 
-      // Get the Supabase URL and anon key from environment variables
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      console.log("Calling generateChatResponse function");
 
-      if (!supabaseUrl || !supabaseAnonKey) {
-        console.error("Supabase URL or anon key is missing:", { 
-          supabaseUrl: supabaseUrl ? "set" : "missing", 
-          supabaseAnonKey: supabaseAnonKey ? "set" : "missing" 
-        });
-        throw new Error("Supabase configuration is missing");
-      }
-
-      // Call the Supabase Edge Function
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/generateChatResponse`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseAnonKey}`
-          },
-          body: JSON.stringify({
-            message: text,
-            conversationHistory
-          })
+      // Call the Supabase Edge Function using the supabase client
+      const { data, error } = await supabase.functions.invoke('generateChatResponse', {
+        body: {
+          message: text,
+          conversationHistory
         }
-      );
+      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response:", {
-          status: response.status,
-          statusText: response.statusText,
-          errorText
-        });
-        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      if (error) {
+        console.error("Supabase Function Error:", error);
+        throw new Error(`Error calling function: ${error.message}`);
       }
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || "Failed to get response");
+      if (!data || !data.success) {
+        throw new Error(data?.error || "Failed to get response");
       }
 
       // Add AI response to chat
