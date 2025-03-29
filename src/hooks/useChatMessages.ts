@@ -16,6 +16,15 @@ export function useChatMessages() {
   useEffect(() => {
     if (user) {
       fetchMessages();
+    } else {
+      // If no user, still show initial welcome message
+      setMessages([{
+        id: "welcome",
+        text: "Hi there. How are you feeling today?",
+        isUser: false,
+        timestamp: new Date()
+      }]);
+      setIsInitialLoad(false);
     }
   }, [user]);
 
@@ -33,7 +42,7 @@ export function useChatMessages() {
         console.error("Error fetching messages:", error);
         toast({
           title: "Error loading messages",
-          description: "Could not load your chat history.",
+          description: "Could not load your chat history. Using local storage instead.",
           variant: "destructive"
         });
         
@@ -75,7 +84,7 @@ export function useChatMessages() {
       console.error("Error in fetchMessages:", error);
       toast({
         title: "Error loading messages",
-        description: "Could not load your chat history. Using local messages instead.",
+        description: "Could not load your chat history. Using local storage instead.",
         variant: "destructive"
       });
       
@@ -94,8 +103,9 @@ export function useChatMessages() {
 
   const saveMessageToDatabase = async (text: string, isUser: boolean) => {
     try {
-      if (!user) return; // Don't save if no user is logged in
+      if (!user) return null; // Don't save if no user is logged in
       
+      // Just for debugging, we'll try to save but won't block on failure
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -107,7 +117,8 @@ export function useChatMessages() {
       
       if (error) {
         console.error("Error saving message to database:", error);
-        throw error;
+        // We'll continue with local message handling without showing an error to the user
+        return null;
       }
       
       return data?.[0]?.id;

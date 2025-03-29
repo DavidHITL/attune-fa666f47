@@ -88,7 +88,7 @@ serve(async (req) => {
 
     // Prepare messages for Anthropic API
     const messages = conversationHistory.length > 0 
-      ? conversationHistory
+      ? [...conversationHistory]
       : [
           {
             role: "assistant",
@@ -96,11 +96,13 @@ serve(async (req) => {
           }
         ];
     
-    // Add the user's current message
-    messages.push({
-      role: "user",
-      content: message
-    });
+    // Add the user's current message if it's not already the last one
+    if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
+      messages.push({
+        role: "user",
+        content: message
+      });
+    }
 
     console.log("Sending request to Anthropic API");
 
