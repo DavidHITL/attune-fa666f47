@@ -1,27 +1,17 @@
 
 import React from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
 
 const NavBar: React.FC = () => {
   const location = useLocation();
   const currentPath = location.pathname;
-  const { signOut } = useAuth();
-  const navigate = useNavigate();
 
   const navItems = [
     { name: "Learn", path: "/learn" },
     { name: "You", path: "/you" },
     { name: "Chat", path: "/chat" }
   ];
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
 
   return (
     <nav className="w-full backdrop-blur-md bg-white/90 border-b border-apple-gray-5 sticky top-0 z-10">
@@ -46,16 +36,6 @@ const NavBar: React.FC = () => {
             </li>
           ))}
         </ul>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleSignOut}
-          className="text-apple-gray hover:text-apple-red hover:bg-apple-gray-6"
-        >
-          <LogOut size={18} className="mr-2" />
-          Sign Out
-        </Button>
       </div>
     </nav>
   );

@@ -4,6 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import NavBar from "@/components/NavBar";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChartContainer, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import {
@@ -27,7 +30,13 @@ interface UserProfileData {
 }
 
 const You: React.FC = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   // Fetch user profile data from Supabase
   const { data: profileData, isLoading, error } = useQuery({
@@ -92,7 +101,7 @@ const You: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <NavBar />
-      <div className="flex-1 container mx-auto py-8 px-4">
+      <div className="flex-1 container mx-auto py-8 px-4 flex flex-col">
         <h1 className="text-2xl font-semibold mb-6">Your Profile Analysis</h1>
         
         <Card className="mb-6">
@@ -141,7 +150,7 @@ const You: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="mb-auto">
           <CardHeader>
             <CardTitle>Understanding Your Profile</CardTitle>
           </CardHeader>
@@ -161,6 +170,18 @@ const You: React.FC = () => {
             </p>
           </CardContent>
         </Card>
+
+        {/* Sign Out Button at the bottom */}
+        <div className="mt-8 mb-6 flex justify-center">
+          <Button 
+            variant="outline" 
+            onClick={handleSignOut}
+            className="text-apple-gray hover:text-apple-red hover:bg-apple-gray-6 flex items-center gap-2"
+          >
+            <LogOut size={18} />
+            Sign Out
+          </Button>
+        </div>
       </div>
       <footer className="text-center py-3 text-xs text-gray-500 border-t border-gray-200">
         understand yourself<br />
