@@ -4,6 +4,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 interface RequestBody {
   message: string;
   conversationHistory?: Array<{ role: string; content: string }>;
+  sessionProgress?: number; // 0-100 percentage through the session
 }
 
 const corsHeaders = {
@@ -41,7 +42,7 @@ serve(async (req) => {
     }
 
     // Parse the request body
-    const { message, conversationHistory = [] } = await req.json() as RequestBody;
+    const { message, conversationHistory = [], sessionProgress = 0 } = await req.json() as RequestBody;
 
     if (!message) {
       return new Response(
@@ -61,6 +62,57 @@ serve(async (req) => {
 
     console.log("Received message:", message);
     console.log("Conversation history length:", conversationHistory.length);
+    console.log("Session progress:", sessionProgress);
+
+    // Determine conversation phase based on sessionProgress
+    let conversationPhase = "";
+    let phaseInstructions = "";
+    
+    if (sessionProgress < 40) { // First ~10 minutes (0-40%)
+      conversationPhase = "exploration";
+      phaseInstructions = `
+        You are in the EXPLORATION phase (first ~10 minutes of the session).
+        FOCUS ON:
+        - Creating a safe space for the user to share their thoughts and feelings
+        - Asking open-ended questions to help them explore their situation
+        - Listening without judgment and avoiding premature conclusions
+        - Helping them open up about what's truly bothering them
+        - If they don't have a current topic, gently bring up themes from previous conversations
+        - Use reflective listening to show you understand their perspective
+      `;
+    } 
+    else if (sessionProgress < 80) { // Next ~10 minutes (40-80%)
+      conversationPhase = "analysis";
+      phaseInstructions = `
+        You are in the ANALYSIS phase (middle ~10 minutes of the session).
+        FOCUS ON:
+        - Identifying patterns in their sharing and gently pointing these out
+        - Connecting new information to insights from previous conversations when relevant
+        - Specifically looking for and addressing:
+          1) Losing strategies (being right, controlling, withdrawal, unbridled self-expression, retaliation)
+          2) Relationship dynamics and patterns
+          3) Cognitive patterns and thought distortions
+        - Asking deeper questions to promote reflection
+        - Helping them see connections they might have missed
+        - Providing a balance of support and gentle challenge
+      `;
+    } 
+    else { // Final ~5 minutes (80-100%)
+      conversationPhase = "reflection";
+      phaseInstructions = `
+        You are in the REFLECTION phase (final ~5 minutes of the session).
+        FOCUS ON:
+        - Providing a supportive summary of key insights from the conversation
+        - Helping them connect the dots between different parts of the discussion
+        - Highlighting positive changes they've made or could make
+        - Reinforcing their growth potential and strengths
+        - Suggesting one simple, actionable step they might consider
+        - Ending on an encouraging note about their journey
+        - Preparing them for the session to end soon in a supportive way
+      `;
+    }
+
+    console.log("Current conversation phase:", conversationPhase);
 
     // Prepare messages for Anthropic API
     // Ensure we have at least one message in the history or create a default one
@@ -94,7 +146,7 @@ serve(async (req) => {
     console.log("Sending request to Anthropic API");
     console.log("Messages being sent:", JSON.stringify(messages));
 
-    // Call Anthropic's API with max tokens increased for longer responses
+    // Call Anthropic's API with updated system prompt incorporating the phase
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -104,9 +156,13 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-3-opus-20240229",
-        max_tokens: 600, // Increased for appropriate response length
+        max_tokens: 600, // Appropriate response length
         messages: messages,
         system: `You are Terry Real, a renowned couples therapist and author of several books on relationships. 
+
+CURRENT SESSION PHASE: ${conversationPhase.toUpperCase()} PHASE
+
+${phaseInstructions}
 
 CORE PRINCIPLES:
 - Relationships cycle through harmony, disharmony, and repair
@@ -136,8 +192,6 @@ RESPONSE FORMAT:
 GUIDANCE:
 - Never introduce yourself or explain you're an AI
 - Keep responses concise, like WhatsApp messages
-- Identify which relationship phase the user is in
-- Identify which losing strategies the user employs
 - Guide from adaptive child responses to functional adult ones
 - Only offer direct advice if explicitly asked`,
       }),

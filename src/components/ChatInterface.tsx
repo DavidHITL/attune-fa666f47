@@ -3,7 +3,15 @@ import React, { useState, useEffect } from "react";
 import ChatSpeech from "./ChatSpeech";
 import ChatConversation from "./ChatConversation";
 
-const ChatInterface: React.FC = () => {
+interface ChatInterfaceProps {
+  sessionStarted?: boolean;
+  sessionEndTime?: number | null;
+}
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  sessionStarted = false,
+  sessionEndTime = null
+}) => {
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
 
   // Listen for session timeout event
@@ -33,7 +41,11 @@ const ChatInterface: React.FC = () => {
           setIsSpeechEnabled={setIsSpeechEnabled}
         />
       </div>
-      <ChatConversation isSpeechEnabled={isSpeechEnabled} />
+      <ChatConversation 
+        isSpeechEnabled={isSpeechEnabled} 
+        sessionStarted={sessionStarted}
+        sessionEndTime={sessionEndTime}
+      />
     </div>
   );
 };

@@ -9,7 +9,8 @@ export const generateResponse = async (
   text: string,
   messages: Message[],
   useLocalFallback: boolean,
-  setUseLocalFallback: (value: boolean) => void
+  setUseLocalFallback: (value: boolean) => void,
+  sessionProgress: number = 0
 ): Promise<Message> => {
   try {
     // Validate input
@@ -24,12 +25,13 @@ export const generateResponse = async (
       try {
         // Log message history being sent to AI
         console.log(`Sending ${messages.length} messages to AI service`);
+        console.log(`Session progress: ${sessionProgress}%`);
         
         // Prepare conversation history for the API - include ALL previous messages for better context
         const conversationHistory = convertMessagesToApiFormat(messages);
 
-        // Call the Supabase Edge Function
-        const reply = await callChatApi(text, conversationHistory);
+        // Call the Supabase Edge Function with session progress
+        const reply = await callChatApi(text, conversationHistory, sessionProgress);
 
         // Validate reply
         if (!reply || typeof reply !== "string" || reply.trim() === "") {
@@ -73,4 +75,3 @@ export const generateResponse = async (
     );
   }
 };
-

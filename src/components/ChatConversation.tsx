@@ -12,12 +12,33 @@ import { Button } from "@/components/ui/button";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
+  sessionStarted?: boolean;
+  sessionEndTime?: number | null;
 }
 
-const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) => {
+const ChatConversation: React.FC<ChatConversationProps> = ({ 
+  isSpeechEnabled, 
+  sessionStarted = false,
+  sessionEndTime = null 
+}) => {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const didInitialFetchRef = useRef(false);
+  
+  // Calculate session progress (0-100%)
+  const calculateSessionProgress = () => {
+    if (!sessionStarted || !sessionEndTime) return 0;
+    
+    const now = Date.now();
+    const sessionDuration = 25 * 60 * 1000; // 25 minutes in ms
+    const sessionStartTime = sessionEndTime - sessionDuration;
+    const elapsed = now - sessionStartTime;
+    
+    // Return percentage of session completed (0-100)
+    return Math.min(100, Math.max(0, (elapsed / sessionDuration) * 100));
+  };
+  
+  const sessionProgress = calculateSessionProgress();
   
   const {
     messages,
@@ -40,8 +61,16 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     useLocalFallback,
     setUseLocalFallback,
     saveMessageToDatabase,
-    isSpeechEnabled
+    isSpeechEnabled,
+    sessionProgress // Pass session progress to useSendMessage
   });
+
+  // Log session progress for debugging
+  useEffect(() => {
+    if (sessionStarted) {
+      console.log(`Current session progress: ${sessionProgress.toFixed(1)}%`);
+    }
+  }, [sessionProgress, sessionStarted]);
 
   // Function to retry database connection
   const handleRetryDatabaseConnection = () => {

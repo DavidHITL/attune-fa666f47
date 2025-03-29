@@ -40,7 +40,10 @@ const Chat: React.FC = () => {
       />
       
       <div className="relative flex-1 overflow-hidden">
-        <ChatInterface />
+        <ChatInterface 
+          sessionStarted={sessionStarted}
+          sessionEndTime={sessionEndTime}
+        />
       </div>
       <footer className="text-center py-3 text-xs text-gray-500 border-t border-gray-200">
         understand yourself<br />

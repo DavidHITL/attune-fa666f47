@@ -1,18 +1,138 @@
+import { Message } from "@/components/MessageBubble";
+import { supabase } from "@/integrations/supabase/client";
 
-// Re-export all chat services from their respective modules
-import { callChatApi, testDatabaseAccess } from "./api/chatService";
-import { convertMessagesToApiFormat, createMessageObject, generateUniqueId } from "./messages/messageUtils";
-import { saveMessage, fetchMessagesFromDatabase } from "./messages/messageStorage";
+export interface ChatMessage {
+  role: string;
+  content: string;
+}
 
-// Export everything
-export { 
-  callChatApi,
-  testDatabaseAccess,
-  convertMessagesToApiFormat,
-  createMessageObject,
-  generateUniqueId,
-  saveMessage,
-  fetchMessagesFromDatabase
+// Function to convert messages to the format expected by the API
+export const convertMessagesToApiFormat = (messages: Message[]): ChatMessage[] => {
+  return messages.map(message => ({
+    role: message.isUser ? "user" : "assistant",
+    content: message.text
+  }));
 };
 
-export type { ChatMessage } from "./messages/messageUtils";
+// Function to create a message object
+export const createMessageObject = (text: string, isUser: boolean): Message => {
+  return {
+    id: Math.random().toString(36).substring(2, 15), // Generate a random ID
+    text: text,
+    isUser: isUser,
+    timestamp: new Date()
+  };
+};
+
+// Function to save a message to the database
+export const saveMessage = async (text: string, isUser: boolean): Promise<string | null> => {
+  try {
+    const userId = supabase.auth.currentUser?.id;
+    if (!userId) {
+      console.error("No user ID found, cannot save message");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([
+        {
+          user_id: userId,
+          text: text,
+          is_user: isUser,
+        },
+      ])
+      .select('id') // Only select the ID
+      .single(); // Expect a single result
+
+    if (error) {
+      console.error("Error saving message:", error);
+      throw error;
+    }
+
+    // Check if data and data.id exist before returning
+    if (data && data.id) {
+      return data.id.toString(); // Return the ID of the new message
+    } else {
+      console.error("No message ID returned after saving");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error saving message:", error);
+    return null;
+  }
+};
+
+// Function to fetch messages from the database
+export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => {
+  try {
+    const userId = supabase.auth.currentUser?.id;
+    if (!userId) {
+      console.log("No user ID found, not fetching messages");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching messages:", error);
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      console.log("No messages found for user:", userId);
+      return null;
+    }
+
+    // Convert database messages to the Message interface
+    const messages: Message[] = data.map(msg => ({
+      id: msg.id.toString(),
+      text: msg.text,
+      isUser: msg.is_user,
+      timestamp: new Date(msg.created_at)
+    }));
+
+    return messages;
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    return null;
+  }
+};
+
+// Function to call the Supabase Edge Function for chat
+export const callChatApi = async (
+  message: string, 
+  conversationHistory: ChatMessage[] = [], 
+  sessionProgress: number = 0
+) => {
+  try {
+    console.log(`Calling Supabase Edge Function with ${conversationHistory.length} messages`);
+    
+    const { data, error } = await supabase.functions.invoke('generateChatResponse', {
+      body: { 
+        message, 
+        conversationHistory,
+        sessionProgress
+      }
+    });
+
+    if (error) {
+      console.error('Error calling Supabase Edge Function:', error);
+      throw new Error(`Supabase function error: ${error.message}`);
+    }
+
+    if (!data?.success) {
+      console.error('Chat API returned an error:', data?.error || 'Unknown error');
+      throw new Error(data?.error || 'Failed to get a response from the AI service');
+    }
+
+    return data.reply;
+  } catch (error) {
+    console.error('Error in callChatApi:', error);
+    throw error;
+  }
+}

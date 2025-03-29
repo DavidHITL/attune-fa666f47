@@ -14,6 +14,7 @@ interface UseSendMessageProps {
   setUseLocalFallback: React.Dispatch<React.SetStateAction<boolean>>;
   saveMessageToDatabase: (text: string, isUser: boolean) => Promise<any>;
   isSpeechEnabled: boolean;
+  sessionProgress?: number; // New prop for session progress
 }
 
 export function useSendMessage({
@@ -22,7 +23,8 @@ export function useSendMessage({
   useLocalFallback,
   setUseLocalFallback,
   saveMessageToDatabase,
-  isSpeechEnabled
+  isSpeechEnabled,
+  sessionProgress = 0 // Default to 0 if not provided
 }: UseSendMessageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
@@ -94,12 +96,13 @@ export function useSendMessage({
         }
       }
       
-      // Generate bot response
+      // Generate bot response with session progress
       const botResponse = await generateResponse(
         text, 
         messages, 
         useLocalFallback, 
-        setUseLocalFallback
+        setUseLocalFallback,
+        sessionProgress // Pass the session progress
       );
 
       // Try to save bot response to database if not in local fallback mode
@@ -150,7 +153,8 @@ export function useSendMessage({
     saveMessageToDatabase, 
     setMessages, 
     isSpeechEnabled, 
-    checkMessageAnalysisThreshold
+    checkMessageAnalysisThreshold,
+    sessionProgress // Add sessionProgress to dependencies
   ]);
 
   return {
