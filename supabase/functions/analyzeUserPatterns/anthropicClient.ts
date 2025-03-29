@@ -24,7 +24,9 @@ Also analyze for signs of "adaptive child" vs "functional adult" responses accor
 - Adaptive Child: Defensiveness, reactive patterns carried from childhood, black-and-white thinking, self-protection at the expense of connection
 - Functional Adult: Taking accountability, showing empathy despite hurt, maintaining respect during conflict, balancing boundaries with openness
 
-Analyze the provided messages for patterns of these five losing strategies and the adaptive child/functional adult balance. Consider recency - more recent messages should be weighted more heavily than older ones. For each strategy, provide:
+IMPORTANT: The conversation corpus will include both USER messages and BOT messages (marked as [USER] and [BOT]). You must ONLY analyze the USER's communication patterns, not the BOT's responses. The BOT messages are provided solely for context to understand what the USER is responding to.
+
+Analyze the provided USER messages for patterns of these five losing strategies and the adaptive child/functional adult balance. Consider recency - more recent messages should be weighted more heavily than older ones. For each strategy, provide:
 1. A score from 0-5 (0 = not present, 1-2 = mildly present, 3 = moderately present, 4-5 = strongly present)
 2. Evidence from the text
 3. Specific phrases or patterns that indicate each strategy
@@ -59,9 +61,11 @@ export async function analyzeWithAnthropic(messageCorpus: string) {
       messages: [
         {
           role: "user",
-          content: `Please analyze these messages from a user to identify patterns based on Terry Real's therapeutic framework, focusing on the five losing strategies and adaptive child vs functional adult patterns:
+          content: `Please analyze these messages from a conversation to identify patterns in the USER's communication based on Terry Real's therapeutic framework, focusing on the five losing strategies and adaptive child vs functional adult patterns.
           
           ${messageCorpus}
+          
+          Remember to ONLY analyze the [USER] messages, not the [BOT] responses. The [BOT] messages are provided only for context.
           
           Respond only with the JSON format specified in your instructions, with no additional text.`
         }

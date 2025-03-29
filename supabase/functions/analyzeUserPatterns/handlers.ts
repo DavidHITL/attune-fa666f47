@@ -16,14 +16,19 @@ export async function processUserMessages(userId: string): Promise<AnalysisRespo
     throw new Error("No messages found for this user");
   }
 
-  console.log(`Analyzing ${userMessages.length} messages from user ${userId} (filtered out AI messages)`);
+  console.log(`Analyzing ${userMessages.length} messages from user ${userId} (with bot responses as context)`);
 
-  // Create a text corpus from the messages for Claude to analyze
-  const messageCorpus = userMessages
-    .map(msg => `[${new Date(msg.created_at).toLocaleString()}] ${msg.content}`)
+  // Create a text corpus from ALL messages to provide full conversation context
+  // But clearly mark which ones are from the user vs bot for Claude to understand
+  const messageCorpus = messages
+    .map(msg => {
+      const senderPrefix = msg.sender_type === 'user' ? "[USER]: " : "[BOT]: ";
+      return `[${new Date(msg.created_at).toLocaleString()}] ${senderPrefix}${msg.content}`;
+    })
     .join("\n\n");
 
-  console.log(`Found ${userMessages.length} user messages to analyze`);
+  console.log(`Providing full conversation context of ${messages.length} messages (${userMessages.length} from user)`);
+  console.log(`Analysis will focus on USER messages while using BOT messages as context only`);
 
   // Call Claude API to analyze the messages
   const claudeData = await analyzeWithAnthropic(messageCorpus);
