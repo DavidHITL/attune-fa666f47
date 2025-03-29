@@ -10,19 +10,15 @@ const HarmonySection = () => {
 
   return (
     <Card className="mb-4 border border-apple-gray-5 rounded-lg shadow-sm">
-      <CollapsibleTrigger
-        asChild
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full cursor-pointer"
-      >
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">Harmony/Disharmony/Repair Cycle</CardTitle>
-            <ChevronDown className={cn("h-5 w-5 transition-transform", isOpen && "transform rotate-180")} />
-          </div>
-        </CardHeader>
-      </CollapsibleTrigger>
-      <Collapsible open={isOpen}>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
+        <CollapsibleTrigger asChild className="w-full cursor-pointer">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl">Harmony/Disharmony/Repair Cycle</CardTitle>
+              <ChevronDown className={cn("h-5 w-5 transition-transform", isOpen && "transform rotate-180")} />
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent>
             <div className="space-y-4">
