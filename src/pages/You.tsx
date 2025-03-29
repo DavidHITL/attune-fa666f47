@@ -1,17 +1,15 @@
-
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import NavBar from "@/components/NavBar";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, MessageCircle, Radar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ChartContainer, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import { ChartContainer, ChartLegend } from "@/components/ui/chart";
 import {
-  Radar,
-  RadarChart,
+  Radar as RadarChart,
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
@@ -19,6 +17,7 @@ import {
   Tooltip
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 
 // Interface for the profile data from users_profile table
 interface UserProfileData {
@@ -56,36 +55,45 @@ const You: React.FC = () => {
     enabled: !!user?.id,
   });
 
+  // Dummy data for the radar chart (if no real data available)
+  const dummyChartData = [
+    { subject: 'Being Right', value: 3.5, fullMark: 5 },
+    { subject: 'Unbridled Self Expression', value: 2.7, fullMark: 5 },
+    { subject: 'Controlling', value: 4.2, fullMark: 5 },
+    { subject: 'Retaliation', value: 1.8, fullMark: 5 },
+    { subject: 'Withdrawal', value: 3.1, fullMark: 5 },
+  ];
+
   // Prepare data for the radar chart
   const prepareChartData = (data: UserProfileData | undefined) => {
-    if (!data) return [];
+    if (!data) return dummyChartData;
 
     // Replace null values with 0 and prepare data structure for the chart
     return [
       {
         subject: 'Being Right',
         value: data.beingright_value ?? 0,
-        fullMark: 10,
+        fullMark: 5,
       },
       {
         subject: 'Unbridled Self Expression',
         value: data.unbridledselfexpression_value ?? 0,
-        fullMark: 10,
+        fullMark: 5,
       },
       {
         subject: 'Controlling',
         value: data.controlling_value ?? 0,
-        fullMark: 10,
+        fullMark: 5,
       },
       {
         subject: 'Retaliation',
         value: data.retaliation_value ?? 0,
-        fullMark: 10,
+        fullMark: 5,
       },
       {
         subject: 'Withdrawal',
         value: data.withdrawal_value ?? 0,
-        fullMark: 10,
+        fullMark: 5,
       },
     ];
   };
@@ -98,81 +106,114 @@ const You: React.FC = () => {
     },
   };
 
+  // Dummy chat sessions count
+  const sessionsLeft = 3;
+
   return (
     <div className="flex flex-col min-h-screen">
       <NavBar />
-      <div className="flex-1 container mx-auto py-8 px-4 flex flex-col">
-        <h1 className="text-2xl font-semibold mb-6">Your Profile Analysis</h1>
+      <div className="flex-1 container mx-auto py-8 px-4 flex flex-col space-y-6">
+        <h1 className="text-2xl font-semibold mb-2">Your Dashboard</h1>
         
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Communication Pattern Profile</CardTitle>
-            <CardDescription>
-              Analysis of your communication patterns based on your interactions
-            </CardDescription>
+        {/* Chat Sessions Left */}
+        <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-apple-blue" />
+            <CardTitle className="text-xl">Chat Sessions</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="w-full h-[300px] flex items-center justify-center">
-                <Skeleton className="h-[250px] w-[250px] rounded-full" />
-              </div>
-            ) : error ? (
-              <div className="text-center py-8 text-red-500">
-                <p>Error loading profile data. Please try again later.</p>
-              </div>
-            ) : !chartData.length ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>No profile data available yet. Continue chatting to generate insights.</p>
-              </div>
-            ) : (
+            <p className="text-2xl font-bold">{sessionsLeft} left this week</p>
+            <p className="text-muted-foreground text-sm">Your sessions reset every Monday</p>
+          </CardContent>
+        </Card>
+        
+        {/* Keep in Mind */}
+        <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl">Keep in Mind</CardTitle>
+            <CardDescription>Key insights from your conversations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {user ? (
+                <>
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Topic 1: Communication Style</h3>
+                    <p className="text-muted-foreground text-sm">You tend to withdraw during conflicts. Consider expressing your needs more directly.</p>
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Topic 2: Listening Skills</h3>
+                    <p className="text-muted-foreground text-sm">You excel at active listening but sometimes interrupt to express your perspective.</p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-muted-foreground italic">We need to talk before we can be sure about your most important challenges.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Losing Strategies */}
+        <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Radar className="h-5 w-5 text-apple-blue" />
+            <CardTitle className="text-xl">Losing Strategies</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
               <ChartContainer 
-                className="h-[300px]"
                 config={chartConfig}
+                className="h-full"
               >
-                <RadarChart 
-                  data={chartData} 
-                  outerRadius={90}
-                >
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="subject" />
-                  <PolarRadiusAxis domain={[0, 10]} />
-                  <Radar
-                    name="Your Values"
-                    dataKey="value"
-                    stroke="#2563EB"
-                    fill="#2563EB"
-                    fillOpacity={0.6}
-                  />
-                  <Tooltip />
-                </RadarChart>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={chartData} outerRadius={90}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="subject" />
+                    <PolarRadiusAxis domain={[0, 5]} />
+                    <Tooltip />
+                    <Radar
+                      name="Your Values"
+                      dataKey="value"
+                      stroke="#2563EB"
+                      fill="#2563EB"
+                      fillOpacity={0.6}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
               </ChartContainer>
-            )}
+            </div>
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground">
+                This visualization shows your tendency toward five losing strategies in communication.
+                Lower scores indicate healthier communication patterns.
+              </p>
+            </div>
           </CardContent>
         </Card>
-
-        <Card className="mb-auto">
+        
+        {/* Partner */}
+        <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
           <CardHeader>
-            <CardTitle>Understanding Your Profile</CardTitle>
+            <CardTitle className="text-xl">Partner</CardTitle>
+            <CardDescription>Connect with your partner</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="mb-4">
-              This spider chart represents five key communication patterns that can impact your relationships:
-            </p>
-            <ul className="list-disc pl-5 space-y-2">
-              <li><strong>Being Right</strong>: The desire to prove your point of view is correct.</li>
-              <li><strong>Unbridled Self Expression</strong>: Expressing thoughts and emotions without considering their impact.</li>
-              <li><strong>Controlling</strong>: Attempts to manage situations and others' behaviors.</li>
-              <li><strong>Retaliation</strong>: Responding to perceived attacks with counterattacks.</li>
-              <li><strong>Withdrawal</strong>: Disengaging from difficult conversations.</li>
-            </ul>
-            <p className="mt-4">
-              Lower scores in each area generally indicate healthier communication patterns. Continue using the app to get more insights and tips for improvement.
-            </p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">Partner Linked:</span>
+                <span className="text-muted-foreground">No</span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button className="bg-apple-blue hover:bg-opacity-90" size="lg">Generate Code</Button>
+                <Button variant="outline" size="lg">Send to Partner</Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
-
-        {/* Sign Out Button at the bottom */}
-        <div className="mt-8 mb-6 flex justify-center">
+        
+        {/* Sign Out */}
+        <div className="mt-2 mb-6 flex justify-center">
           <Button 
             variant="outline" 
             onClick={handleSignOut}
