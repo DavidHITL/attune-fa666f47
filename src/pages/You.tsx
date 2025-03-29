@@ -52,22 +52,30 @@ const You: React.FC = () => {
       <NavBar />
       <div className="flex-1 flex justify-center">
         <div className="max-w-4xl w-full py-8 px-4 flex flex-col space-y-6">
-          <h1 className="text-2xl font-semibold mb-2">Your Dashboard</h1>
+          <h1 className="text-2xl font-semibold mb-6 mt-4">Your Dashboard</h1>
           
           {/* Chat Sessions Left */}
-          <ChatSessionsCard />
+          <div className="mt-2">
+            <ChatSessionsCard />
+          </div>
           
           {/* Keep in Mind */}
-          <KeepInMindCard isAuthenticated={!!user} />
+          <div className="mt-6">
+            <KeepInMindCard isAuthenticated={!!user} />
+          </div>
           
           {/* Losing Strategies */}
-          <LosingStrategiesCard profileData={profileData} />
+          <div className="mt-6">
+            <LosingStrategiesCard profileData={profileData} />
+          </div>
           
           {/* Partner */}
-          <PartnerCard />
+          <div className="mt-6">
+            <PartnerCard />
+          </div>
           
           {/* Sign Out */}
-          <div className="mt-2 mb-6 flex justify-center">
+          <div className="mt-8 mb-6 flex justify-center">
             <Button 
               variant="outline" 
               onClick={handleSignOut}
