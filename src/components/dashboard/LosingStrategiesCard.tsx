@@ -6,6 +6,7 @@ import LosingStrategiesChart, { StrategyChartData } from "./LosingStrategiesChar
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { formatDistanceToNow } from "date-fns";
 
 // Interface for the profile data from users_profile table
 interface UserProfileData {
@@ -147,12 +148,34 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
   };
 
   const chartData = prepareChartData();
+  
+  // Format the last updated date if available
+  const getLastUpdated = () => {
+    if (!analysisData?.timestamp) return null;
+    
+    try {
+      const timestamp = new Date(analysisData.timestamp);
+      return formatDistanceToNow(timestamp, { addSuffix: true });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return null;
+    }
+  };
+  
+  const lastUpdated = getLastUpdated();
 
   return (
     <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
-      <CardHeader className="flex flex-row items-center gap-2">
-        <Radar className="h-5 w-5 text-apple-blue" />
-        <CardTitle className="text-xl">Losing Strategies</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Radar className="h-5 w-5 text-apple-blue" />
+          <CardTitle className="text-xl">Losing Strategies</CardTitle>
+        </div>
+        {lastUpdated && (
+          <span className="text-xs text-muted-foreground">
+            Last updated: {lastUpdated}
+          </span>
+        )}
       </CardHeader>
       <CardContent>
         <LosingStrategiesChart chartData={chartData} />

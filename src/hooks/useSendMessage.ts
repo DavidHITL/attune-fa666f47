@@ -30,27 +30,6 @@ export function useSendMessage({
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
-  const checkMessageAnalysisThreshold = useCallback(async (userId: string) => {
-    try {
-      // Get message count from existing messages instead of making a separate database call
-      const userMessageCount = messages.filter(msg => msg.isUser).length;
-      
-      // If message count is 19 (will become 20 with this message)
-      if (userMessageCount === 19) {
-        toast({
-          title: "Analyzing your communication patterns",
-          description: "We'll process your messages to provide insights on your communication style.",
-        });
-        
-        // Queue analysis via analysis_queue table
-        // The database trigger will pick this up and create an entry in analysis_queue
-        // We don't need to do anything else here as the queue processing function will handle the rest
-      }
-    } catch (error) {
-      console.error("Error checking message threshold:", error);
-    }
-  }, [messages]);
-
   const handleSendMessage = useCallback(async (text: string) => {
     if (!text.trim()) return; // Don't send empty messages
     
@@ -62,9 +41,6 @@ export function useSendMessage({
       });
       return;
     }
-
-    // Check message threshold before sending
-    await checkMessageAnalysisThreshold(user.id);
 
     // Create new user message
     const newUserMessage = createMessageObject(text, true);
@@ -157,8 +133,7 @@ export function useSendMessage({
     setUseLocalFallback, 
     saveMessageToDatabase, 
     setMessages, 
-    isSpeechEnabled, 
-    checkMessageAnalysisThreshold,
+    isSpeechEnabled,
     sessionProgress // Add sessionProgress to dependencies
   ]);
 

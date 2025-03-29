@@ -1,6 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const SESSION_DURATION_MS = 25 * 60 * 1000; // 25 minutes in milliseconds
 
@@ -9,6 +11,20 @@ export const useSessionManager = () => {
   const [sessionEndTime, setSessionEndTime] = useState<number | null>(null);
   const [showStartModal, setShowStartModal] = useState(true);
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
+  const { user } = useAuth();
+
+  const triggerAnalysis = async (userId: string) => {
+    try {
+      if (!userId) return;
+      
+      // Add an entry to the analysis_queue table
+      await supabase
+        .from('analysis_queue')
+        .insert([{ user_id: userId }]);
+    } catch (error) {
+      console.error("Error queueing analysis on session end:", error);
+    }
+  };
 
   const startSession = () => {
     const endTime = Date.now() + SESSION_DURATION_MS;
@@ -33,6 +49,11 @@ export const useSessionManager = () => {
     // Clear session data
     localStorage.removeItem('sessionActive');
     localStorage.removeItem('sessionEndTime');
+    
+    // Trigger analysis when session ends
+    if (user?.id) {
+      triggerAnalysis(user.id);
+    }
     
     toast({
       title: "Session ended",
@@ -61,6 +82,11 @@ export const useSessionManager = () => {
     // Clear session data
     localStorage.removeItem('sessionActive');
     localStorage.removeItem('sessionEndTime');
+
+    // Trigger analysis when session is manually ended
+    if (user?.id) {
+      triggerAnalysis(user.id);
+    }
     
     toast({
       title: "Session ended early",
