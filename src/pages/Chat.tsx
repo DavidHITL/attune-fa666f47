@@ -48,11 +48,6 @@ const Chat: React.FC = () => {
         </div>
       </div>
       
-      <footer className="text-center py-3 text-xs text-apple-gray border-t border-apple-gray-5 bg-white/90 backdrop-blur-sm">
-        understand yourself<br />
-        Napkin LLC — Zurich
-      </footer>
-      
       <VoiceChat 
         open={voiceChatOpen} 
         onOpenChange={setVoiceChatOpen} 
