@@ -2,11 +2,12 @@
 import { useState, useRef, useEffect } from "react";
 import { RealtimeChat } from "@/utils/RealtimeAudio";
 import { supabase } from "@/integrations/supabase/client";
+import { useSpeechRecognition } from "./useSpeechRecognition";
 
 export function useVoiceChat(user: any | null) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', text: string}>>([]);
+  const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', text: string, timestamp?: Date}>>([]);
   const chatRef = useRef<RealtimeChat | null>(null);
 
   // Save message to database
@@ -41,8 +42,9 @@ export function useVoiceChat(user: any | null) {
     try {
       setIsConnecting(true);
       
+      // Initialize RealtimeChat with the transcript callback
       chatRef.current = new RealtimeChat((text) => {
-        setTranscript(prev => prev + text);
+        setTranscript(prev => text);  // Update with latest transcript instead of appending
       });
       
       await chatRef.current.connect();
@@ -54,7 +56,11 @@ export function useVoiceChat(user: any | null) {
         // Listen for AI responses
         chatRef.current.addEventListener('response', async (response: string) => {
           // Add AI response to local state
-          setMessages(prev => [...prev, { role: 'assistant', text: response }]);
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            text: response, 
+            timestamp: new Date() 
+          }]);
           
           // Save AI response to database
           await saveMessageToDatabase(response, false);
@@ -74,21 +80,26 @@ export function useVoiceChat(user: any | null) {
       chatRef.current = null;
     }
     setTranscript("");
-    setMessages([]);
   };
 
   // Send user message
   const sendMessage = async () => {
     if (!chatRef.current || !transcript.trim()) return;
 
+    const currentTranscript = transcript.trim();
+
     // Add user message to chat
-    setMessages(prev => [...prev, { role: 'user', text: transcript }]);
+    setMessages(prev => [...prev, { 
+      role: 'user', 
+      text: currentTranscript, 
+      timestamp: new Date() 
+    }]);
     
     // Save user message to database
-    await saveMessageToDatabase(transcript, true);
+    await saveMessageToDatabase(currentTranscript, true);
     
     // Send the message
-    chatRef.current.sendMessage(transcript);
+    chatRef.current.sendMessage(currentTranscript);
     
     // Clear transcript for next input
     setTranscript("");
