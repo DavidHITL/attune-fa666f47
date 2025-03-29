@@ -84,6 +84,45 @@ export type Database = {
         }
         Relationships: []
       }
+      users_profile: {
+        Row: {
+          beingright_value: number | null
+          controlling_value: number | null
+          created_at: string
+          id: string
+          linked_partner_id: string | null
+          partner_code: string | null
+          retaliation_value: number | null
+          unbridledselfexpression_value: number | null
+          user_id: string
+          withdrawal_value: number | null
+        }
+        Insert: {
+          beingright_value?: number | null
+          controlling_value?: number | null
+          created_at?: string
+          id?: string
+          linked_partner_id?: string | null
+          partner_code?: string | null
+          retaliation_value?: number | null
+          unbridledselfexpression_value?: number | null
+          user_id: string
+          withdrawal_value?: number | null
+        }
+        Update: {
+          beingright_value?: number | null
+          controlling_value?: number | null
+          created_at?: string
+          id?: string
+          linked_partner_id?: string | null
+          partner_code?: string | null
+          retaliation_value?: number | null
+          unbridledselfexpression_value?: number | null
+          user_id?: string
+          withdrawal_value?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

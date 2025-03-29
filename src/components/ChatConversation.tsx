@@ -67,15 +67,17 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
         setMessages(formattedMessages);
       } else {
         // If no messages, add a welcome message
-        setMessages([{
+        const welcomeMsg = {
           id: "welcome",
           text: "Hi there. How are you feeling today?",
           isUser: false,
           timestamp: new Date()
-        }]);
+        };
+        
+        setMessages([welcomeMsg]);
         
         // Save the welcome message to database
-        saveMessageToDatabase("Hi there. How are you feeling today?", false);
+        await saveMessageToDatabase("Hi there. How are you feeling today?", false);
       }
     } catch (error) {
       console.error("Error in fetchMessages:", error);
@@ -102,21 +104,25 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     try {
       if (!user) return; // Don't save if no user is logged in
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           content: text,
           user_id: user.id,
           sender_type: isUser ? 'user' : 'bot'
-        });
+        })
+        .select();
       
       if (error) {
         console.error("Error saving message to database:", error);
         throw error;
       }
+      
+      return data?.[0]?.id;
     } catch (error) {
       console.error("Failed to save message:", error);
       // Continue with local message handling even if database save fails
+      return null;
     }
   };
 
@@ -132,8 +138,17 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     // Add user message to local state
     setMessages((prevMessages) => [...prevMessages, newUserMessage]);
     
-    // Save user message to database
-    await saveMessageToDatabase(text, true);
+    // Save user message to database and get the saved message ID
+    const savedMessageId = await saveMessageToDatabase(text, true);
+    if (savedMessageId) {
+      // Update the message ID in state if we got one from the database
+      newUserMessage.id = savedMessageId.toString();
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === newUserMessage.id ? {...msg, id: savedMessageId.toString()} : msg
+        )
+      );
+    }
     
     setIsLoading(true);
 
@@ -145,11 +160,14 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
         setUseLocalFallback
       );
 
+      // Save bot response to database and get the saved message ID
+      const savedBotMessageId = await saveMessageToDatabase(botResponse.text, false);
+      if (savedBotMessageId) {
+        botResponse.id = savedBotMessageId.toString();
+      }
+
       // Add bot response to local state
       setMessages((prevMessages) => [...prevMessages, botResponse]);
-      
-      // Save bot response to database
-      await saveMessageToDatabase(botResponse.text, false);
       
       // Speak the bot's response if speech is enabled
       speakMessage(botResponse.text, isSpeechEnabled);
