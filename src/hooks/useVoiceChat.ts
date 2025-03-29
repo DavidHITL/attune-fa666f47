@@ -2,6 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import { RealtimeChat } from "@/utils/RealtimeAudio";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ChatError, ErrorType } from "@/utils/realtime/types";
 
 export function useVoiceChat(user: any | null) {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -10,6 +12,7 @@ export function useVoiceChat(user: any | null) {
   const chatRef = useRef<RealtimeChat | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [lastSpeechData, setLastSpeechData] = useState<Float32Array | null>(null);
+  const [databaseError, setDatabaseError] = useState(false);
 
   // Save message to database
   const saveMessageToDatabase = async (text: string, isUser: boolean) => {
@@ -27,14 +30,53 @@ export function useVoiceChat(user: any | null) {
       
       if (error) {
         console.error("Error saving voice message to database:", error);
+        setDatabaseError(true);
         throw error;
       }
       
+      setDatabaseError(false);
       return data?.[0]?.id;
     } catch (error) {
       console.error("Failed to save voice message:", error);
       // Continue with local message handling even if database save fails
       return null;
+    }
+  };
+  
+  // Retry database connection
+  const retryDatabaseConnection = async () => {
+    try {
+      const { error } = await supabase.from('messages').select('id').limit(1);
+      
+      if (error) {
+        console.error("Database still not accessible:", error);
+        toast.error("Still unable to connect to database");
+      } else {
+        setDatabaseError(false);
+        toast.success("Database connection restored");
+      }
+    } catch (error) {
+      console.error("Database reconnection attempt failed:", error);
+      toast.error("Still unable to connect to database");
+    }
+  };
+
+  // Handle voice chat errors
+  const handleChatError = (error: ChatError) => {
+    console.error("Voice chat error:", error);
+    
+    switch (error.type) {
+      case ErrorType.CONNECTION:
+        toast.error("Connection to voice service lost. Attempting to reconnect...");
+        break;
+      case ErrorType.AUDIO:
+        toast.error("Audio processing error. Please check your microphone.");
+        break;
+      case ErrorType.SERVER:
+        toast.error(`Server error: ${error.message}`);
+        break;
+      default:
+        toast.error("An error occurred with the voice chat");
     }
   };
 
@@ -43,14 +85,23 @@ export function useVoiceChat(user: any | null) {
     try {
       setIsConnecting(true);
       
+      // Disconnect existing instance if any
+      if (chatRef.current) {
+        disconnect();
+      }
+      
       // Initialize RealtimeChat with the transcript callback
       chatRef.current = new RealtimeChat((text) => {
         setTranscript(prev => text);  // Update with latest transcript instead of appending
       });
       
+      // Register error handler
+      chatRef.current.addEventListener('error', handleChatError);
+      
       await chatRef.current.connect();
       
       console.log("Voice chat connected successfully");
+      toast.success("Voice chat connected");
 
       // Set up listener for AI responses
       if (chatRef.current) {
@@ -69,6 +120,7 @@ export function useVoiceChat(user: any | null) {
       }
     } catch (error) {
       console.error("Failed to start voice chat:", error);
+      toast.error("Failed to connect to voice service");
     } finally {
       setIsConnecting(false);
     }
@@ -134,6 +186,8 @@ export function useVoiceChat(user: any | null) {
     connect,
     disconnect,
     sendMessage,
-    processSpeechInput
+    processSpeechInput,
+    databaseError,
+    retryDatabaseConnection
   };
 }

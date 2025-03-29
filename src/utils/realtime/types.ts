@@ -37,4 +37,21 @@ export interface WebSocketMessageEvent {
   type: string;
   delta?: string;
   error?: string;
+  message?: string;
+  details?: string;
+}
+
+// Error types for better error handling
+export enum ErrorType {
+  CONNECTION = "connection_error",
+  AUDIO = "audio_processing_error",
+  MESSAGE = "message_error",
+  SERVER = "server_error",
+  UNKNOWN = "unknown_error"
+}
+
+export interface ChatError {
+  type: ErrorType;
+  message: string;
+  originalError?: Error;
 }

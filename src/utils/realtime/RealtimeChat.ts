@@ -1,5 +1,5 @@
 
-import { TranscriptCallback, SessionConfig } from './types';
+import { TranscriptCallback, SessionConfig, ErrorType, ChatError } from './types';
 import { AudioProcessor } from './AudioProcessor';
 import { EventEmitter } from './EventEmitter';
 import { WebSocketManager } from './WebSocketManager';
@@ -14,6 +14,7 @@ export class RealtimeChat {
   private transcriptCallback: TranscriptCallback;
   private lastTranscriptUpdate: number = 0;
   private processingTimeout: NodeJS.Timeout | null = null;
+  private reconnecting: boolean = false;
   
   public isConnected: boolean = false;
 
@@ -41,10 +42,21 @@ export class RealtimeChat {
       // Set up event handlers
       this.setupWebSocketHandlers();
       
+      // Check audio context and attempt to resume it
+      await this.audioProcessor.resumeAudioContext();
+      
     } catch (error) {
       console.error("Failed to connect:", error);
       this.isConnected = false;
-      throw error;
+      
+      const chatError: ChatError = {
+        type: ErrorType.CONNECTION,
+        message: "Failed to connect to voice service",
+        originalError: error instanceof Error ? error : new Error(String(error))
+      };
+      
+      this.eventEmitter.dispatchEvent('error', chatError);
+      throw chatError;
     }
   }
   
@@ -62,14 +74,19 @@ export class RealtimeChat {
             console.log("Session created successfully");
             // Configure session after creation
             this.configureSession();
+            this.eventEmitter.dispatchEvent('connected', { status: "connected" });
             break;
             
           case 'response.audio.delta':
-            await this.handleAudioDelta(data.delta);
+            if (data.delta) {
+              await this.handleAudioDelta(data.delta);
+            }
             break;
             
           case 'response.audio_transcript.delta':
-            this.updateTranscript(data.delta);
+            if (data.delta) {
+              this.updateTranscript(data.delta);
+            }
             break;
             
           case 'response.audio.done':
@@ -78,7 +95,15 @@ export class RealtimeChat {
             break;
             
           case 'error':
-            console.error("Error from voice service:", data.error);
+            const errorMsg = data.error || "Unknown error from voice service";
+            console.error("Error from voice service:", errorMsg);
+            
+            const chatError: ChatError = {
+              type: ErrorType.SERVER,
+              message: errorMsg
+            };
+            
+            this.eventEmitter.dispatchEvent('error', chatError);
             break;
             
           default:
@@ -86,6 +111,14 @@ export class RealtimeChat {
         }
       } catch (error) {
         console.error("Error processing WebSocket message:", error);
+        
+        const chatError: ChatError = {
+          type: ErrorType.MESSAGE,
+          message: "Failed to process WebSocket message",
+          originalError: error instanceof Error ? error : new Error(String(error))
+        };
+        
+        this.eventEmitter.dispatchEvent('error', chatError);
       }
     });
   }
@@ -124,28 +157,71 @@ export class RealtimeChat {
    * For handling audio data chunks
    */
   private async handleAudioDelta(base64Audio: string): Promise<void> {
-    if (!this.audioProcessor.getAudioContext()) return;
-    
-    // Convert base64 to ArrayBuffer
-    const binaryString = atob(base64Audio);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    if (!base64Audio || base64Audio.trim() === "") {
+      console.warn("Received empty audio data");
+      return;
     }
     
-    // Create audio data for PCM16
-    const audioData = this.audioProcessor.createAudioFromPCM16(bytes);
-    
-    // Play audio
-    await this.audioProcessor.queueAudioForPlayback(audioData);
+    try {
+      if (!this.audioProcessor.getAudioContext()) {
+        await this.audioProcessor.resumeAudioContext();
+        if (!this.audioProcessor.getAudioContext()) {
+          throw new Error("Could not initialize AudioContext");
+        }
+      }
+      
+      // Convert base64 to ArrayBuffer
+      const binaryString = atob(base64Audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Create audio data for PCM16
+      const audioData = this.audioProcessor.createAudioFromPCM16(bytes);
+      
+      // Play audio
+      await this.audioProcessor.queueAudioForPlayback(audioData);
+    } catch (error) {
+      console.error("Error handling audio data:", error);
+      
+      const chatError: ChatError = {
+        type: ErrorType.AUDIO,
+        message: "Failed to process audio data",
+        originalError: error instanceof Error ? error : new Error(String(error))
+      };
+      
+      this.eventEmitter.dispatchEvent('error', chatError);
+    }
   }
   
   /**
    * Send a message to the AI
    */
   sendMessage(message: string): void {
-    if (!this.isConnected) {
-      console.error("WebSocket not connected");
+    if (!message || message.trim() === "") {
+      console.warn("Attempted to send empty message");
+      return;
+    }
+    
+    if (!this.isConnected || !this.websocketManager.checkConnection()) {
+      const errorMsg = "WebSocket not connected";
+      console.error(errorMsg);
+      
+      const chatError: ChatError = {
+        type: ErrorType.CONNECTION,
+        message: errorMsg
+      };
+      
+      this.eventEmitter.dispatchEvent('error', chatError);
+      
+      // Try to reconnect
+      if (!this.reconnecting) {
+        this.reconnecting = true;
+        this.connect().finally(() => {
+          this.reconnecting = false;
+        });
+      }
       return;
     }
     
@@ -154,6 +230,7 @@ export class RealtimeChat {
     // Clear any processing timeout
     if (this.processingTimeout) {
       clearTimeout(this.processingTimeout);
+      this.processingTimeout = null;
     }
     
     // Create a conversation item with user message
@@ -172,7 +249,9 @@ export class RealtimeChat {
     };
     
     // Send the message
-    this.websocketManager.send(messageEvent);
+    if (!this.websocketManager.send(messageEvent)) {
+      return; // Send failed, error handled in WebSocketManager
+    }
     
     // Request a response
     this.websocketManager.send({type: 'response.create'});
@@ -182,18 +261,40 @@ export class RealtimeChat {
    * Send speech data to the AI
    */
   sendSpeechData(audioData: Float32Array): void {
-    if (!this.isConnected) return;
+    if (!audioData || audioData.length === 0) return;
     
-    // Convert Float32Array to base64 encoded Int16Array
-    const base64Audio = this.audioProcessor.encodeAudioData(audioData);
+    if (!this.isConnected || !this.websocketManager.checkConnection()) {
+      console.warn("Cannot send speech data: WebSocket not connected");
+      return;
+    }
     
-    // Send audio buffer
-    const audioEvent = {
-      type: 'input_audio_buffer.append',
-      audio: base64Audio
-    };
-    
-    this.websocketManager.send(audioEvent);
+    try {
+      // Convert Float32Array to base64 encoded Int16Array
+      const base64Audio = this.audioProcessor.encodeAudioData(audioData);
+      
+      if (!base64Audio) {
+        console.warn("Failed to encode audio data");
+        return;
+      }
+      
+      // Send audio buffer
+      const audioEvent = {
+        type: 'input_audio_buffer.append',
+        audio: base64Audio
+      };
+      
+      this.websocketManager.send(audioEvent);
+    } catch (error) {
+      console.error("Error sending speech data:", error);
+      
+      const chatError: ChatError = {
+        type: ErrorType.AUDIO,
+        message: "Failed to send speech data",
+        originalError: error instanceof Error ? error : new Error(String(error))
+      };
+      
+      this.eventEmitter.dispatchEvent('error', chatError);
+    }
   }
   
   /**

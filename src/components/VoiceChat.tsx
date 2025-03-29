@@ -1,12 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Phone } from "lucide-react";
+import { Phone, Wifi, WifiOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import VoiceVisualization from "./voice/VoiceVisualization";
 import VoiceMessageList from "./VoiceMessageList";
+import DatabaseConnectionAlert from "./chat/DatabaseConnectionAlert";
 
 interface VoiceChatProps {
   open: boolean;
@@ -26,7 +27,9 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     chatRef,
     connect,
     disconnect,
-    sendMessage
+    sendMessage,
+    databaseError,
+    retryDatabaseConnection
   } = useVoiceChat(user);
 
   const {
@@ -35,6 +38,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     isSupported,
     toggleListening
   } = useSpeechRecognition();
+  
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
 
   // Use speech recognition to update transcript
   useEffect(() => {
@@ -46,11 +51,17 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   // Handle connection to voice API
   useEffect(() => {
     if (open && !chatRef.current) {
-      connect();
+      setConnectionStatus('connecting');
+      connect().then(() => {
+        setConnectionStatus('connected');
+      }).catch(() => {
+        setConnectionStatus('disconnected');
+      });
     }
     return () => {
       if (chatRef.current) {
         disconnect();
+        setConnectionStatus('disconnected');
       }
     };
   }, [open, connect, disconnect, chatRef]);
@@ -95,10 +106,33 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Phone size={18} /> Voice Conversation
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Phone size={18} /> Voice Conversation
+            </div>
+            <div className="text-xs flex items-center gap-1">
+              {connectionStatus === 'connected' && (
+                <>
+                  <Wifi size={14} className="text-green-500" />
+                  <span className="text-green-500">Connected</span>
+                </>
+              )}
+              {connectionStatus === 'connecting' && (
+                <span className="text-amber-500">Connecting...</span>
+              )}
+              {connectionStatus === 'disconnected' && (
+                <>
+                  <WifiOff size={14} className="text-red-500" />
+                  <span className="text-red-500">Disconnected</span>
+                </>
+              )}
+            </div>
           </DialogTitle>
         </DialogHeader>
+        
+        {databaseError && (
+          <DatabaseConnectionAlert onRetryConnection={retryDatabaseConnection} />
+        )}
         
         <div className="flex-1 overflow-y-auto">
           {messages.length > 0 ? (
@@ -120,7 +154,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
           <div className="flex gap-2 items-center justify-between w-full">
             <div className="text-xs text-gray-500">
               {isConnecting ? "Connecting to voice service..." : 
-              chatRef.current?.isConnected ? "Voice service connected" : 
+              connectionStatus === 'connected' ? "Voice service connected" : 
               "Voice service disconnected"}
             </div>
           </div>
