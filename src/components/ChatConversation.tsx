@@ -57,6 +57,19 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     fetchMessages();
   };
 
+  // Watch for auth changes to automatically retry connection when user logs in
+  useEffect(() => {
+    if (user && useLocalFallback) {
+      console.log("User is logged in but in local fallback mode. Attempting to reconnect to database...");
+      // Small delay to ensure auth is fully established
+      const timer = setTimeout(() => {
+        handleRetryDatabaseConnection();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, useLocalFallback]);
+
   // Fetch messages when component mounts or user changes
   useEffect(() => {
     // Don't attempt to fetch messages while auth state is still loading
