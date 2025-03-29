@@ -1,15 +1,17 @@
 
-import React from "react";
+import React, { useState } from "react";
 import NavBar from "@/components/NavBar";
 import Timer from "@/components/Timer";
 import ChatInterface from "@/components/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { PhoneCall } from "lucide-react";
+import VoiceChat from "@/components/VoiceChat";
 
 const Chat: React.FC = () => {
-  const handlePhoneCall = () => {
-    // This function will be triggered when the phone button is clicked
-    window.open("tel:+11234567890", "_blank");
+  const [voiceChatOpen, setVoiceChatOpen] = useState(false);
+
+  const handlePhoneClick = () => {
+    setVoiceChatOpen(true);
   };
 
   return (
@@ -23,8 +25,8 @@ const Chat: React.FC = () => {
             variant="outline" 
             size="icon" 
             className="rounded-full hover:bg-blue-100 border-blue-200"
-            onClick={handlePhoneCall}
-            title="Call for support"
+            onClick={handlePhoneClick}
+            title="Start voice conversation"
           >
             <PhoneCall className="text-blue-600" size={20} />
           </Button>
@@ -35,6 +37,11 @@ const Chat: React.FC = () => {
         understand yourself<br />
         Napkin LLC — Zurich
       </footer>
+      
+      <VoiceChat 
+        open={voiceChatOpen} 
+        onOpenChange={setVoiceChatOpen} 
+      />
     </div>
   );
 };
