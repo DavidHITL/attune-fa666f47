@@ -32,6 +32,27 @@ export function useChatMessages() {
     try {
       setIsLoading(true);
       
+      // First try to get user profile to ensure it exists
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users_profile')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single();
+      
+      if (profileError) {
+        console.error("Error fetching user profile:", profileError);
+        // If no profile, proceed with just a welcome message
+        setMessages([{
+          id: "welcome",
+          text: "Hi there. How are you feeling today?",
+          isUser: false,
+          timestamp: new Date()
+        }]);
+        setIsLoading(false);
+        setIsInitialLoad(false);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')

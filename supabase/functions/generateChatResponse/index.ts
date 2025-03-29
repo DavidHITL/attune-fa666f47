@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { Anthropic } from "https://esm.sh/@anthropic-ai/sdk@0.12.0";
 
 interface RequestBody {
   message: string;
@@ -29,29 +28,6 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "API key configuration error",
-          success: false,
-        }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
-
-    // Initialize the Anthropic client with proper error handling
-    let anthropic;
-    try {
-      anthropic = new Anthropic({
-        apiKey: anthropicApiKey,
-      });
-    } catch (initError) {
-      console.error("Failed to initialize Anthropic client:", initError);
-      return new Response(
-        JSON.stringify({
-          error: "Failed to initialize AI client",
           success: false,
         }),
         {
@@ -106,46 +82,44 @@ serve(async (req) => {
 
     console.log("Sending request to Anthropic API");
 
-    // Send request to Anthropic's Claude API
-    try {
-      const response = await anthropic.messages.create({
+    // Call Anthropic's API directly instead of using the client
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicApiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
         model: "claude-3-opus-20240229",
         max_tokens: 1000,
         messages: messages,
         system: "You are a supportive, empathetic, and thoughtful AI assistant. Your purpose is to help the user reflect on their feelings and experiences. Respond with warmth and understanding. Keep responses concise and conversational.",
-      });
-
-      console.log("Received response from Anthropic API");
-
-      // Return the response
-      return new Response(
-        JSON.stringify({
-          reply: response.content[0].text,
-          success: true,
-        }),
-        {
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    } catch (apiError) {
-      console.error("Anthropic API Error:", apiError);
-      return new Response(
-        JSON.stringify({
-          error: `API Error: ${apiError.message}`,
-          success: false,
-        }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("Anthropic API Error Response:", errorData);
+      throw new Error(`API returned ${response.status}: ${errorData}`);
     }
+    
+    const data = await response.json();
+    console.log("Received response from Anthropic API");
+
+    // Return the response
+    return new Response(
+      JSON.stringify({
+        reply: data.content[0].text,
+        success: true,
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      }
+    );
   } catch (error) {
     console.error("Error in generateChatResponse function:", error);
     
