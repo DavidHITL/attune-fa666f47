@@ -67,6 +67,7 @@ serve(async (req) => {
     let messages = [];
     
     if (conversationHistory.length > 0) {
+      // Use all available conversation history for better context
       messages = [...conversationHistory];
       
       // Check if the last message is from the user - if not, add the current message
@@ -93,7 +94,7 @@ serve(async (req) => {
     console.log("Sending request to Anthropic API");
     console.log("Messages being sent:", JSON.stringify(messages));
 
-    // Call Anthropic's API directly
+    // Call Anthropic's API with max tokens increased for longer responses
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -103,9 +104,9 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-3-opus-20240229",
-        max_tokens: 1000,
+        max_tokens: 2000,
         messages: messages,
-        system: "You are a supportive, empathetic, and thoughtful AI assistant. Your purpose is to help the user reflect on their feelings and experiences. Respond with warmth and understanding. Keep responses concise and conversational.",
+        system: "You are a supportive, empathetic, and thoughtful AI assistant. Your purpose is to help the user reflect on their feelings and experiences. Respond with warmth and understanding. Keep responses conversational and remember details from previous messages to maintain continuity in the conversation.",
       }),
     });
     
@@ -149,3 +150,4 @@ serve(async (req) => {
     );
   }
 });
+

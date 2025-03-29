@@ -25,7 +25,7 @@ export const generateResponse = async (
         // Log message history being sent to AI
         console.log(`Sending ${messages.length} messages to AI service`);
         
-        // Prepare conversation history for the API - include all previous messages
+        // Prepare conversation history for the API - include ALL previous messages for better context
         const conversationHistory = convertMessagesToApiFormat(messages);
 
         // Call the Supabase Edge Function
@@ -73,3 +73,4 @@ export const generateResponse = async (
     );
   }
 };
+
