@@ -7,42 +7,75 @@ interface TimerProps {
   initialSeconds?: number;
   isRunning?: boolean;
   onComplete?: () => void;
+  sessionEndTime?: number;
 }
 
 const Timer: React.FC<TimerProps> = ({ 
   initialMinutes = 25,
   initialSeconds = 0,
   isRunning = false,
-  onComplete
+  onComplete,
+  sessionEndTime
 }) => {
   const [minutes, setMinutes] = useState(initialMinutes);
   const [seconds, setSeconds] = useState(initialSeconds);
   const [isActive, setIsActive] = useState(isRunning);
   const [isAlmostDone, setIsAlmostDone] = useState(false);
 
+  // Calculate remaining time from sessionEndTime
   useEffect(() => {
-    if (isActive) {
-      const timer = setInterval(() => {
-        setSeconds((prevSeconds) => {
-          if (prevSeconds === 0) {
-            setMinutes((prevMinutes) => {
-              if (prevMinutes <= 0) {
-                clearInterval(timer);
-                setIsActive(false);
-                onComplete?.();
-                return 0;
-              }
-              return prevMinutes - 1;
-            });
-            return 59;
-          }
-          return prevSeconds - 1;
-        });
-      }, 1000); // Update every second
-
-      return () => clearInterval(timer);
+    if (sessionEndTime) {
+      const calculateRemainingTime = () => {
+        const now = Date.now();
+        const totalRemainingSeconds = Math.max(0, Math.floor((sessionEndTime - now) / 1000));
+        
+        if (totalRemainingSeconds <= 0) {
+          setMinutes(0);
+          setSeconds(0);
+          setIsActive(false);
+          onComplete?.();
+          return;
+        }
+        
+        const remainingMinutes = Math.floor(totalRemainingSeconds / 60);
+        const remainingSeconds = totalRemainingSeconds % 60;
+        
+        setMinutes(remainingMinutes);
+        setSeconds(remainingSeconds);
+        setIsAlmostDone(remainingMinutes < 5);
+      };
+      
+      calculateRemainingTime();
+      
+      if (isActive) {
+        const timer = setInterval(calculateRemainingTime, 1000);
+        return () => clearInterval(timer);
+      }
+    } else {
+      // Fall back to countdown logic when no sessionEndTime is provided
+      if (isActive) {
+        const timer = setInterval(() => {
+          setSeconds((prevSeconds) => {
+            if (prevSeconds === 0) {
+              setMinutes((prevMinutes) => {
+                if (prevMinutes <= 0) {
+                  clearInterval(timer);
+                  setIsActive(false);
+                  onComplete?.();
+                  return 0;
+                }
+                return prevMinutes - 1;
+              });
+              return 59;
+            }
+            return prevSeconds - 1;
+          });
+        }, 1000);
+  
+        return () => clearInterval(timer);
+      }
     }
-  }, [isActive, onComplete]);
+  }, [isActive, onComplete, sessionEndTime]);
 
   // Check if less than 5 minutes remain
   useEffect(() => {
@@ -51,12 +84,14 @@ const Timer: React.FC<TimerProps> = ({
     }
   }, [minutes]);
 
-  // Reset timer when initialMinutes changes or isRunning is set to true
+  // Set initial state based on props
   useEffect(() => {
-    setMinutes(initialMinutes);
-    setSeconds(initialSeconds);
+    if (!sessionEndTime) {
+      setMinutes(initialMinutes);
+      setSeconds(initialSeconds);
+    }
     setIsActive(isRunning);
-  }, [initialMinutes, initialSeconds, isRunning]);
+  }, [initialMinutes, initialSeconds, isRunning, sessionEndTime]);
 
   const formattedTime = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 

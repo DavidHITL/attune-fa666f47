@@ -27,9 +27,12 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
+const SESSION_DURATION_MS = 25 * 60 * 1000; // 25 minutes in milliseconds
+
 const Chat: React.FC = () => {
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionEndTime, setSessionEndTime] = useState<number | null>(null);
   const [showStartModal, setShowStartModal] = useState(true);
   const [showEndConfirmation, setShowEndConfirmation] = useState(false);
   const navigate = useNavigate();
@@ -39,8 +42,15 @@ const Chat: React.FC = () => {
   };
 
   const startSession = () => {
+    const endTime = Date.now() + SESSION_DURATION_MS;
     setSessionStarted(true);
+    setSessionEndTime(endTime);
     setShowStartModal(false);
+    
+    // Save session state to localStorage
+    localStorage.setItem('sessionActive', 'true');
+    localStorage.setItem('sessionEndTime', endTime.toString());
+    
     toast({
       title: "Session started",
       description: "Your 25-minute therapeutic session has begun."
@@ -49,14 +59,25 @@ const Chat: React.FC = () => {
 
   const handleSessionComplete = () => {
     setSessionStarted(false);
+    setSessionEndTime(null);
+    
+    // Clear session data
+    localStorage.removeItem('sessionActive');
+    localStorage.removeItem('sessionEndTime');
+    
     toast({
       title: "Session ended",
       description: "Your therapeutic session has ended. Thank you for participating.",
       variant: "default"
     });
     
-    // Optional: Navigate away or show a summary
-    // navigate("/home");
+    // Add session closing message to the chat
+    const event = new CustomEvent('session-timeout', {
+      detail: {
+        message: "Our 25-minute session has ended. I hope our conversation was helpful. Remember to practice what we discussed, and I'll be here next time you'd like to talk."
+      }
+    });
+    document.dispatchEvent(event);
   };
 
   const handleRequestEndSession = () => {
@@ -65,60 +86,70 @@ const Chat: React.FC = () => {
 
   const confirmEndSession = () => {
     setSessionStarted(false);
+    setSessionEndTime(null);
     setShowEndConfirmation(false);
+    
+    // Clear session data
+    localStorage.removeItem('sessionActive');
+    localStorage.removeItem('sessionEndTime');
+    
     toast({
       title: "Session ended early",
       description: "Your session has been ended. Feel free to start a new one when you're ready."
     });
   };
 
-  // If user navigates away and comes back during active session
+  // Check for active session on component mount
   useEffect(() => {
-    const activeSession = localStorage.getItem('activeSession');
-    const sessionEndTime = localStorage.getItem('sessionEndTime');
+    const sessionActive = localStorage.getItem('sessionActive') === 'true';
+    const storedEndTime = localStorage.getItem('sessionEndTime');
     
-    if (activeSession === 'true' && sessionEndTime) {
-      const endTime = parseInt(sessionEndTime, 10);
-      const currentTime = new Date().getTime();
+    if (sessionActive && storedEndTime) {
+      const endTime = parseInt(storedEndTime, 10);
+      const now = Date.now();
       
-      if (endTime > currentTime) {
-        // Calculate remaining time
-        const remainingMs = endTime - currentTime;
-        const remainingMinutes = Math.floor(remainingMs / (60 * 1000));
-        const remainingSeconds = Math.floor((remainingMs % (60 * 1000)) / 1000);
-        
+      if (endTime > now) {
+        // Session is still active
         setSessionStarted(true);
+        setSessionEndTime(endTime);
         setShowStartModal(false);
       } else {
-        // Session would have ended
-        localStorage.removeItem('activeSession');
-        localStorage.removeItem('sessionEndTime');
+        // Session has expired while away
+        handleSessionComplete();
       }
     }
   }, []);
-
-  // Save session state when it starts
+  
+  // Check if session has expired
   useEffect(() => {
-    if (sessionStarted) {
-      const endTime = new Date().getTime() + (25 * 60 * 1000); // 25 minutes from now
-      localStorage.setItem('activeSession', 'true');
-      localStorage.setItem('sessionEndTime', endTime.toString());
-    } else {
-      localStorage.removeItem('activeSession');
-      localStorage.removeItem('sessionEndTime');
+    if (sessionEndTime) {
+      const checkExpiration = () => {
+        const now = Date.now();
+        if (now >= sessionEndTime) {
+          handleSessionComplete();
+        }
+      };
+      
+      // Check immediately
+      checkExpiration();
+      
+      // Set up interval to check periodically
+      const interval = setInterval(checkExpiration, 1000);
+      return () => clearInterval(interval);
     }
-  }, [sessionStarted]);
+  }, [sessionEndTime]);
 
   return (
     <div className="flex flex-col h-screen">
       <NavBar />
       
-      {/* Timer component, shows default time if session not started */}
+      {/* Timer component with session end time */}
       <Timer 
         initialMinutes={25} 
         initialSeconds={0} 
         isRunning={sessionStarted}
         onComplete={handleSessionComplete}
+        sessionEndTime={sessionEndTime || undefined}
       />
       
       <div className="relative flex-1 overflow-hidden">
@@ -162,7 +193,7 @@ const Chat: React.FC = () => {
       />
       
       {/* Start Session Modal */}
-      <Dialog open={showStartModal} onOpenChange={setShowStartModal}>
+      <Dialog open={showStartModal && !sessionStarted} onOpenChange={setShowStartModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Start Your Session</DialogTitle>
