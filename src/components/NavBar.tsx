@@ -30,7 +30,7 @@ const NavBar: React.FC = () => {
         
         <div className="text-center flex-1">
           <Link to="/you" className="text-xl font-medium">
-            Attune
+            You
           </Link>
         </div>
         
