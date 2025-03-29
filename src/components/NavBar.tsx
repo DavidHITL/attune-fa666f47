@@ -20,8 +20,8 @@ const NavBar: React.FC = () => {
           <Link 
             to="/learn" 
             className={cn(
-              "text-apple-gray hover:text-apple-blue transition-colors",
-              currentPath === "/learn" && "text-apple-blue"
+              "text-apple-gray hover:text-apple-gray-3 transition-colors",
+              currentPath === "/learn" && "text-black"
             )}
           >
             Learn
@@ -38,8 +38,8 @@ const NavBar: React.FC = () => {
           <Link 
             to="/chat" 
             className={cn(
-              "text-apple-gray hover:text-apple-blue transition-colors",
-              currentPath === "/chat" && "text-apple-blue"
+              "text-apple-gray hover:text-apple-gray-3 transition-colors",
+              currentPath === "/chat" && "text-black"
             )}
           >
             Chat
