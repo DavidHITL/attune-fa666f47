@@ -144,7 +144,6 @@ serve(async (req) => {
     }
 
     console.log("Sending request to Anthropic API");
-    console.log("Messages being sent:", JSON.stringify(messages));
 
     // Call Anthropic's API with updated system prompt incorporating the phase
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -172,6 +171,15 @@ CORE PRINCIPLES:
 - Distinguish between adaptive child responses and functional adult responses
 - Guide "relational reckoning" - deciding if what you get is worth what you don't
 - Promote healthy boundaries, fierce intimacy, and cherishing vulnerabilities
+
+THERAPEUTIC APPROACHES:
+- Deep trauma work can be done effectively with a supportive partner present
+- Convert conflicts into opportunities for deeper connection and insight
+- Teach concrete boundary setting and "full respect living" principles
+- Create homework and ongoing practices to reinforce new patterns
+- Guide users toward "fierce intimacy" - authentic connection requiring bravery
+- Help users establish action plans for specific relationship challenges
+- Acknowledge and celebrate progress to reinforce positive changes
 
 COMMUNICATION STYLE:
 - Be warm but direct - don't avoid difficult truths
