@@ -1,25 +1,23 @@
 
 import React from "react";
-import NavBar from "@/components/NavBar";
+import { Container } from "@/components/ui/Container";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Book } from "lucide-react";
+import KnowledgeBaseExplorer from "@/components/learn/KnowledgeBaseExplorer";
 
-const Learn: React.FC = () => {
+// The Learn page - showcasing Terry Real's methodologies and concepts
+export default function Learn() {
   return (
-    <div className="flex flex-col min-h-screen">
-      <NavBar />
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold mb-4">Learn Page</h1>
-          <p className="text-gray-600">
-            This is the Learn section where educational content would appear.
-          </p>
-        </div>
-      </div>
-      <footer className="text-center py-3 text-xs text-gray-500 border-t border-gray-200">
-        Attune<br />
-        Napkin LLC — Zurich
-      </footer>
-    </div>
-  );
-};
+    <Container>
+      <PageHeader
+        title="Learn"
+        description="Explore Terry Real's relational therapy concepts and methodologies"
+        icon={<Book className="w-10 h-10" />}
+      />
 
-export default Learn;
+      <div className="mt-6 grid grid-cols-1 gap-6">
+        <KnowledgeBaseExplorer />
+      </div>
+    </Container>
+  );
+}
