@@ -1,10 +1,15 @@
 
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Phone, Wifi, WifiOff } from "lucide-react";
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Phone } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useVoiceChatConnection } from "@/hooks/useVoiceChatConnection";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useAutoSendMessage } from "@/hooks/useAutoSendMessage";
+import VoiceConnectionStatus from "./voice/VoiceConnectionStatus";
+import VoiceUIControls from "./voice/VoiceUIControls";
 import VoiceVisualization from "./voice/VoiceVisualization";
 import VoiceMessageList from "./VoiceMessageList";
 import DatabaseConnectionAlert from "./chat/DatabaseConnectionAlert";
@@ -39,7 +44,26 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     toggleListening
   } = useSpeechRecognition();
   
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+  // Use custom hooks for voice chat functionality
+  const { connectionStatus } = useVoiceChatConnection({
+    open,
+    connect,
+    disconnect,
+    chatRef
+  });
+  
+  useSpeechToText({
+    open,
+    isSupported,
+    isListening,
+    toggleListening
+  });
+  
+  useAutoSendMessage({
+    transcript,
+    open,
+    sendMessage
+  });
 
   // Use speech recognition to update transcript
   useEffect(() => {
@@ -48,38 +72,6 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     }
   }, [speechTranscript, open, setTranscript]);
 
-  // Handle connection to voice API
-  useEffect(() => {
-    if (open && !chatRef.current) {
-      setConnectionStatus('connecting');
-      connect().then(() => {
-        setConnectionStatus('connected');
-      }).catch(() => {
-        setConnectionStatus('disconnected');
-      });
-    }
-    return () => {
-      if (chatRef.current) {
-        disconnect();
-        setConnectionStatus('disconnected');
-      }
-    };
-  }, [open, connect, disconnect, chatRef]);
-
-  // Start listening when the dialog opens
-  useEffect(() => {
-    if (open && isSupported && !isListening) {
-      setTimeout(() => {
-        toggleListening();
-      }, 500);
-    }
-    return () => {
-      if (isListening) {
-        toggleListening();
-      }
-    };
-  }, [open, isSupported, isListening, toggleListening]);
-
   const handleClose = () => {
     if (isListening) {
       toggleListening();
@@ -87,17 +79,6 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     disconnect();
     onOpenChange(false);
   };
-
-  // Auto-send message when there's a pause in speaking
-  useEffect(() => {
-    if (!transcript.trim() || !open) return;
-    
-    const timer = setTimeout(() => {
-      sendMessage();
-    }, 2000);
-    
-    return () => clearTimeout(timer);
-  }, [transcript, open, sendMessage]);
 
   // Determine if the voice assistant is actively speaking
   const isAssistantActive = messages.length > 0 && messages[messages.length - 1].role === 'assistant';
@@ -110,23 +91,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
             <div className="flex items-center gap-2">
               <Phone size={18} /> Voice Conversation
             </div>
-            <div className="text-xs flex items-center gap-1">
-              {connectionStatus === 'connected' && (
-                <>
-                  <Wifi size={14} className="text-green-500" />
-                  <span className="text-green-500">Connected</span>
-                </>
-              )}
-              {connectionStatus === 'connecting' && (
-                <span className="text-amber-500">Connecting...</span>
-              )}
-              {connectionStatus === 'disconnected' && (
-                <>
-                  <WifiOff size={14} className="text-red-500" />
-                  <span className="text-red-500">Disconnected</span>
-                </>
-              )}
-            </div>
+            <VoiceConnectionStatus status={connectionStatus} />
           </DialogTitle>
         </DialogHeader>
         
@@ -150,15 +115,10 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
           </div>
         )}
         
-        <DialogFooter>
-          <div className="flex gap-2 items-center justify-between w-full">
-            <div className="text-xs text-gray-500">
-              {isConnecting ? "Connecting to voice service..." : 
-              connectionStatus === 'connected' ? "Voice service connected" : 
-              "Voice service disconnected"}
-            </div>
-          </div>
-        </DialogFooter>
+        <VoiceUIControls
+          isConnecting={isConnecting}
+          connectionStatus={connectionStatus}
+        />
       </DialogContent>
     </Dialog>
   );
