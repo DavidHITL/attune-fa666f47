@@ -9,11 +9,10 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X, Phone } from "lucide-react";
+import { X, Phone, Mic } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
-import VoiceMessageList from './VoiceMessageList';
-import VoiceInputArea from './VoiceInputArea';
+import VoiceVisualization from "./voice/VoiceVisualization";
 
 interface VoiceChatProps {
   open: boolean;
@@ -51,6 +50,10 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
     onOpenChange(false);
   };
 
+  // Determine if the voice assistant is actively speaking
+  const isAssistantActive = messages.length > 0 && 
+                            messages[messages.length-1].role === 'assistant';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[80vh] flex flex-col">
@@ -60,13 +63,18 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
           </DialogTitle>
         </DialogHeader>
         
-        <VoiceMessageList messages={messages} transcript={transcript} />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <VoiceVisualization 
+            isActive={transcript.length > 0 || isAssistantActive} 
+            className="mx-auto"
+          />
+        </div>
         
-        <VoiceInputArea 
-          transcript={transcript} 
-          setTranscript={setTranscript} 
-          onSend={sendMessage}
-        />
+        {transcript && (
+          <div className="text-center mb-3 px-4 text-sm text-gray-600">
+            {transcript}
+          </div>
+        )}
         
         <DialogFooter>
           <div className="flex gap-2 items-center justify-between w-full">
