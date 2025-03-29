@@ -16,6 +16,25 @@ interface UserProfileData {
   withdrawal_value: number | null;
 }
 
+// Interface for the losing strategy flags from analysis_results
+interface LosingStrategyFlags {
+  beingRight?: number;
+  unbridledSelfExpression?: number;
+  controlling?: number;
+  retaliation?: number;
+  withdrawal?: number;
+}
+
+// Interface for analysis results data
+interface AnalysisResultData {
+  id: string;
+  user_id: string;
+  timestamp: string;
+  summary_text: string | null;
+  keywords: string[] | null;
+  losing_strategy_flags: LosingStrategyFlags | null;
+}
+
 interface LosingStrategiesCardProps {
   profileData?: UserProfileData;
 }
@@ -44,7 +63,7 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
         return null;
       }
       
-      return data;
+      return data as AnalysisResultData;
     },
     enabled: !!user?.id,
   });
@@ -62,7 +81,7 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
   const prepareChartData = (): StrategyChartData[] => {
     // First try to use the analysis results if available
     if (analysisData?.losing_strategy_flags) {
-      const flags = analysisData.losing_strategy_flags;
+      const flags = analysisData.losing_strategy_flags as LosingStrategyFlags;
       return [
         {
           subject: 'Being Right',
