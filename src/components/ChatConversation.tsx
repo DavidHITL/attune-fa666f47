@@ -6,6 +6,8 @@ import { useChatMessages } from "@/hooks/useChatMessages";
 import { useSendMessage } from "@/hooks/useSendMessage";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DatabaseIcon } from "lucide-react";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
@@ -102,6 +104,16 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
 
   return (
     <div className="flex flex-col h-full">
+      {useLocalFallback && (
+        <Alert variant="destructive" className="m-4">
+          <DatabaseIcon className="h-4 w-4" />
+          <AlertTitle>Database Connection Issue</AlertTitle>
+          <AlertDescription>
+            Unable to save messages to the database. Your messages will be stored locally only for this session.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
         <ChatMessageList
           messages={messages}

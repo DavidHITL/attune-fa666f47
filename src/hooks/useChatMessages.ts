@@ -39,7 +39,7 @@ export function useChatMessages() {
       
       if (!dbMessages) {
         console.log("No messages found or error fetching, creating welcome message");
-        // If no messages or error, add a welcome message and save it
+        // If no messages or error, add a welcome message
         const welcomeMessage = {
           id: "welcome",
           text: "Hi there. How are you feeling today?",
@@ -49,8 +49,16 @@ export function useChatMessages() {
         
         setMessages([welcomeMessage]);
         
-        // Save the welcome message to database
-        await saveMessage(welcomeMessage.text, false);
+        // Don't try to save the welcome message if we already had database errors
+        if (!useLocalFallback) {
+          // Try saving the welcome message to database, but don't throw if it fails
+          try {
+            await saveMessage(welcomeMessage.text, false);
+          } catch (err) {
+            console.log("Could not save welcome message, continuing in local mode");
+            setUseLocalFallback(true);
+          }
+        }
       } else {
         console.log("Setting messages from database:", dbMessages.length);
         setMessages(dbMessages);
@@ -71,15 +79,24 @@ export function useChatMessages() {
         isUser: false,
         timestamp: new Date()
       }]);
+      
+      // Mark as using local fallback
+      setUseLocalFallback(true);
     } finally {
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-  }, [user]);
+  }, [user, useLocalFallback]);
 
   const saveMessageToDatabase = useCallback(async (text: string, isUser: boolean) => {
     try {
       if (!user) return null; // Don't save if no user is logged in
+      
+      // If we're already in local fallback mode, don't try to save to the database
+      if (useLocalFallback) {
+        console.log("In local fallback mode, not saving to database");
+        return null;
+      }
       
       console.log("Saving message to database:", { text, isUser, userId: user.id });
       
@@ -90,11 +107,6 @@ export function useChatMessages() {
         console.error("Could not save message to database");
         if (!useLocalFallback) {
           setUseLocalFallback(true);
-          toast({
-            title: "Connection Issue",
-            description: "Could not save your messages. Switching to local mode.",
-            variant: "destructive"
-          });
         }
         return null;
       }
@@ -105,11 +117,6 @@ export function useChatMessages() {
       console.error("Failed to save message:", error);
       if (!useLocalFallback) {
         setUseLocalFallback(true);
-        toast({
-          title: "Connection Issue",
-          description: "Could not save your messages. Switching to local mode.",
-          variant: "destructive"
-        });
       }
       return null;
     }

@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { generateResponse } from "@/services/responseGenerator";
 import { speakMessage } from "@/components/ChatSpeech";
-import { createMessageObject, saveMessage } from "@/services/chatApiService";
+import { createMessageObject } from "@/services/chatApiService";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 
@@ -72,17 +72,26 @@ export function useSendMessage({
     setIsLoading(true);
 
     try {
-      // Save user message to database and get the saved message ID
-      const savedMessageId = await saveMessageToDatabase(text, true);
-      if (savedMessageId) {
-        // Update the message ID in state if we got one from the database
-        newUserMessage.id = savedMessageId.toString();
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === newUserMessage.id ? {...msg, id: savedMessageId.toString()} : msg
-          )
-        );
-        needsIdUpdate = false;
+      // Only try to save to database if not already in local fallback mode
+      if (!useLocalFallback) {
+        try {
+          // Save user message to database and get the saved message ID
+          const savedMessageId = await saveMessageToDatabase(text, true);
+          if (savedMessageId) {
+            // Update the message ID in state if we got one from the database
+            newUserMessage.id = savedMessageId.toString();
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === newUserMessage.id ? {...msg, id: savedMessageId.toString()} : msg
+              )
+            );
+            needsIdUpdate = false;
+          }
+        } catch (err) {
+          console.error("Could not save user message:", err);
+          setUseLocalFallback(true);
+          // Continue with local mode
+        }
       }
       
       // Generate bot response
@@ -93,10 +102,18 @@ export function useSendMessage({
         setUseLocalFallback
       );
 
-      // Save bot response to database
-      const savedBotMessageId = await saveMessageToDatabase(botResponse.text, false);
-      if (savedBotMessageId) {
-        botResponse.id = savedBotMessageId.toString();
+      // Try to save bot response to database if not in local fallback mode
+      if (!useLocalFallback) {
+        try {
+          const savedBotMessageId = await saveMessageToDatabase(botResponse.text, false);
+          if (savedBotMessageId) {
+            botResponse.id = savedBotMessageId.toString();
+          }
+        } catch (err) {
+          console.error("Could not save bot response:", err);
+          setUseLocalFallback(true);
+          // Continue with local mode
+        }
       }
 
       // Add bot response to local state
@@ -125,7 +142,16 @@ export function useSendMessage({
     } finally {
       setIsLoading(false);
     }
-  }, [user, messages, useLocalFallback, setUseLocalFallback, saveMessageToDatabase, setMessages, isSpeechEnabled, checkMessageAnalysisThreshold]);
+  }, [
+    user, 
+    messages, 
+    useLocalFallback, 
+    setUseLocalFallback, 
+    saveMessageToDatabase, 
+    setMessages, 
+    isSpeechEnabled, 
+    checkMessageAnalysisThreshold
+  ]);
 
   return {
     isLoading,

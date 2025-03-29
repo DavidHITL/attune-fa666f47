@@ -79,16 +79,29 @@ export const createMessageObject = (text: string, isUser: boolean): Message => {
   };
 };
 
-// Save message directly to database
+// Save message to database with explicit error handling for RLS policy issues
 export const saveMessage = async (text: string, isUser: boolean): Promise<string | null> => {
   try {
     // Check if the user is logged in
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!session || !session.user || !session.user.id) {
       console.error("No valid session found when saving message");
       return null;
     }
     
+    // First check if we can access the messages table
+    const { error: testError } = await supabase
+      .from('messages')
+      .select('id')
+      .limit(1);
+      
+    if (testError) {
+      console.error("Error testing access to messages table:", testError);
+      // If we can't access the table, don't try to insert
+      return null;
+    }
+    
+    // Try to insert the message with explicit user_id set to current user
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -102,11 +115,17 @@ export const saveMessage = async (text: string, isUser: boolean): Promise<string
     if (error) {
       console.error("Error saving message to database:", error);
       if (error.code === '42501' || error.message.includes('policy')) {
-        console.error("This appears to be a Row Level Security (RLS) policy issue");
+        console.error("Row Level Security (RLS) policy issue detected:", error.message);
+        toast({
+          title: "Database Access Issue",
+          description: "Could not save your message to the database due to permissions. Using local mode.",
+          variant: "destructive"
+        });
       }
       return null;
     }
     
+    console.log("Message saved successfully with ID:", data?.id);
     return data?.id?.toString() || null;
   } catch (error) {
     console.error("Failed to save message:", error);
@@ -119,8 +138,24 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
   try {
     // Check if the user is logged in
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!session || !session.user) {
       console.error("No valid session found when fetching messages");
+      return null;
+    }
+
+    // First test if we can access the messages table
+    const { data: testData, error: testError } = await supabase
+      .from('messages')
+      .select('count')
+      .limit(1);
+      
+    if (testError) {
+      console.error("Error testing access to messages table:", testError);
+      toast({
+        title: "Database Access Issue",
+        description: "Could not fetch your chat history. Using local storage instead.",
+        variant: "destructive"
+      });
       return null;
     }
 
@@ -133,12 +168,13 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
     if (error) {
       console.error("Error fetching messages:", error);
       if (error.code === '42501' || error.message.includes('policy')) {
-        console.error("This appears to be a Row Level Security (RLS) policy issue");
+        console.error("Row Level Security (RLS) policy issue detected:", error.message);
       }
       return null;
     }
     
     if (!data || data.length === 0) {
+      console.log("No messages found in database");
       return null;
     }
     
