@@ -20,7 +20,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onRequestEndSession
 }) => {
   return (
-    <div className="relative">
+    <div className="relative max-w-2xl mx-auto w-full">
       {/* Timer component with session end time */}
       <Timer 
         initialMinutes={25} 
@@ -45,7 +45,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       
       {/* End session button appears when session is active */}
       {sessionStarted && (
-        <div className="absolute top-2 left-2 z-10">
+        <div className="absolute top-2 left-0 z-10">
           <Button
             variant="outline"
             size="sm"
