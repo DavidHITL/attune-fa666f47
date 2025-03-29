@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import Chat from "./pages/Chat";
 import Learn from "./pages/Learn";
 import You from "./pages/You";
+import Landing from "./pages/Landing";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +20,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/home" element={<Index />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/learn" element={<Learn />} />
           <Route path="/you" element={<You />} />
