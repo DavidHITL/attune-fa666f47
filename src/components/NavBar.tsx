@@ -20,22 +20,23 @@ const NavBar: React.FC = () => {
           >
             Learn
           </Link>
-        </div>
-        
-        <div className="text-center flex-1">
           {currentPath === "/learn" && (
             <span className="text-xl font-medium">Learn</span>
           )}
+        </div>
+        
+        <div className="text-center flex-1">
+          <Link 
+            to="/you" 
+            className={cn(
+              "text-apple-gray hover:text-apple-gray-3 transition-colors",
+              currentPath === "/you" && "invisible"
+            )}
+          >
+            You
+          </Link>
           {currentPath === "/you" && (
             <span className="text-xl font-medium">You</span>
-          )}
-          {currentPath === "/chat" && (
-            <span className="text-xl font-medium">Chat</span>
-          )}
-          {currentPath !== "/learn" && currentPath !== "/you" && currentPath !== "/chat" && (
-            <Link to="/you" className="text-apple-gray hover:text-apple-gray-3 transition-colors">
-              You
-            </Link>
           )}
         </div>
         
@@ -49,6 +50,9 @@ const NavBar: React.FC = () => {
           >
             Chat
           </Link>
+          {currentPath === "/chat" && (
+            <span className="text-xl font-medium text-right">Chat</span>
+          )}
         </div>
       </div>
     </nav>
