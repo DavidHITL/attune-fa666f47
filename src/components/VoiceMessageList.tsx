@@ -3,7 +3,7 @@ import React, { useRef, useEffect } from 'react';
 import VoiceMessageBubble from './VoiceMessageBubble';
 
 interface VoiceMessageListProps {
-  messages: Array<{role: 'user' | 'assistant', text: string}>;
+  messages: Array<{role: 'user' | 'assistant', text: string, timestamp?: Date}>;
   transcript: string;
 }
 
@@ -23,7 +23,10 @@ const VoiceMessageList: React.FC<VoiceMessageListProps> = ({ messages, transcrip
         </div>
       ) : (
         messages.map((message, index) => (
-          <VoiceMessageBubble key={index} message={message} />
+          <VoiceMessageBubble key={index} message={{
+            ...message,
+            timestamp: message.timestamp || new Date()
+          }} />
         ))
       )}
       

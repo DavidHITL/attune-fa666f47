@@ -9,6 +9,27 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      analysis_queue: {
+        Row: {
+          created_at: string
+          id: string
+          processed: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          processed?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          processed?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string | null
@@ -93,6 +114,7 @@ export type Database = {
           id: string
           keywords: string[] | null
           linked_partner_id: string | null
+          message_count: number | null
           partner_code: string | null
           retaliation_value: number | null
           summary_text: string | null
@@ -109,6 +131,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           linked_partner_id?: string | null
+          message_count?: number | null
           partner_code?: string | null
           retaliation_value?: number | null
           summary_text?: string | null
@@ -125,6 +148,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           linked_partner_id?: string | null
+          message_count?: number | null
           partner_code?: string | null
           retaliation_value?: number | null
           summary_text?: string | null

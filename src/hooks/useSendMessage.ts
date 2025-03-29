@@ -28,6 +28,32 @@ export function useSendMessage({
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
+  const checkMessageAnalysisThreshold = async (userId: string) => {
+    try {
+      // Get the current user's profile to check message count
+      const { data: profile, error: profileError } = await supabase
+        .from('users_profile')
+        .select('message_count')
+        .eq('user_id', userId)
+        .single();
+
+      if (profileError) {
+        console.error("Error fetching user profile:", profileError);
+        return;
+      }
+
+      // If message count is 19 (will become 20 with this message)
+      if (profile && profile.message_count === 19) {
+        toast({
+          title: "Analyzing your communication patterns",
+          description: "We'll process your messages to provide insights on your communication style.",
+        });
+      }
+    } catch (error) {
+      console.error("Error checking message threshold:", error);
+    }
+  };
+
   const handleSendMessage = async (text: string) => {
     if (!user) {
       toast({
@@ -37,6 +63,9 @@ export function useSendMessage({
       });
       return;
     }
+
+    // Check message threshold before sending
+    await checkMessageAnalysisThreshold(user.id);
 
     // Create new user message
     const newUserMessage: Message = {
