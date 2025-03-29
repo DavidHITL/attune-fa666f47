@@ -4,6 +4,7 @@ import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { saveMessage, fetchMessagesFromDatabase } from "@/services/chatApiService";
 
 export function useChatMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,51 +34,12 @@ export function useChatMessages() {
       setHasError(false);
       console.log("Fetching messages for user:", user.id);
 
-      // Get all previous messages for this user directly, without checking profile first
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+      // Get messages directly from the database using our improved function
+      const dbMessages = await fetchMessagesFromDatabase();
       
-      if (error) {
-        console.error("Error fetching messages:", error);
-        toast({
-          title: "Error loading messages",
-          description: "Could not load your chat history. Using local storage instead.",
-          variant: "destructive"
-        });
-        setHasError(true);
-        
-        // If error, add a welcome message
-        setMessages([{
-          id: "welcome",
-          text: "Hi there. How are you feeling today?",
-          isUser: false,
-          timestamp: new Date()
-        }]);
-        
-        setIsLoading(false);
-        setIsInitialLoad(false);
-        return;
-      }
-      
-      console.log(`Found ${data?.length || 0} messages in database`);
-      
-      if (data && data.length > 0) {
-        // Transform database messages to our app format
-        const formattedMessages: Message[] = data.map(dbMessage => ({
-          id: dbMessage.id.toString(),
-          text: dbMessage.content || '',
-          isUser: dbMessage.sender_type === 'user',
-          timestamp: new Date(dbMessage.created_at)
-        }));
-        
-        console.log("Setting messages from database:", formattedMessages.length);
-        setMessages(formattedMessages);
-      } else {
-        console.log("No messages found, creating welcome message");
-        // If no messages, add a welcome message and save it
+      if (!dbMessages) {
+        console.log("No messages found or error fetching, creating welcome message");
+        // If no messages or error, add a welcome message and save it
         const welcomeMessage = {
           id: "welcome",
           text: "Hi there. How are you feeling today?",
@@ -88,7 +50,10 @@ export function useChatMessages() {
         setMessages([welcomeMessage]);
         
         // Save the welcome message to database
-        await saveMessageToDatabase(welcomeMessage.text, false);
+        await saveMessage(welcomeMessage.text, false);
+      } else {
+        console.log("Setting messages from database:", dbMessages.length);
+        setMessages(dbMessages);
       }
     } catch (error) {
       console.error("Error in fetchMessages:", error);
@@ -118,28 +83,37 @@ export function useChatMessages() {
       
       console.log("Saving message to database:", { text, isUser, userId: user.id });
       
-      // Using upsert to be more resilient - if the insert fails, it will update
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          content: text,
-          user_id: user.id,
-          sender_type: isUser ? 'user' : 'bot'
-        })
-        .select();
+      // Use our improved direct save function
+      const messageId = await saveMessage(text, isUser);
       
-      if (error) {
-        console.error("Error saving message to database:", error);
+      if (!messageId) {
+        console.error("Could not save message to database");
+        if (!useLocalFallback) {
+          setUseLocalFallback(true);
+          toast({
+            title: "Connection Issue",
+            description: "Could not save your messages. Switching to local mode.",
+            variant: "destructive"
+          });
+        }
         return null;
       }
       
-      console.log("Message saved successfully:", data?.[0]?.id);
-      return data?.[0]?.id;
+      console.log("Message saved successfully:", messageId);
+      return messageId;
     } catch (error) {
       console.error("Failed to save message:", error);
+      if (!useLocalFallback) {
+        setUseLocalFallback(true);
+        toast({
+          title: "Connection Issue",
+          description: "Could not save your messages. Switching to local mode.",
+          variant: "destructive"
+        });
+      }
       return null;
     }
-  }, [user]);
+  }, [user, useLocalFallback]);
 
   return {
     messages,

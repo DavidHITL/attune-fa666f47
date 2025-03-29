@@ -12,7 +12,7 @@ interface ChatConversationProps {
 }
 
 const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) => {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const didInitialFetchRef = useRef(false);
   
@@ -39,11 +39,18 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     isSpeechEnabled
   });
 
-  // Fetch messages when the component mounts or user changes
+  // Fetch messages when component mounts or user changes
   useEffect(() => {
+    // Don't attempt to fetch messages while auth state is still loading
+    if (isAuthLoading) {
+      console.log("Auth is still loading, waiting before fetching messages");
+      return;
+    }
+    
     if (!user) {
       // If no user is logged in, just show the welcome message
       if (!initialLoadDone) {
+        console.log("No user logged in, showing welcome message");
         setMessages([{
           id: "welcome",
           text: "Hi there. How are you feeling today?",
@@ -64,10 +71,12 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
       // Set a flag to prevent duplicate fetches
       didInitialFetchRef.current = true;
       
-      // Fetch messages - the hook handles adding a welcome message if none exist
-      fetchMessages();
+      // Add a slight delay to ensure auth is fully initialized
+      setTimeout(() => {
+        fetchMessages();
+      }, 100);
     }
-  }, [user, fetchMessages, setMessages, initialLoadDone]);
+  }, [user, isAuthLoading, fetchMessages, setMessages, initialLoadDone]);
 
   // Reset the ref when user changes
   useEffect(() => {
@@ -77,7 +86,19 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     };
   }, [user?.id]);
 
-  const isLoading = isLoadingMessages || isSendingMessage;
+  const isLoading = isLoadingMessages || isSendingMessage || isAuthLoading;
+
+  // Show appropriate error or loading state
+  if (isAuthLoading) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center">
+        <div className="text-center p-4">
+          <div className="spinner mb-4">Loading...</div>
+          <p>Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

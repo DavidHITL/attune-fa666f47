@@ -65,7 +65,6 @@ export const convertMessagesToApiFormat = (messages: Message[]): ChatMessage[] =
 };
 
 // Generate a unique ID for messages
-// Uses timestamp + random value to ensure uniqueness even in the same millisecond
 export const generateUniqueId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 };
@@ -78,4 +77,83 @@ export const createMessageObject = (text: string, isUser: boolean): Message => {
     isUser,
     timestamp: new Date()
   };
+};
+
+// Save message directly to database
+export const saveMessage = async (text: string, isUser: boolean): Promise<string | null> => {
+  try {
+    // Check if the user is logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error("No valid session found when saving message");
+      return null;
+    }
+    
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        content: text,
+        user_id: session.user.id,
+        sender_type: isUser ? 'user' : 'bot'
+      })
+      .select('id')
+      .single();
+    
+    if (error) {
+      console.error("Error saving message to database:", error);
+      if (error.code === '42501' || error.message.includes('policy')) {
+        console.error("This appears to be a Row Level Security (RLS) policy issue");
+      }
+      return null;
+    }
+    
+    return data?.id?.toString() || null;
+  } catch (error) {
+    console.error("Failed to save message:", error);
+    return null;
+  }
+};
+
+// Fetch messages directly from the database
+export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => {
+  try {
+    // Check if the user is logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error("No valid session found when fetching messages");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error("Error fetching messages:", error);
+      if (error.code === '42501' || error.message.includes('policy')) {
+        console.error("This appears to be a Row Level Security (RLS) policy issue");
+      }
+      return null;
+    }
+    
+    if (!data || data.length === 0) {
+      return null;
+    }
+    
+    // Transform database messages to our app format
+    const formattedMessages: Message[] = data.map(dbMessage => ({
+      id: dbMessage.id.toString(),
+      text: dbMessage.content || '',
+      isUser: dbMessage.sender_type === 'user',
+      timestamp: new Date(dbMessage.created_at)
+    }));
+    
+    console.log(`Fetched ${formattedMessages.length} messages from database`);
+    return formattedMessages;
+  } catch (error) {
+    console.error("Failed to fetch messages:", error);
+    return null;
+  }
 };

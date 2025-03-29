@@ -3,8 +3,7 @@ import { useState, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { generateResponse } from "@/services/responseGenerator";
 import { speakMessage } from "@/components/ChatSpeech";
-import { supabase } from "@/integrations/supabase/client";
-import { createMessageObject } from "@/services/chatApiService";
+import { createMessageObject, saveMessage } from "@/services/chatApiService";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 
@@ -30,20 +29,11 @@ export function useSendMessage({
 
   const checkMessageAnalysisThreshold = useCallback(async (userId: string) => {
     try {
-      // Get the current user's profile to check message count
-      const { data: profile, error: profileError } = await supabase
-        .from('users_profile')
-        .select('message_count')
-        .eq('user_id', userId)
-        .single();
-
-      if (profileError) {
-        console.error("Error fetching user profile:", profileError);
-        return;
-      }
-
+      // Get message count from existing messages instead of making a separate database call
+      const userMessageCount = messages.filter(msg => msg.isUser).length;
+      
       // If message count is 19 (will become 20 with this message)
-      if (profile && profile.message_count === 19) {
+      if (userMessageCount === 19) {
         toast({
           title: "Analyzing your communication patterns",
           description: "We'll process your messages to provide insights on your communication style.",
@@ -52,9 +42,11 @@ export function useSendMessage({
     } catch (error) {
       console.error("Error checking message threshold:", error);
     }
-  }, []);
+  }, [messages]);
 
   const handleSendMessage = useCallback(async (text: string) => {
+    if (!text.trim()) return; // Don't send empty messages
+    
     if (!user) {
       toast({
         title: "Authentication required",
@@ -68,31 +60,32 @@ export function useSendMessage({
     await checkMessageAnalysisThreshold(user.id);
 
     // Create new user message
-    const newUserMessage: Message = {
-      id: Date.now().toString(),
-      text,
-      isUser: true,
-      timestamp: new Date()
-    };
+    const newUserMessage = createMessageObject(text, true);
 
-    // Add user message to local state
+    // Add user message to local state immediately
     setMessages((prevMessages) => [...prevMessages, newUserMessage]);
     
-    // Save user message to database and get the saved message ID
-    const savedMessageId = await saveMessageToDatabase(text, true);
-    if (savedMessageId) {
-      // Update the message ID in state if we got one from the database
-      newUserMessage.id = savedMessageId.toString();
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === newUserMessage.id ? {...msg, id: savedMessageId.toString()} : msg
-        )
-      );
-    }
+    // Track if we need to update the message ID after saving
+    let needsIdUpdate = true;
     
+    // Start loading state for bot reply
     setIsLoading(true);
 
     try {
+      // Save user message to database and get the saved message ID
+      const savedMessageId = await saveMessageToDatabase(text, true);
+      if (savedMessageId) {
+        // Update the message ID in state if we got one from the database
+        newUserMessage.id = savedMessageId.toString();
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === newUserMessage.id ? {...msg, id: savedMessageId.toString()} : msg
+          )
+        );
+        needsIdUpdate = false;
+      }
+      
+      // Generate bot response
       const botResponse = await generateResponse(
         text, 
         messages, 
@@ -100,7 +93,7 @@ export function useSendMessage({
         setUseLocalFallback
       );
 
-      // Save bot response to database and get the saved message ID
+      // Save bot response to database
       const savedBotMessageId = await saveMessageToDatabase(botResponse.text, false);
       if (savedBotMessageId) {
         botResponse.id = savedBotMessageId.toString();
@@ -119,6 +112,16 @@ export function useSendMessage({
         description: "Failed to generate a response. Please try again.",
         variant: "destructive"
       });
+      
+      // If we couldn't save the user message with an ID and still need to update
+      if (needsIdUpdate) {
+        // Make sure the message still appears in the UI even if saving failed
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === newUserMessage.id ? {...msg} : msg
+          )
+        );
+      }
     } finally {
       setIsLoading(false);
     }
