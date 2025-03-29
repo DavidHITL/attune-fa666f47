@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import ChatMessageList from "./ChatMessageList";
 import ChatInput from "./ChatInput";
@@ -63,10 +64,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   const handleRetryDatabaseConnection = () => {
     if (!user) return;
     
-    toast({
-      title: "Retrying database connection",
-      description: "Attempting to reconnect to the database...",
-    });
+    console.log("Retrying database connection");
     
     setUseLocalFallback(false);
     didInitialFetchRef.current = false;
@@ -153,7 +151,9 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
           isInitialLoad={isInitialLoad}
         />
       </div>
-      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+      <div className="bg-apple-gray-6">
+        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+      </div>
     </div>
   );
 };

@@ -38,7 +38,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
   return (
     <form 
       onSubmit={handleSubmit} 
-      className="p-2 border-t border-gray-200 bg-white max-w-2xl mx-auto w-full"
+      className="p-2 border-t border-gray-200 bg-apple-gray-6 max-w-2xl mx-auto w-full"
     >
       <div className="flex items-center relative">
         <input
@@ -46,7 +46,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Type a message..."
-          className="w-full rounded-full border border-gray-300 py-3 px-4 pr-[80px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-full border border-gray-300 py-3 px-4 pr-[80px] focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
           disabled={isLoading}
         />
         <div className="absolute right-3 flex space-x-2">
