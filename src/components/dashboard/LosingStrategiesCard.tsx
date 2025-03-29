@@ -2,16 +2,7 @@
 import React from "react";
 import { Radar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer } from "@/components/ui/chart";
-import {
-  ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Tooltip,
-  Radar as RadarPlot
-} from "recharts";
+import LosingStrategiesChart, { StrategyChartData } from "./LosingStrategiesChart";
 
 // Interface for the profile data from users_profile table
 interface UserProfileData {
@@ -28,7 +19,7 @@ interface LosingStrategiesCardProps {
 
 const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData }) => {
   // Dummy data for the radar chart (if no real data available)
-  const dummyChartData = [
+  const dummyChartData: StrategyChartData[] = [
     { subject: 'Being Right', value: 3.5, fullMark: 5 },
     { subject: 'Unbridled Self Expression', value: 2.7, fullMark: 5 },
     { subject: 'Controlling', value: 4.2, fullMark: 5 },
@@ -37,7 +28,7 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
   ];
 
   // Prepare data for the radar chart
-  const prepareChartData = (data: UserProfileData | undefined) => {
+  const prepareChartData = (data: UserProfileData | undefined): StrategyChartData[] => {
     if (!data) return dummyChartData;
 
     // Replace null values with 0 and prepare data structure for the chart
@@ -71,12 +62,6 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
   };
 
   const chartData = prepareChartData(profileData);
-  const chartConfig = {
-    userValues: {
-      label: "Your Values",
-      color: "#2563EB", // Blue color
-    },
-  };
 
   return (
     <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
@@ -85,26 +70,7 @@ const LosingStrategiesCard: React.FC<LosingStrategiesCardProps> = ({ profileData
         <CardTitle className="text-xl">Losing Strategies</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] w-full">
-          <ChartContainer config={chartConfig} className="h-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="subject" />
-                <PolarRadiusAxis domain={[0, 5]} />
-                <Tooltip />
-                <RadarPlot
-                  name="Your Values"
-                  dataKey="value"
-                  stroke="#2563EB"
-                  fill="#2563EB"
-                  fillOpacity={0.6}
-                  data={chartData}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </div>
+        <LosingStrategiesChart chartData={chartData} />
         <div className="mt-4">
           <p className="text-sm text-muted-foreground">
             This visualization shows your tendency toward five losing strategies in communication.
