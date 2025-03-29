@@ -34,7 +34,11 @@ if (typeof window !== 'undefined') {
     onvoiceschanged: null,
     paused: false,
     pending: false,
-    speaking: false
+    speaking: false,
+    // Add EventTarget methods that SpeechSynthesis inherits
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn()
   };
 }
 
