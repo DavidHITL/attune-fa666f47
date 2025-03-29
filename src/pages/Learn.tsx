@@ -1,8 +1,6 @@
 
 import React from "react";
 import { Container } from "@/components/ui/Container";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Book } from "lucide-react";
 import KnowledgeBaseExplorer from "@/components/learn/KnowledgeBaseExplorer";
 import KnowledgeImportForm from "@/components/learn/KnowledgeImportForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,12 +16,6 @@ export default function Learn() {
     <>
       <NavBar />
       <Container>
-        <PageHeader
-          title="Learn"
-          description="Explore Terry Real's relational therapy concepts and methodologies"
-          icon={<Book className="w-10 h-10" />}
-        />
-
         <Tabs defaultValue="explore" className="mt-6">
           <TabsList className="mb-4">
             <TabsTrigger value="explore">Explore Knowledge Base</TabsTrigger>
