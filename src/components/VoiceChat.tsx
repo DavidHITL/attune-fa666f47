@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -9,11 +9,11 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, X, Phone } from "lucide-react";
-import { RealtimeChat } from "@/utils/RealtimeAudio";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { X, Phone } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useVoiceChat } from "@/hooks/useVoiceChat";
+import VoiceMessageList from './VoiceMessageList';
+import VoiceInputArea from './VoiceInputArea';
 
 interface VoiceChatProps {
   open: boolean;
@@ -21,12 +21,17 @@ interface VoiceChatProps {
 }
 
 const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [transcript, setTranscript] = useState("");
-  const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', text: string}>>([]);
-  const chatRef = useRef<RealtimeChat | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+  const {
+    isConnecting,
+    transcript,
+    setTranscript,
+    messages,
+    chatRef,
+    connect,
+    disconnect,
+    sendMessage
+  } = useVoiceChat(user);
 
   // Handle connection to voice API
   useEffect(() => {
@@ -36,106 +41,14 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
     
     return () => {
       if (chatRef.current) {
-        chatRef.current.disconnect();
-        chatRef.current = null;
+        disconnect();
       }
     };
   }, [open]);
 
-  // Scroll to bottom of messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Save message to database
-  const saveMessageToDatabase = async (text: string, isUser: boolean) => {
-    try {
-      if (!user) return; // Don't save if no user is logged in
-      
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          content: text,
-          user_id: user.id,
-          sender_type: isUser ? 'user' : 'bot'
-        })
-        .select();
-      
-      if (error) {
-        console.error("Error saving voice message to database:", error);
-        throw error;
-      }
-      
-      return data?.[0]?.id;
-    } catch (error) {
-      console.error("Failed to save voice message:", error);
-      // Continue with local message handling even if database save fails
-      return null;
-    }
-  };
-
-  const connect = async () => {
-    try {
-      setIsConnecting(true);
-      
-      chatRef.current = new RealtimeChat((text) => {
-        setTranscript(prev => prev + text);
-      });
-      
-      await chatRef.current.connect();
-      
-      toast({
-        title: "Voice chat active",
-        description: "You can now speak with the AI assistant."
-      });
-
-      // Set up listener for AI responses
-      if (chatRef.current) {
-        // Listen for AI responses
-        chatRef.current.addEventListener('response', async (response: string) => {
-          // Add AI response to local state
-          setMessages(prev => [...prev, { role: 'assistant', text: response }]);
-          
-          // Save AI response to database
-          await saveMessageToDatabase(response, false);
-        });
-      }
-    } catch (error) {
-      console.error("Failed to start voice chat:", error);
-      toast({
-        title: "Connection failed",
-        description: error instanceof Error ? error.message : "Could not connect to voice chat",
-        variant: "destructive"
-      });
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
   const handleClose = () => {
-    if (chatRef.current) {
-      chatRef.current.disconnect();
-      chatRef.current = null;
-    }
-    setTranscript("");
-    setMessages([]);
+    disconnect();
     onOpenChange(false);
-  };
-
-  const handleSendMessage = async () => {
-    if (!chatRef.current || !transcript.trim()) return;
-
-    // Add user message to chat
-    setMessages(prev => [...prev, { role: 'user', text: transcript }]);
-    
-    // Save user message to database
-    await saveMessageToDatabase(transcript, true);
-    
-    // Send the message
-    chatRef.current.sendMessage(transcript);
-    
-    // Clear transcript for next input
-    setTranscript("");
   };
 
   return (
@@ -147,59 +60,13 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50 rounded-md my-4 min-h-[300px]">
-          {messages.length === 0 ? (
-            <div className="text-center text-gray-500 py-10">
-              Speak naturally with the AI assistant or type a message below.
-            </div>
-          ) : (
-            messages.map((message, index) => (
-              <div 
-                key={index} 
-                className={`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`}
-              >
-                <div 
-                  className={`inline-block px-4 py-2 rounded-lg ${
-                    message.role === 'user' 
-                      ? 'bg-blue-500 text-white rounded-br-none' 
-                      : 'bg-gray-200 text-gray-800 rounded-bl-none'
-                  }`}
-                >
-                  {message.text}
-                </div>
-              </div>
-            ))
-          )}
-          
-          {transcript && (
-            <div className="text-right mb-4">
-              <div className="inline-block px-4 py-2 rounded-lg bg-blue-500 text-white rounded-br-none">
-                {transcript}
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
+        <VoiceMessageList messages={messages} transcript={transcript} />
         
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-              placeholder="Type a message..."
-              className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <Button
-            disabled={!transcript.trim()}
-            onClick={handleSendMessage}
-            size="sm"
-          >
-            Send
-          </Button>
-        </div>
+        <VoiceInputArea 
+          transcript={transcript} 
+          setTranscript={setTranscript} 
+          onSend={sendMessage}
+        />
         
         <DialogFooter>
           <div className="flex gap-2 items-center justify-between w-full">
