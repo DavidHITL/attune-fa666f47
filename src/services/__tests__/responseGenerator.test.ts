@@ -1,12 +1,8 @@
 
-// This file would contain unit tests for the responseGenerator functionality
-// Implementation would require Jest or another testing library to be set up
-// Basic structure would be:
-
-/*
 import { generateResponse } from "../responseGenerator";
 import { callChatApi } from "../chatApiService";
 import { generateLocalResponse } from "../../utils/localResponseGenerator";
+import { toast } from "@/hooks/use-toast";
 
 // Mock dependencies
 jest.mock("../chatApiService", () => ({
@@ -78,6 +74,58 @@ describe("generateResponse", () => {
     expect(setUseLocalFallback).toHaveBeenCalledWith(true);
   });
 
-  // Additional test cases would go here
+  it("should use local response directly when useLocalFallback is true", async () => {
+    // Setup mocks
+    (generateLocalResponse as jest.Mock).mockReturnValue("Local response");
+    
+    const setUseLocalFallback = jest.fn();
+    
+    // Call function
+    const result = await generateResponse(
+      "Hello",
+      [],
+      true,
+      setUseLocalFallback
+    );
+    
+    // Assertions
+    expect(callChatApi).not.toHaveBeenCalled();
+    expect(generateLocalResponse).toHaveBeenCalled();
+    expect(result.text).toBe("Local response");
+    expect(setUseLocalFallback).not.toHaveBeenCalled();
+  });
+
+  it("should return error message for empty input", async () => {
+    // Call function with empty input
+    const result = await generateResponse(
+      "",
+      [],
+      false,
+      jest.fn()
+    );
+    
+    // Assertions
+    expect(result.text).toContain("didn't receive");
+    expect(result.isUser).toBe(false);
+  });
+
+  it("should handle general errors gracefully", async () => {
+    // Setup a mock that throws an unexpected error
+    (callChatApi as jest.Mock).mockImplementation(() => {
+      throw new Error("Unexpected error");
+    });
+    
+    // Call function
+    const result = await generateResponse(
+      "Hello",
+      [],
+      false,
+      jest.fn()
+    );
+    
+    // Assertions
+    expect(result.text).toContain("sorry");
+    expect(result.isUser).toBe(false);
+    expect(toast).toHaveBeenCalled();
+  });
 });
-*/

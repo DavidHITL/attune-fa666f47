@@ -1,8 +1,12 @@
 
 import { useState } from "react";
 import { Message } from "@/components/MessageBubble";
-import { generateResponse } from "@/components/ChatResponseGenerator";
+import { generateResponse } from "@/services/responseGenerator";
 import { speakMessage } from "@/components/ChatSpeech";
+import { supabase } from "@/integrations/supabase/client";
+import { createMessageObject } from "@/services/chatApiService";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 interface UseSendMessageProps {
   messages: Message[];
@@ -22,8 +26,18 @@ export function useSendMessage({
   isSpeechEnabled
 }: UseSendMessageProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
 
   const handleSendMessage = async (text: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You need to be logged in to send messages.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Create new user message
     const newUserMessage: Message = {
       id: Date.now().toString(), // Convert to string
@@ -69,6 +83,13 @@ export function useSendMessage({
       // Speak the bot's response if speech is enabled
       speakMessage(botResponse.text, isSpeechEnabled);
       
+    } catch (error) {
+      console.error("Error generating response:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate a response. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
