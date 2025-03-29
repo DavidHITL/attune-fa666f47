@@ -18,9 +18,9 @@ serve(async (req) => {
   if (upgradeHeader.toLowerCase() === "websocket") {
     try {
       const { socket, response } = Deno.upgradeWebSocket(req);
-      const ANTHROPIC_API_KEY = Deno.env.get("anthropic");
+      const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
       
-      if (!ANTHROPIC_API_KEY) {
+      if (!OPENAI_API_KEY) {
         socket.close(1011, "API key not configured");
         return response;
       }
@@ -78,9 +78,9 @@ serve(async (req) => {
 
   // Handle regular HTTP requests for token generation
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get("anthropic");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     
-    if (!ANTHROPIC_API_KEY) {
+    if (!OPENAI_API_KEY) {
       throw new Error('API key not configured');
     }
     
@@ -88,7 +88,7 @@ serve(async (req) => {
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${ANTHROPIC_API_KEY}`,
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

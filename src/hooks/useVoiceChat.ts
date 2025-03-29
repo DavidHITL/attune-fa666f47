@@ -9,6 +9,7 @@ export function useVoiceChat(user: any | null) {
   const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', text: string, timestamp?: Date}>>([]);
   const chatRef = useRef<RealtimeChat | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [lastSpeechData, setLastSpeechData] = useState<Float32Array | null>(null);
 
   // Save message to database
   const saveMessageToDatabase = async (text: string, isUser: boolean) => {
@@ -111,6 +112,19 @@ export function useVoiceChat(user: any | null) {
     setTranscript("");
   };
 
+  // Process and send speech data to API if available
+  useEffect(() => {
+    if (!chatRef.current || !lastSpeechData) return;
+    
+    chatRef.current.sendSpeechData(lastSpeechData);
+    setLastSpeechData(null);
+  }, [lastSpeechData]);
+
+  // Process audio input from the microphone
+  const processSpeechInput = (audioData: Float32Array) => {
+    setLastSpeechData(audioData);
+  };
+
   return {
     isConnecting,
     transcript,
@@ -119,6 +133,7 @@ export function useVoiceChat(user: any | null) {
     chatRef,
     connect,
     disconnect,
-    sendMessage
+    sendMessage,
+    processSpeechInput
   };
 }
