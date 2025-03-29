@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
@@ -9,6 +8,7 @@ type AuthContextType = {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
+  isAdmin: () => boolean;
   signUp: (email: string, password: string) => Promise<{
     error: Error | null;
     success: boolean;
@@ -22,6 +22,11 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// List of admin emails - normally this would be in a database
+const ADMIN_EMAILS = [
+  // Add your email here to grant yourself admin access
+];
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   children 
 }) => {
@@ -29,6 +34,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Function to check if current user is an admin
+  const isAdmin = () => {
+    if (!user) return false;
+    return ADMIN_EMAILS.includes(user.email || '');
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -184,6 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         session,
         isLoading,
+        isAdmin,
         signUp,
         signIn,
         signOut,
