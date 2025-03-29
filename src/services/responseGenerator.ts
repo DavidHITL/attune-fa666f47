@@ -2,7 +2,8 @@
 import { Message } from "@/components/MessageBubble";
 import { toast } from "@/hooks/use-toast";
 import { generateLocalResponse } from "@/utils/localResponseGenerator";
-import { callChatApi, convertMessagesToApiFormat, createMessageObject, ChatMessage } from "./chatApiService";
+import { callChatApi } from "./api/chatService";
+import { createMessageObject, convertMessagesToApiFormat, ChatMessage } from "./chatApiService";
 
 // Function to generate a response, either from Supabase or locally
 export const generateResponse = async (

@@ -6,10 +6,12 @@ import { ChatMessage } from "../messages/messageUtils";
 // Function to call the Supabase Edge Function
 export const callChatApi = async (
   message: string,
-  conversationHistory: ChatMessage[]
+  conversationHistory: ChatMessage[],
+  sessionProgress: number = 0 // Default to 0 if not provided
 ): Promise<string> => {
   console.log("Calling generateChatResponse function");
   console.log("Conversation history length:", conversationHistory.length);
+  console.log("Session progress:", sessionProgress);
   
   try {
     // Check if the session is valid before making the request
@@ -22,7 +24,8 @@ export const callChatApi = async (
     const { data, error } = await supabase.functions.invoke('generateChatResponse', {
       body: {
         message,
-        conversationHistory
+        conversationHistory,
+        sessionProgress
       }
     });
 
