@@ -49,7 +49,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           <Button
             variant="outline"
             size="sm"
-            className="border-red-200 text-red-600 hover:bg-red-50"
+            className="border-gray-200 text-black hover:bg-gray-50"
             onClick={onRequestEndSession}
           >
             End Session

@@ -96,8 +96,8 @@ const Timer: React.FC<TimerProps> = ({
   const formattedTime = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
   return (
-    <div className={`text-center py-4 ${isAlmostDone ? 'text-red-600' : 'text-gray-600'} flex justify-center items-center gap-2`}>
-      {isAlmostDone && <AlertTriangle size={16} className="text-red-600" />}
+    <div className={`text-center py-4 ${isAlmostDone ? 'text-black' : 'text-gray-600'} flex justify-center items-center gap-2`}>
+      {isAlmostDone && <AlertTriangle size={16} className="text-black" />}
       {isActive ? (
         <>{formattedTime} remaining in session</>
       ) : (
