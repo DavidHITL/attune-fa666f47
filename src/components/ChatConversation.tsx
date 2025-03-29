@@ -59,7 +59,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
       if (data && data.length > 0) {
         // Transform database messages to our app format
         const formattedMessages: Message[] = data.map(dbMessage => ({
-          id: dbMessage.id,
+          id: dbMessage.id.toString(), // Ensure ID is a string
           text: dbMessage.content || '',
           isUser: dbMessage.sender_type === 'user',
           timestamp: new Date(dbMessage.created_at)
@@ -123,7 +123,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
   const handleSendMessage = async (text: string) => {
     // Create new user message
     const newUserMessage: Message = {
-      id: Date.now().toString(),
+      id: Date.now().toString(), // Convert to string
       text,
       isUser: true,
       timestamp: new Date()

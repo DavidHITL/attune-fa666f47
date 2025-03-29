@@ -55,7 +55,7 @@ export const generateResponse = async (
 
         // Return AI response
         return {
-          id: (Date.now() + 1).toString(),
+          id: Date.now().toString(), // Convert to string
           text: data.reply,
           isUser: false,
           timestamp: new Date()
@@ -67,7 +67,7 @@ export const generateResponse = async (
         // Generate local response as fallback
         const localReply = generateLocalResponse(text);
         return {
-          id: (Date.now() + 1).toString(),
+          id: Date.now().toString(), // Convert to string
           text: localReply,
           isUser: false,
           timestamp: new Date()
@@ -77,7 +77,7 @@ export const generateResponse = async (
       // Use local response generation
       const localReply = generateLocalResponse(text);
       return {
-        id: (Date.now() + 1).toString(),
+        id: Date.now().toString(), // Convert to string
         text: localReply,
         isUser: false,
         timestamp: new Date()
@@ -93,7 +93,7 @@ export const generateResponse = async (
 
     // Return fallback response in case of error
     return {
-      id: (Date.now() + 1).toString(),
+      id: Date.now().toString(), // Convert to string
       text: "I'm sorry, I couldn't process your message right now. Please try again later.",
       isUser: false,
       timestamp: new Date()
