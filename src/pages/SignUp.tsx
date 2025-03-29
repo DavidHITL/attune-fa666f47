@@ -158,7 +158,7 @@ const SignUp: React.FC = () => {
       </main>
 
       <footer className="text-center py-6 text-xs text-gray-500 border-t border-gray-200">
-        understand yourself<br />
+        Attune<br />
         Napkin LLC — Zurich
       </footer>
     </div>

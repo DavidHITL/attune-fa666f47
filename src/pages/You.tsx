@@ -184,7 +184,7 @@ const You: React.FC = () => {
         </div>
       </div>
       <footer className="text-center py-3 text-xs text-gray-500 border-t border-gray-200">
-        understand yourself<br />
+        Attune<br />
         Napkin LLC — Zurich
       </footer>
     </div>
