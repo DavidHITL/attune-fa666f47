@@ -12,6 +12,14 @@ export const generateResponse = async (
   setUseLocalFallback: (value: boolean) => void
 ): Promise<Message> => {
   try {
+    // Validate input
+    if (!text || text.trim() === "") {
+      return createMessageObject(
+        "I didn't receive a message. Please try again.",
+        false
+      );
+    }
+    
     if (!useLocalFallback) {
       try {
         // Prepare conversation history for the API
@@ -20,11 +28,23 @@ export const generateResponse = async (
         // Call the Supabase Edge Function
         const reply = await callChatApi(text, conversationHistory);
 
+        // Validate reply
+        if (!reply || typeof reply !== "string" || reply.trim() === "") {
+          throw new Error("Received an invalid response from the AI service");
+        }
+
         // Return AI response
         return createMessageObject(reply, false);
       } catch (error) {
         console.error("Error with Supabase function, falling back to local processing:", error);
         setUseLocalFallback(true);
+        
+        // Show a toast notification about the fallback
+        toast({
+          title: "Using local response mode",
+          description: "There was an issue with the AI service. Using simplified responses.",
+          variant: "default"
+        });
         
         // Generate local response as fallback
         const localReply = generateLocalResponse(text);

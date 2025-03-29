@@ -28,7 +28,11 @@ export const callChatApi = async (
     throw new Error(`Error calling function: ${error.message}`);
   }
 
-  if (!data || !data.success) {
+  if (!data) {
+    throw new Error("No response data received");
+  }
+  
+  if (!data.success) {
     throw new Error(data?.error || "Failed to get response");
   }
 
@@ -43,10 +47,16 @@ export const convertMessagesToApiFormat = (messages: Message[]): ChatMessage[] =
   }));
 };
 
+// Generate a unique ID for messages
+// Uses timestamp + random value to ensure uniqueness even in the same millisecond
+export const generateUniqueId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+};
+
 // Create a message object
 export const createMessageObject = (text: string, isUser: boolean): Message => {
   return {
-    id: Date.now().toString(),
+    id: generateUniqueId(),
     text,
     isUser,
     timestamp: new Date()
