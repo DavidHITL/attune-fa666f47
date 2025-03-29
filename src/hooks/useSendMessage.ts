@@ -4,7 +4,6 @@ import { Message } from "@/components/MessageBubble";
 import { generateResponse } from "@/services/responseGenerator";
 import { speakMessage } from "@/components/ChatSpeech";
 import { createMessageObject } from "@/services/chatApiService";
-import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -34,11 +33,7 @@ export function useSendMessage({
     if (!text.trim()) return; // Don't send empty messages
     
     if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "You need to be logged in to send messages.",
-        variant: "destructive"
-      });
+      console.error("Authentication required to send messages");
       return;
     }
 
@@ -108,11 +103,6 @@ export function useSendMessage({
       
     } catch (error) {
       console.error("Error generating response:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate a response. Please try again.",
-        variant: "destructive"
-      });
       
       // If we couldn't save the user message with an ID and still need to update
       if (needsIdUpdate) {

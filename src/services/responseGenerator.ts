@@ -1,6 +1,5 @@
 
 import { Message } from "@/components/MessageBubble";
-import { toast } from "@/hooks/use-toast";
 import { generateLocalResponse } from "@/utils/localResponseGenerator";
 import { callChatApi } from "./api/chatService";
 import { createMessageObject, convertMessagesToApiFormat, ChatMessage } from "./chatApiService";
@@ -45,13 +44,6 @@ export const generateResponse = async (
         console.error("Error with Supabase function, falling back to local processing:", error);
         setUseLocalFallback(true);
         
-        // Show a toast notification about the fallback
-        toast({
-          title: "Using local response mode",
-          description: "There was an issue with the AI service. Using simplified responses.",
-          variant: "default"
-        });
-        
         // Generate local response as fallback
         const localReply = generateLocalResponse(text);
         return createMessageObject(localReply, false);
@@ -63,11 +55,6 @@ export const generateResponse = async (
     }
   } catch (error) {
     console.error("Error getting chat response:", error);
-    toast({
-      title: "Error",
-      description: "Failed to get a response. Please try again.",
-      variant: "destructive"
-    });
 
     // Return fallback response in case of error
     return createMessageObject(

@@ -1,7 +1,6 @@
 
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
 import { testDatabaseAccess } from "../api/chatService";
 
 // Save message to database with explicit error handling for RLS policy issues
@@ -17,12 +16,8 @@ export const saveMessage = async (text: string, isUser: boolean): Promise<string
     // First check if we can access the messages table
     const hasAccess = await testDatabaseAccess();
     if (!hasAccess) {
-      // Show a more helpful message about RLS issues
-      toast({
-        title: "Database Access Issue",
-        description: "Could not save your message to the database due to permissions. Using local mode.",
-        variant: "destructive"
-      });
+      // Log error about RLS issues
+      console.error("Database access issue: Could not save message due to permissions");
       return null;
     }
     
@@ -41,11 +36,6 @@ export const saveMessage = async (text: string, isUser: boolean): Promise<string
       console.error("Error saving message to database:", error);
       if (error.code === '42501' || error.message.includes('policy')) {
         console.error("Row Level Security (RLS) policy issue detected:", error.message);
-        toast({
-          title: "Database Access Issue",
-          description: "Could not save your message to the database due to permissions. Using local mode.",
-          variant: "destructive"
-        });
       }
       return null;
     }
@@ -71,11 +61,7 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
     // First test if we can access the messages table
     const hasAccess = await testDatabaseAccess();
     if (!hasAccess) {
-      toast({
-        title: "Database Access Issue",
-        description: "Could not fetch your chat history. Using local storage instead.",
-        variant: "destructive"
-      });
+      console.error("Database access issue: Could not fetch chat history");
       return null;
     }
 

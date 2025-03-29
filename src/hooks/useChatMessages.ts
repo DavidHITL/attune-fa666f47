@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { toast } from "@/hooks/use-toast";
 import { saveMessage, fetchMessagesFromDatabase } from "@/services/chatApiService";
 
 export function useChatMessages() {
@@ -66,11 +65,6 @@ export function useChatMessages() {
     } catch (error) {
       console.error("Error in fetchMessages:", error);
       setHasError(true);
-      toast({
-        title: "Error loading messages",
-        description: "Could not load your chat history. Using local storage instead.",
-        variant: "destructive"
-      });
       
       // Set a welcome message if we can't load from the database
       setMessages([{

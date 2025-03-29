@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from "react";
-import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -36,10 +35,7 @@ export const useSessionManager = () => {
     localStorage.setItem('sessionActive', 'true');
     localStorage.setItem('sessionEndTime', endTime.toString());
     
-    toast({
-      title: "Session started",
-      description: "Your 25-minute therapeutic session has begun."
-    });
+    console.log("Session started with end time:", new Date(endTime).toLocaleTimeString());
   };
 
   const handleSessionComplete = () => {
@@ -55,11 +51,7 @@ export const useSessionManager = () => {
       triggerAnalysis(user.id);
     }
     
-    toast({
-      title: "Session ended",
-      description: "Your therapeutic session has ended. Thank you for participating.",
-      variant: "default"
-    });
+    console.log("Session ended");
     
     // Add session closing message to the chat
     const event = new CustomEvent('session-timeout', {
@@ -88,10 +80,7 @@ export const useSessionManager = () => {
       triggerAnalysis(user.id);
     }
     
-    toast({
-      title: "Session ended early",
-      description: "Your session has been ended. Feel free to start a new one when you're ready."
-    });
+    console.log("Session ended early by user");
   };
 
   // Check for active session on component mount

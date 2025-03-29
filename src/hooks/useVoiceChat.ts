@@ -1,7 +1,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { RealtimeChat } from "@/utils/RealtimeAudio";
-import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 export function useVoiceChat(user: any | null) {
@@ -48,10 +47,7 @@ export function useVoiceChat(user: any | null) {
       
       await chatRef.current.connect();
       
-      toast({
-        title: "Voice chat active",
-        description: "You can now speak with the AI assistant."
-      });
+      console.log("Voice chat connected successfully");
 
       // Set up listener for AI responses
       if (chatRef.current) {
@@ -66,11 +62,6 @@ export function useVoiceChat(user: any | null) {
       }
     } catch (error) {
       console.error("Failed to start voice chat:", error);
-      toast({
-        title: "Connection failed",
-        description: error instanceof Error ? error.message : "Could not connect to voice chat",
-        variant: "destructive"
-      });
     } finally {
       setIsConnecting(false);
     }

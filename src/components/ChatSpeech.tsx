@@ -1,7 +1,6 @@
 
 import React, { useEffect } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
 
 interface ChatSpeechProps {
   isSpeechEnabled: boolean;
@@ -18,21 +17,12 @@ const ChatSpeech: React.FC<ChatSpeechProps> = ({
   // Toggle speech functionality
   const toggleSpeech = () => {
     if (!speechAvailable) {
-      toast({
-        title: "Not supported",
-        description: "Speech synthesis is not supported in your browser.",
-        variant: "destructive"
-      });
+      console.error("Speech synthesis is not supported in your browser.");
       return;
     }
     
     setIsSpeechEnabled(!isSpeechEnabled);
     
-    toast({
-      title: isSpeechEnabled ? "Voice feedback disabled" : "Voice feedback enabled",
-      description: isSpeechEnabled ? "The assistant will no longer speak responses." : "The assistant will now speak responses aloud.",
-    });
-
     // If enabling speech, load voices immediately for browsers that need it
     if (!isSpeechEnabled) {
       window.speechSynthesis.getVoices();

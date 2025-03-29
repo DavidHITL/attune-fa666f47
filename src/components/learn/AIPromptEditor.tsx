@@ -9,7 +9,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrainCircuit, Loader2 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -82,11 +81,7 @@ FOCUS ON:
 
   const onSubmit = async (data: FormData) => {
     if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "You need to be logged in to update AI prompts.",
-        variant: "destructive",
-      });
+      console.error("Authentication required to update AI prompts");
       return;
     }
 
@@ -108,17 +103,9 @@ FOCUS ON:
         throw new Error(response.data?.error || "Failed to update prompts");
       }
       
-      toast({
-        title: "Prompts updated",
-        description: "AI system prompts have been successfully updated.",
-      });
+      console.log("AI system prompts have been successfully updated");
     } catch (error) {
       console.error("Error updating prompts:", error);
-      toast({
-        title: "Update failed",
-        description: error instanceof Error ? error.message : "Failed to update AI prompts",
-        variant: "destructive",
-      });
     } finally {
       setIsSubmitting(false);
     }

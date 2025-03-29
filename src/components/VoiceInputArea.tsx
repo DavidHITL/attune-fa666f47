@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface VoiceInputAreaProps {
@@ -31,12 +30,7 @@ const VoiceInputArea: React.FC<VoiceInputAreaProps> = ({
       }
 
       // If message count is 19 (will become 20 with this message)
-      if (profile && profile.message_count === 19) {
-        toast({
-          title: "Analyzing your communication patterns",
-          description: "We'll process your messages to provide insights on your communication style.",
-        });
-      }
+      // No toast notification is shown anymore
     } catch (error) {
       console.error("Error checking message threshold:", error);
     }
