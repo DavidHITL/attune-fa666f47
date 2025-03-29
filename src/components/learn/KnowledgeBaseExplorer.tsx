@@ -50,7 +50,7 @@ const KnowledgeBaseExplorer: React.FC = () => {
     searchQuery === "" || 
     source.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     source.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    source.content_summary.toLowerCase().includes(searchQuery.toLowerCase())
+    source.content_summary?.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
   return (
@@ -154,16 +154,18 @@ const SourceCard: React.FC<{ source: TherapySource }> = ({ source }) => {
       </div>
       <p className="text-xs text-muted-foreground">{source.author}</p>
       <p className="text-sm mt-1">{source.description}</p>
-      <div className="flex flex-wrap gap-1 mt-2">
-        {source.keywords.map((keyword, index) => (
-          <span 
-            key={index} 
-            className="text-xs px-2 py-0.5 rounded-full bg-slate-100"
-          >
-            {keyword}
-          </span>
-        ))}
-      </div>
+      {source.keywords && source.keywords.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {source.keywords.map((keyword, index) => (
+            <span 
+              key={index} 
+              className="text-xs px-2 py-0.5 rounded-full bg-slate-100"
+            >
+              {keyword}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

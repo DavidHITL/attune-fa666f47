@@ -9,6 +9,24 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_configuration: {
+        Row: {
+          id: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          id: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          id?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       analysis_queue: {
         Row: {
           created_at: string
@@ -105,6 +123,93 @@ export type Database = {
           id?: string
           partner_id?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      therapy_concepts: {
+        Row: {
+          added_by: string | null
+          alternative_names: string[] | null
+          category: string
+          created_at: string
+          description: string
+          examples: string[] | null
+          id: string
+          name: string
+          related_concept_ids: string[] | null
+          source_ids: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          added_by?: string | null
+          alternative_names?: string[] | null
+          category: string
+          created_at?: string
+          description: string
+          examples?: string[] | null
+          id?: string
+          name: string
+          related_concept_ids?: string[] | null
+          source_ids?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          added_by?: string | null
+          alternative_names?: string[] | null
+          category?: string
+          created_at?: string
+          description?: string
+          examples?: string[] | null
+          id?: string
+          name?: string
+          related_concept_ids?: string[] | null
+          source_ids?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      therapy_sources: {
+        Row: {
+          added_by: string | null
+          author: string
+          content_summary: string | null
+          created_at: string
+          description: string
+          full_content: string | null
+          id: string
+          keywords: string[] | null
+          title: string
+          type: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          added_by?: string | null
+          author: string
+          content_summary?: string | null
+          created_at?: string
+          description: string
+          full_content?: string | null
+          id?: string
+          keywords?: string[] | null
+          title: string
+          type: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          added_by?: string | null
+          author?: string
+          content_summary?: string | null
+          created_at?: string
+          description?: string
+          full_content?: string | null
+          id?: string
+          keywords?: string[] | null
+          title?: string
+          type?: string
+          updated_at?: string
+          year?: number
         }
         Relationships: []
       }

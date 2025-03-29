@@ -33,7 +33,7 @@ export const fetchTherapySources = async (): Promise<TherapySource[] | null> => 
   try {
     const { data, error } = await supabase
       .from('therapy_sources')
-      .select('*')
+      .select('id, title, author, year, type, description, keywords, content_summary')
       .order('year', { ascending: false });
       
     if (error) {
@@ -41,7 +41,7 @@ export const fetchTherapySources = async (): Promise<TherapySource[] | null> => 
       return null;
     }
     
-    return data;
+    return data as unknown as TherapySource[];
   } catch (error) {
     console.error("Error in fetchTherapySources:", error);
     return null;
@@ -57,7 +57,7 @@ export const fetchTherapyConcepts = async (
   try {
     let query = supabase
       .from('therapy_concepts')
-      .select('*');
+      .select('id, name, description, source_ids, related_concept_ids, category, examples, alternative_names');
       
     if (category) {
       query = query.eq('category', category);
@@ -70,7 +70,7 @@ export const fetchTherapyConcepts = async (
       return null;
     }
     
-    return data;
+    return data as unknown as TherapyConcept[];
   } catch (error) {
     console.error("Error in fetchTherapyConcepts:", error);
     return null;
@@ -88,7 +88,7 @@ export const fetchRelatedContent = async (conceptId: string): Promise<{
     // First get the concept to find related IDs
     const { data: concept, error: conceptError } = await supabase
       .from('therapy_concepts')
-      .select('*')
+      .select('id, name, description, source_ids, related_concept_ids, category, examples')
       .eq('id', conceptId)
       .single();
       
@@ -100,8 +100,8 @@ export const fetchRelatedContent = async (conceptId: string): Promise<{
     // Fetch related sources
     const { data: sources, error: sourcesError } = await supabase
       .from('therapy_sources')
-      .select('*')
-      .in('id', concept.source_ids);
+      .select('id, title, author, year, type, description, keywords, content_summary')
+      .in('id', concept.source_ids || []);
       
     if (sourcesError) {
       console.error("Error fetching related sources:", sourcesError);
@@ -111,8 +111,8 @@ export const fetchRelatedContent = async (conceptId: string): Promise<{
     // Fetch related concepts
     const { data: relatedConcepts, error: relatedError } = await supabase
       .from('therapy_concepts')
-      .select('*')
-      .in('id', concept.related_concept_ids);
+      .select('id, name, description, source_ids, related_concept_ids, category, examples')
+      .in('id', concept.related_concept_ids || []);
       
     if (relatedError) {
       console.error("Error fetching related concepts:", relatedError);
@@ -120,8 +120,8 @@ export const fetchRelatedContent = async (conceptId: string): Promise<{
     }
     
     return {
-      sources,
-      relatedConcepts
+      sources: sources as unknown as TherapySource[],
+      relatedConcepts: relatedConcepts as unknown as TherapyConcept[]
     };
   } catch (error) {
     console.error("Error in fetchRelatedContent:", error);
@@ -140,7 +140,7 @@ export const searchKnowledgeBase = async (query: string): Promise<{
     // Search concepts
     const { data: concepts, error: conceptsError } = await supabase
       .from('therapy_concepts')
-      .select('*')
+      .select('id, name, description, source_ids, related_concept_ids, category, examples, alternative_names')
       .or(`name.ilike.%${query}%,description.ilike.%${query}%`);
       
     if (conceptsError) {
@@ -151,7 +151,7 @@ export const searchKnowledgeBase = async (query: string): Promise<{
     // Search sources
     const { data: sources, error: sourcesError } = await supabase
       .from('therapy_sources')
-      .select('*')
+      .select('id, title, author, year, type, description, keywords, content_summary')
       .or(`title.ilike.%${query}%,description.ilike.%${query}%,content_summary.ilike.%${query}%`);
       
     if (sourcesError) {
@@ -160,8 +160,8 @@ export const searchKnowledgeBase = async (query: string): Promise<{
     }
     
     return {
-      concepts,
-      sources
+      concepts: concepts as unknown as TherapyConcept[],
+      sources: sources as unknown as TherapySource[]
     };
   } catch (error) {
     console.error("Error in searchKnowledgeBase:", error);

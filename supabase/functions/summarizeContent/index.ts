@@ -1,126 +1,95 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
+
+interface RequestBody {
+  text: string;
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders,
+    });
   }
 
   try {
-    const anthropicApiKey = Deno.env.get("anthropic-attune-api-key");
-    
-    if (!anthropicApiKey) {
-      console.error("Missing API key: anthropic-attune-api-key not set");
-      return new Response(
-        JSON.stringify({
-          error: "API key configuration error",
-          success: false,
-        }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
-        }
-      );
-    }
+    // Parse the request body
+    const body: RequestBody = await req.json();
+    const { text } = body;
 
-    // Parse request body
-    const { text } = await req.json();
-    
-    if (!text || typeof text !== "string") {
+    if (!text || text.trim().length === 0) {
       return new Response(
         JSON.stringify({
-          error: "Text parameter is required and must be a string",
           success: false,
+          error: "No text provided",
         }),
         {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400,
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders,
-          },
         }
       );
     }
 
-    // Call Claude API to generate summary
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    // Prepare the prompt for OpenAI
+    const prompt = `
+      Create a concise summary (maximum 200 words) of the following text about therapeutic concepts.
+      Focus on the core ideas, techniques, and principles, especially those related to Terry Real's work on relationships.
+      The summary should be clear, informative, and highlight the most important concepts.
+      
+      Text: ${text}
+    `;
+
+    // Call OpenAI API
+    const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": anthropicApiKey,
-        "anthropic-version": "2023-06-01"
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "claude-3-opus-20240229",
-        max_tokens: 1500,
-        system: `You are an expert in relational therapy and relationship psychology, particularly Terry Real's methodology.
-        Your task is to create a comprehensive summary of the provided text that captures the key concepts, techniques, and insights.
-        
-        Summarization guidelines:
-        1. Create a 250-400 word summary that preserves the core therapeutic concepts
-        2. Highlight key relationship patterns, strategies, and frameworks mentioned
-        3. Maintain the original terminology used by Terry Real
-        4. Structure the summary with clear paragraphs focusing on different aspects
-        5. Include specific techniques or interventions mentioned
-        6. Keep the summary focused on practical applications for therapy or relationships`,
+        model: "gpt-4",
         messages: [
           {
             role: "user",
-            content: `Summarize the following text by Terry Real, capturing the key therapeutic concepts and practical insights:
-            
-            ${text.substring(0, 10000)} // Limit to prevent token overflow
-            
-            Create a comprehensive summary that would be useful for therapists or individuals studying Terry Real's relational life therapy approach.`
-          }
-        ]
-      })
+            content: prompt,
+          },
+        ],
+        temperature: 0.3,
+      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Claude API error response:", errorText);
-      throw new Error(`API returned ${response.status}: ${errorText}`);
+    if (!openAIResponse.ok) {
+      const errorText = await openAIResponse.text();
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
 
-    const data = await response.json();
-    const summary = data.content[0].text;
+    const openAIData = await openAIResponse.json();
+    const summary = openAIData.choices[0].message.content.trim();
 
     return new Response(
       JSON.stringify({
-        summary: summary,
         success: true,
+        summary: summary,
       }),
       {
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
       }
     );
   } catch (error) {
-    console.error("Error in summarizeContent function:", error);
-    
+    console.error("Error summarizing content:", error);
     return new Response(
       JSON.stringify({
-        error: error.message,
         success: false,
+        error: error.message,
       }),
       {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders,
-        },
       }
     );
   }
