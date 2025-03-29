@@ -35,7 +35,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="max-w-2xl mx-auto w-full flex flex-col">
+      <div className="max-w-2xl mx-auto w-full flex flex-col px-6">
         <ChatSpeech 
           isSpeechEnabled={isSpeechEnabled}
           setIsSpeechEnabled={setIsSpeechEnabled}

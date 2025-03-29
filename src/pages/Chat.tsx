@@ -39,13 +39,16 @@ const Chat: React.FC = () => {
         onRequestEndSession={handleRequestEndSession}
       />
       
-      <div className="relative flex-1 overflow-hidden">
-        <ChatInterface 
-          sessionStarted={sessionStarted}
-          sessionEndTime={sessionEndTime}
-        />
+      <div className="relative flex-1 overflow-hidden bg-apple-gray-6">
+        <div className="h-full overflow-auto pb-6">
+          <ChatInterface 
+            sessionStarted={sessionStarted}
+            sessionEndTime={sessionEndTime}
+          />
+        </div>
       </div>
-      <footer className="text-center py-3 text-xs text-gray-500 border-t border-gray-200">
+      
+      <footer className="text-center py-3 text-xs text-apple-gray border-t border-apple-gray-5 bg-white/90 backdrop-blur-sm">
         understand yourself<br />
         Napkin LLC — Zurich
       </footer>

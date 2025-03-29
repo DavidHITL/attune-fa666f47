@@ -24,26 +24,26 @@ const NavBar: React.FC = () => {
   };
 
   return (
-    <nav className="w-full border-b border-gray-200">
-      <div className="max-w-2xl mx-auto py-4 px-4 flex justify-between items-center">
-        <ul className="flex space-x-2">
-          {navItems.map((item, index) => (
-            <React.Fragment key={item.path}>
-              <li>
-                <Link
-                  to={item.path}
-                  className={cn(
-                    "text-gray-500 hover:text-blue-600 transition-colors",
-                    currentPath === item.path && "text-blue-600 font-medium"
-                  )}
-                >
-                  {item.name}
-                </Link>
-              </li>
-              {index < navItems.length - 1 && (
-                <li className="text-gray-400">|</li>
-              )}
-            </React.Fragment>
+    <nav className="w-full backdrop-blur-md bg-white/90 border-b border-apple-gray-5 sticky top-0 z-10">
+      <div className="max-w-2xl mx-auto py-4 px-6 flex justify-between items-center">
+        <ul className="flex space-x-6">
+          {navItems.map((item) => (
+            <li key={item.path}>
+              <Link
+                to={item.path}
+                className={cn(
+                  "font-medium text-base transition-colors relative py-1",
+                  currentPath === item.path 
+                    ? "text-apple-blue" 
+                    : "text-apple-gray hover:text-apple-blue"
+                )}
+              >
+                {item.name}
+                {currentPath === item.path && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-apple-blue rounded-full" />
+                )}
+              </Link>
+            </li>
           ))}
         </ul>
         
@@ -51,9 +51,9 @@ const NavBar: React.FC = () => {
           variant="ghost" 
           size="sm" 
           onClick={handleSignOut}
-          className="text-gray-500 hover:text-red-600"
+          className="text-apple-gray hover:text-apple-red hover:bg-apple-gray-6"
         >
-          <LogOut size={18} className="mr-1" />
+          <LogOut size={18} className="mr-2" />
           Sign Out
         </Button>
       </div>
