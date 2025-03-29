@@ -15,33 +15,43 @@ export const callChatApi = async (
   conversationHistory: ChatMessage[]
 ): Promise<string> => {
   console.log("Calling generateChatResponse function");
-
-  const { data, error } = await supabase.functions.invoke('generateChatResponse', {
-    body: {
-      message,
-      conversationHistory
-    }
-  });
-
-  if (error) {
-    console.error("Supabase Function Error:", error);
-    throw new Error(`Error calling function: ${error.message}`);
-  }
-
-  if (!data) {
-    throw new Error("No response data received");
-  }
+  console.log("Conversation history length:", conversationHistory.length);
   
-  if (!data.success) {
-    throw new Error(data?.error || "Failed to get response");
-  }
+  try {
+    const { data, error } = await supabase.functions.invoke('generateChatResponse', {
+      body: {
+        message,
+        conversationHistory
+      }
+    });
 
-  return data.reply;
+    if (error) {
+      console.error("Supabase Function Error:", error);
+      throw new Error(`Error calling function: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error("No response data received");
+    }
+    
+    if (!data.success) {
+      throw new Error(data?.error || "Failed to get response");
+    }
+
+    return data.reply;
+  } catch (error) {
+    console.error("Error in callChatApi:", error);
+    throw error;
+  }
 };
 
 // Convert app messages to API format
 export const convertMessagesToApiFormat = (messages: Message[]): ChatMessage[] => {
-  return messages.map(msg => ({
+  // Filter out any empty or undefined messages
+  const validMessages = messages.filter(msg => msg && msg.text);
+  console.log(`Converting ${validMessages.length} messages to API format`);
+  
+  return validMessages.map(msg => ({
     role: msg.isUser ? "user" : "assistant",
     content: msg.text
   }));

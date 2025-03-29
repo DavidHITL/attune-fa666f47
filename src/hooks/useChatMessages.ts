@@ -12,10 +12,12 @@ export function useChatMessages() {
   const [useLocalFallback, setUseLocalFallback] = useState(false);
   const { user } = useAuth();
 
-  // Fetch messages from Supabase when component mounts
+  // Fetch messages from Supabase whenever the component mounts or user changes
   useEffect(() => {
-    // Always fetch messages when the hook is initialized
-    // This ensures we get fresh data when navigating back to the chat page
+    // Set loading state at the beginning of the effect
+    setIsLoading(true);
+    console.log("useChatMessages effect triggered, user:", user?.id);
+    
     if (user) {
       fetchMessages();
     } else {
@@ -26,13 +28,13 @@ export function useChatMessages() {
         isUser: false,
         timestamp: new Date()
       }]);
+      setIsLoading(false);
       setIsInitialLoad(false);
     }
   }, [user]); // Only re-run when user changes
 
   const fetchMessages = async () => {
     try {
-      setIsLoading(true);
       console.log("Fetching messages for user:", user?.id);
       
       // First try to get user profile to ensure it exists
@@ -96,6 +98,8 @@ export function useChatMessages() {
           isUser: dbMessage.sender_type === 'user',
           timestamp: new Date(dbMessage.created_at)
         }));
+        
+        console.log("Setting messages from database:", formattedMessages.length);
         setMessages(formattedMessages);
       } else {
         console.log("No messages found, creating welcome message");
@@ -169,6 +173,7 @@ export function useChatMessages() {
     isInitialLoad,
     useLocalFallback,
     setUseLocalFallback,
-    saveMessageToDatabase
+    saveMessageToDatabase,
+    fetchMessages // Export fetchMessages so it can be called manually if needed
   };
 }

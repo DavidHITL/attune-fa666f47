@@ -1,15 +1,18 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import ChatMessageList from "./ChatMessageList";
 import ChatInput from "./ChatInput";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { useSendMessage } from "@/hooks/useSendMessage";
+import { useAuth } from "@/context/AuthContext";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
 }
 
 const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) => {
+  const { user } = useAuth();
+  
   const {
     messages,
     setMessages,
@@ -17,7 +20,8 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     isInitialLoad,
     useLocalFallback,
     setUseLocalFallback,
-    saveMessageToDatabase
+    saveMessageToDatabase,
+    fetchMessages
   } = useChatMessages();
 
   const {
@@ -31,6 +35,16 @@ const ChatConversation: React.FC<ChatConversationProps> = ({ isSpeechEnabled }) 
     saveMessageToDatabase,
     isSpeechEnabled
   });
+
+  // This effect ensures we refresh messages when the component mounts
+  // or when the user changes, which is crucial for persistence across navigations
+  useEffect(() => {
+    console.log("ChatConversation mounted, user:", user?.id);
+    if (user && messages.length === 0) {
+      console.log("No messages in state, fetching messages...");
+      fetchMessages();
+    }
+  }, [user, messages.length, fetchMessages]);
 
   const isLoading = isLoadingMessages || isSendingMessage;
 

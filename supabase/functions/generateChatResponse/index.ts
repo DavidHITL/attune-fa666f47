@@ -63,24 +63,35 @@ serve(async (req) => {
     console.log("Conversation history length:", conversationHistory.length);
 
     // Prepare messages for Anthropic API
-    const messages = conversationHistory.length > 0 
-      ? [...conversationHistory]
-      : [
-          {
-            role: "assistant",
-            content: "Hello, I'm here to listen and support you. How are you feeling today?"
-          }
-        ];
+    // Ensure we have at least one message in the history or create a default one
+    let messages = [];
     
-    // Add the user's current message if it's not already the last one
-    if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
-      messages.push({
-        role: "user",
-        content: message
-      });
+    if (conversationHistory.length > 0) {
+      messages = [...conversationHistory];
+      
+      // Check if the last message is from the user - if not, add the current message
+      if (messages[messages.length - 1].role !== "user") {
+        messages.push({
+          role: "user",
+          content: message
+        });
+      }
+    } else {
+      // Start a fresh conversation with an initial assistant message followed by the user's message
+      messages = [
+        {
+          role: "assistant",
+          content: "Hello, I'm here to listen and support you. How are you feeling today?"
+        },
+        {
+          role: "user",
+          content: message
+        }
+      ];
     }
 
     console.log("Sending request to Anthropic API");
+    console.log("Messages being sent:", JSON.stringify(messages));
 
     // Call Anthropic's API directly
     const response = await fetch("https://api.anthropic.com/v1/messages", {
