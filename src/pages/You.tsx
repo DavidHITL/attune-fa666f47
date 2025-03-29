@@ -112,116 +112,119 @@ const You: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <NavBar />
-      <div className="flex-1 container mx-auto py-8 px-4 flex flex-col space-y-6">
-        <h1 className="text-2xl font-semibold mb-2">Your Dashboard</h1>
-        
-        {/* Chat Sessions Left */}
-        <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
-          <CardHeader className="flex flex-row items-center gap-2">
-            <MessageCircle className="h-5 w-5 text-apple-blue" />
-            <CardTitle className="text-xl">Chat Sessions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{sessionsLeft} left this week</p>
-            <p className="text-muted-foreground text-sm">Your sessions reset every Monday</p>
-          </CardContent>
-        </Card>
-        
-        {/* Keep in Mind */}
-        <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl">Keep in Mind</CardTitle>
-            <CardDescription>Key insights from your conversations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {user ? (
-                <>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Topic 1: Communication Style</h3>
-                    <p className="text-muted-foreground text-sm">You tend to withdraw during conflicts. Consider expressing your needs more directly.</p>
-                  </div>
-                  <Separator />
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Topic 2: Listening Skills</h3>
-                    <p className="text-muted-foreground text-sm">You excel at active listening but sometimes interrupt to express your perspective.</p>
-                  </div>
-                </>
-              ) : (
-                <p className="text-muted-foreground italic">We need to talk before we can be sure about your most important challenges.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Losing Strategies */}
-        <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
-          <CardHeader className="flex flex-row items-center gap-2">
-            <Radar className="h-5 w-5 text-apple-blue" />
-            <CardTitle className="text-xl">Losing Strategies</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full">
-              <ChartContainer 
-                config={chartConfig}
-                className="h-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={chartData} outerRadius={90}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="subject" />
-                    <PolarRadiusAxis domain={[0, 5]} />
-                    <Tooltip />
-                    <Radar
-                      name="Your Values"
-                      dataKey="value"
-                      stroke="#2563EB"
-                      fill="#2563EB"
-                      fillOpacity={0.6}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </div>
-            <div className="mt-4">
-              <p className="text-sm text-muted-foreground">
-                This visualization shows your tendency toward five losing strategies in communication.
-                Lower scores indicate healthier communication patterns.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Partner */}
-        <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl">Partner</CardTitle>
-            <CardDescription>Connect with your partner</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">Partner Linked:</span>
-                <span className="text-muted-foreground">No</span>
+      <div className="flex-1 flex justify-center">
+        <div className="max-w-4xl w-full py-8 px-4 flex flex-col space-y-6">
+          <h1 className="text-2xl font-semibold mb-2">Your Dashboard</h1>
+          
+          {/* Chat Sessions Left */}
+          <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
+            <CardHeader className="flex flex-row items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-apple-blue" />
+              <CardTitle className="text-xl">Chat Sessions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{sessionsLeft} left this week</p>
+              <p className="text-muted-foreground text-sm">Your sessions reset every Monday</p>
+            </CardContent>
+          </Card>
+          
+          {/* Keep in Mind */}
+          <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-xl">Keep in Mind</CardTitle>
+              <CardDescription>Key insights from your conversations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {user ? (
+                  <>
+                    <div className="space-y-2">
+                      <h3 className="font-medium">Topic 1: Communication Style</h3>
+                      <p className="text-muted-foreground text-sm">You tend to withdraw during conflicts. Consider expressing your needs more directly.</p>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      <h3 className="font-medium">Topic 2: Listening Skills</h3>
+                      <p className="text-muted-foreground text-sm">You excel at active listening but sometimes interrupt to express your perspective.</p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground italic">We need to talk before we can be sure about your most important challenges.</p>
+                )}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button className="bg-apple-blue hover:bg-opacity-90" size="lg">Generate Code</Button>
-                <Button variant="outline" size="lg">Send to Partner</Button>
+            </CardContent>
+          </Card>
+          
+          {/* Losing Strategies */}
+          <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
+            <CardHeader className="flex flex-row items-center gap-2">
+              <Radar className="h-5 w-5 text-apple-blue" />
+              <CardTitle className="text-xl">Losing Strategies</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px] w-full">
+                <ChartContainer 
+                  config={chartConfig}
+                  className="h-full"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart outerRadius={90}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="subject" />
+                      <PolarRadiusAxis domain={[0, 5]} />
+                      <Tooltip />
+                      <RadarChart.Radar
+                        name="Your Values"
+                        dataKey="value"
+                        stroke="#2563EB"
+                        fill="#2563EB"
+                        fillOpacity={0.6}
+                        data={chartData}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Sign Out */}
-        <div className="mt-2 mb-6 flex justify-center">
-          <Button 
-            variant="outline" 
-            onClick={handleSignOut}
-            className="text-apple-gray hover:text-apple-red hover:bg-apple-gray-6 flex items-center gap-2"
-          >
-            <LogOut size={18} />
-            Sign Out
-          </Button>
+              <div className="mt-4">
+                <p className="text-sm text-muted-foreground">
+                  This visualization shows your tendency toward five losing strategies in communication.
+                  Lower scores indicate healthier communication patterns.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Partner */}
+          <Card className="border border-apple-gray-5 rounded-lg shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-xl">Partner</CardTitle>
+              <CardDescription>Connect with your partner</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Partner Linked:</span>
+                  <span className="text-muted-foreground">No</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button className="bg-apple-blue hover:bg-opacity-90" size="lg">Generate Code</Button>
+                  <Button variant="outline" size="lg">Send to Partner</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Sign Out */}
+          <div className="mt-2 mb-6 flex justify-center">
+            <Button 
+              variant="outline" 
+              onClick={handleSignOut}
+              className="text-apple-gray hover:text-apple-red hover:bg-apple-gray-6 flex items-center gap-2"
+            >
+              <LogOut size={18} />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </div>
       <footer className="text-center py-3 text-xs text-gray-500 border-t border-gray-200">
