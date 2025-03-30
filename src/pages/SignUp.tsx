@@ -66,9 +66,13 @@ const SignUp: React.FC = () => {
         });
         navigate("/you", { replace: true });
       } else if (error) {
-        // If it's the database error we know about, give a more friendly message
+        // If it's the database error we know about, redirect to signin
         if (error.message.includes("Database error saving new user")) {
-          setError("We had trouble setting up your profile, but your account was created. Please try signing in.");
+          toast({
+            title: "Account created",
+            description: "Your account was created, but we had trouble setting up your profile. Please sign in to continue.",
+          });
+          navigate("/signin", { replace: true });
         } else {
           setError(error.message);
         }

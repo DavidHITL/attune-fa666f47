@@ -18,7 +18,7 @@ export const authService = {
       // User created successfully in auth.users
       // Now manually create a profile if the trigger failed
       try {
-        // Allow some time for auth changes to propagate
+        // Allow more time for auth changes to propagate
         setTimeout(async () => {
           try {
             const { data: userData } = await supabase.auth.getUser();
@@ -32,8 +32,11 @@ export const authService = {
                 
               // Only create a profile if it doesn't exist
               if (!existingProfile) {
-                // Generate a random partner code manually
-                const partnerCode = Array.from(Array(12), () => Math.floor(Math.random() * 36).toString(36)).join('');
+                // Generate a random partner code using a safer method
+                const partnerCode = Array(12)
+                  .fill(0)
+                  .map(() => Math.floor(Math.random() * 36).toString(36))
+                  .join('');
                 
                 const { error: profileError } = await supabase
                   .from('users_profile')
@@ -45,13 +48,15 @@ export const authService = {
                   
                 if (profileError) {
                   console.warn("Failed to create user profile, but auth account was created:", profileError.message);
+                } else {
+                  console.log("Successfully created fallback user profile");
                 }
               }
             }
           } catch (delayedProfileErr) {
             console.warn("Error in delayed profile creation:", delayedProfileErr);
           }
-        }, 1000);
+        }, 2000); // Increased timeout to give more time for database operations
       } catch (profileErr) {
         // Even if profile creation fails, the user's auth account is created
         console.warn("Error creating user profile, but auth account was created:", profileErr);
