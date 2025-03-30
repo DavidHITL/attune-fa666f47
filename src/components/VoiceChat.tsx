@@ -12,6 +12,7 @@ import VoiceVisualization from "./voice/VoiceVisualization";
 import { RealtimeChat } from "@/utils/RealtimeAudio";
 import { useVoiceChatConnection } from "@/hooks/useVoiceChatConnection";
 import { toast } from "sonner";
+import VoiceConnectionStatus from "./voice/VoiceConnectionStatus";
 
 interface VoiceChatProps {
   open: boolean;
@@ -77,10 +78,14 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
         <div className="flex flex-col items-center justify-center h-[60vh] gap-6">
           <VoiceVisualization isActive={connectionStatus === 'connected'} />
           
-          <div className="text-center text-sm text-gray-500">
-            {connectionStatus === 'connecting' ? 'Connecting to AI voice service...' : 
-             connectionStatus === 'connected' ? 'Listening... Speak naturally with the AI.' :
-             'Connection not established'}
+          <div className="flex flex-col items-center gap-2">
+            <VoiceConnectionStatus status={connectionStatus} />
+            
+            <div className="text-center text-sm text-gray-500">
+              {connectionStatus === 'connecting' ? 'Connecting to AI voice service...' : 
+               connectionStatus === 'connected' ? 'Listening... Speak naturally with the AI.' :
+               'Connection not established'}
+            </div>
           </div>
           
           <Button 
