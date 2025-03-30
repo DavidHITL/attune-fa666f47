@@ -1,4 +1,3 @@
-import { testRealtimeFunctionEndpoint } from './testRealtimeFunctionEndpoint';
 
 /**
  * Test the HTTP endpoint

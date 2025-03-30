@@ -4,6 +4,8 @@
  */
 export class ConnectionState {
   private _isConnected: boolean = false;
+  private _isConnecting: boolean = false;
+  private _shouldReconnect: boolean = true;
   
   /**
    * Set connection state
@@ -13,10 +15,38 @@ export class ConnectionState {
   }
   
   /**
+   * Set connecting state
+   */
+  setConnecting(value: boolean): void {
+    this._isConnecting = value;
+  }
+
+  /**
    * Get connection state
    */
   isConnected(): boolean {
     return this._isConnected;
+  }
+
+  /**
+   * Get connecting state
+   */
+  isConnecting(): boolean {
+    return this._isConnecting;
+  }
+  
+  /**
+   * Set whether we should attempt reconnection
+   */
+  setShouldReconnect(value: boolean): void {
+    this._shouldReconnect = value;
+  }
+  
+  /**
+   * Check if we should attempt reconnection
+   */
+  shouldTryReconnect(): boolean {
+    return this._shouldReconnect;
   }
   
   /**
