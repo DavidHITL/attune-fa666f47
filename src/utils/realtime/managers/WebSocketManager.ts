@@ -1,4 +1,3 @@
-
 /**
  * Manages WebSocket connections
  */
@@ -23,7 +22,7 @@ export class WebSocketManager {
   async connect(
     setupHandlers: (websocket: WebSocket, timeoutId: number) => void
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         if (!this.wsUrl) {
           const error = new Error("WebSocket URL not set");
@@ -49,7 +48,6 @@ export class WebSocketManager {
         }
         
         // Get auth token if available from Supabase
-        let authHeaders = {};
         try {
           const { supabase } = await import('@/integrations/supabase/client');
           const { data } = await supabase.auth.getSession();
