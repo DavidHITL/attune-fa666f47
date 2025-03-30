@@ -84,7 +84,7 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
       };
 
       socket.onclose = (event) => {
-        console.log(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
+        console.log(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}`);
       };
 
       try {
@@ -100,10 +100,19 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
         
         // Send confirmation message to client
         try {
-          socket.send(JSON.stringify({ type: "connection.established", message: "WebSocket connection established", time: new Date().toISOString() }));
+          socket.send(JSON.stringify({ 
+            type: "connection.established", 
+            message: "WebSocket connection established", 
+            time: new Date().toISOString() 
+          }));
           console.log("Sent connection established message to client");
         } catch (sendError) {
           console.error("Error sending confirmation message:", sendError);
+          console.error("Error details:", JSON.stringify({
+            name: sendError.name,
+            message: sendError.message,
+            stack: sendError.stack
+          }));
         }
         
         // Set up client connection handlers with detailed error handling
@@ -124,7 +133,16 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
             message: handlerError.message,
             stack: handlerError.stack
           }));
-          // Continue execution - don't return yet as we want to try setting up the OpenAI connection
+          try {
+            socket.send(JSON.stringify({
+              type: "error",
+              error: "Failed to set up client connection handlers",
+              details: handlerError instanceof Error ? handlerError.message : String(handlerError),
+              time: new Date().toISOString()
+            }));
+          } catch (sendError) {
+            console.error("Failed to send error notification to client:", sendError);
+          }
         }
         
         // Connect to OpenAI Realtime API with detailed error handling
@@ -156,7 +174,6 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
           } catch (sendError) {
             console.error("Failed to send error message to client:", sendError);
           }
-          // We still return the response as the WebSocket has been upgraded
         }
         
         console.log("WebSocket handler completed successfully, returning response");
@@ -178,7 +195,6 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
         } catch (sendError) {
           console.error("Failed to send error notification to client:", sendError);
         }
-        // We still return the response since the WebSocket has been upgraded
         return response;
       }
     } catch (error) {

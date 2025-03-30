@@ -12,6 +12,7 @@ export class ConnectionState {
    */
   setConnected(value: boolean): void {
     this._isConnected = value;
+    console.log(`[ConnectionState] Connection state set to: ${value ? 'connected' : 'disconnected'}`);
   }
   
   /**
@@ -19,6 +20,7 @@ export class ConnectionState {
    */
   setConnecting(value: boolean): void {
     this._isConnecting = value;
+    console.log(`[ConnectionState] Connecting state set to: ${value ? 'connecting' : 'not connecting'}`);
   }
 
   /**
@@ -40,6 +42,7 @@ export class ConnectionState {
    */
   setShouldReconnect(value: boolean): void {
     this._shouldReconnect = value;
+    console.log(`[ConnectionState] Should reconnect set to: ${value}`);
   }
   
   /**
@@ -54,6 +57,7 @@ export class ConnectionState {
    */
   checkConnection(websocket: WebSocket | null): boolean {
     if (!websocket) {
+      console.log("[ConnectionState] No WebSocket instance available");
       return false;
     }
     
@@ -62,7 +66,8 @@ export class ConnectionState {
     
     // If our state says connected but WebSocket is closed, update our state
     if (this._isConnected && !isActuallyConnected) {
-      console.warn("Connection state mismatch - updating state to match actual WebSocket state");
+      console.warn("[ConnectionState] Connection state mismatch - updating state to match actual WebSocket state");
+      console.warn(`[ConnectionState] Internal state: ${this._isConnected}, WebSocket state: ${websocket.readyState}`);
       this._isConnected = false;
     }
     

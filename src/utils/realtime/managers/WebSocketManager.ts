@@ -8,6 +8,9 @@ export class WebSocketManager {
   private openPromiseReject: ((reason?: any) => void) | null = null;
   public messageHandler: ((event: MessageEvent) => void) | null = null;
   public wsUrl: string | null = null;
+  private connectionAttempt = 0;
+  private maxConnectionAttempts = 3;
+  private connectionLogInterval: number | null = null;
 
   /**
    * Set the WebSocket URL
@@ -48,6 +51,15 @@ export class WebSocketManager {
           }
         }
         
+        // Reset connection counter if it's a new connection attempt
+        if (this.connectionAttempt >= this.maxConnectionAttempts) {
+          this.connectionAttempt = 0;
+        }
+        
+        // Increment connection attempt
+        this.connectionAttempt++;
+        console.log(`[Managers/WebSocketManager] Connection attempt ${this.connectionAttempt} of ${this.maxConnectionAttempts}`);
+        
         // Get auth token if available from Supabase
         let finalUrl = this.wsUrl;
         try {
@@ -80,11 +92,24 @@ export class WebSocketManager {
           const timeoutId = window.setTimeout(() => {
             console.error("[Managers/WebSocketManager] Connection timed out");
             this.rejectOpenPromise(new Error("Connection timeout"));
-            this.websocket?.close();
+            
+            if (this.websocket) {
+              try {
+                this.websocket.close();
+              } catch (closeError) {
+                console.error("[Managers/WebSocketManager] Error closing WebSocket after timeout:", closeError);
+              }
+            }
           }, 10000);
           
           // Configure handlers
           setupHandlers(this.websocket, timeoutId);
+          
+          // Add event listener for unhandled errors
+          this.websocket.addEventListener('error', (event) => {
+            console.error("[Managers/WebSocketManager] WebSocket error event:", event);
+          });
+          
         } catch (wsError) {
           console.error("[Managers/WebSocketManager] Error creating WebSocket:", wsError);
           reject(wsError);
@@ -115,9 +140,16 @@ export class WebSocketManager {
     console.log("[Managers/WebSocketManager] Initial state:", getReadyStateString(this.websocket.readyState));
     
     // Set up interval to log state changes
-    const stateCheckInterval = setInterval(() => {
+    if (this.connectionLogInterval) {
+      clearInterval(this.connectionLogInterval);
+    }
+    
+    this.connectionLogInterval = window.setInterval(() => {
       if (!this.websocket) {
-        clearInterval(stateCheckInterval);
+        if (this.connectionLogInterval) {
+          clearInterval(this.connectionLogInterval);
+          this.connectionLogInterval = null;
+        }
         return;
       }
       console.log("[Managers/WebSocketManager] Current state:", getReadyStateString(this.websocket.readyState));
@@ -125,8 +157,16 @@ export class WebSocketManager {
     
     // Clear interval when connection closes
     this.websocket.onclose = (event) => {
-      clearInterval(stateCheckInterval);
-      console.log("[Managers/WebSocketManager] WebSocket closed. Code:", event.code, "Reason:", event.reason);
+      if (this.connectionLogInterval) {
+        clearInterval(this.connectionLogInterval);
+        this.connectionLogInterval = null;
+      }
+      console.log(`[Managers/WebSocketManager] WebSocket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}`);
+      console.log("WebSocket close event details:", JSON.stringify({
+        wasClean: event.wasClean,
+        code: event.code,
+        reason: event.reason
+      }));
     };
   }
   
@@ -135,8 +175,20 @@ export class WebSocketManager {
    */
   disconnect(): void {
     console.log("[Managers/WebSocketManager] Disconnecting");
-    this.websocket?.close();
-    this.websocket = null;
+    
+    if (this.connectionLogInterval) {
+      clearInterval(this.connectionLogInterval);
+      this.connectionLogInterval = null;
+    }
+    
+    if (this.websocket) {
+      try {
+        this.websocket.close();
+      } catch (error) {
+        console.error("[Managers/WebSocketManager] Error closing WebSocket during disconnect:", error);
+      }
+      this.websocket = null;
+    }
   }
   
   /**
@@ -185,7 +237,16 @@ export class WebSocketManager {
     this.messageHandler = handler;
     
     if (this.websocket) {
-      this.websocket.onmessage = this.messageHandler;
+      this.websocket.onmessage = (event) => {
+        try {
+          // Process the message through the handler
+          if (this.messageHandler) {
+            this.messageHandler(event);
+          }
+        } catch (error) {
+          console.error("[Managers/WebSocketManager] Error in message handler:", error);
+        }
+      };
     }
   }
 
