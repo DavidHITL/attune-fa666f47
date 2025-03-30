@@ -17,7 +17,7 @@ serve(async (req) => {
   const upgradeHeader = req.headers.get("upgrade") || "";
   if (upgradeHeader.toLowerCase() === "websocket") {
     try {
-      console.log("Processing WebSocket upgrade request");
+      console.log("Processing WebSocket upgrade request for OpenAI Realtime API");
       const { socket, response } = Deno.upgradeWebSocket(req);
       const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
       
@@ -31,7 +31,7 @@ serve(async (req) => {
       
       let openAISocket: WebSocket | null = null;
       let connectionAttempts = 0;
-      const maxConnectionAttempts = 5; // Increased from 3 to 5
+      const maxConnectionAttempts = 3;
       let reconnectTimeout: number | undefined;
       
       // Function to connect to OpenAI with retry logic
@@ -45,24 +45,34 @@ serve(async (req) => {
             }
           }
           
-          console.log("Connecting to OpenAI Realtime API");
+          // Connect to the correct OpenAI Realtime API endpoint
+          console.log("Connecting to OpenAI Realtime API with model: gpt-4o-realtime-preview");
           openAISocket = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01");
           
           openAISocket.onopen = () => {
-            console.log("Connected to OpenAI");
+            console.log("Connected to OpenAI Realtime API");
+            
+            // Send authentication message 
             openAISocket!.send(JSON.stringify({
               type: "auth",
               authorization: `Bearer ${OPENAI_API_KEY}`
             }));
+            
+            // Notify client that session was created
             socket.send(JSON.stringify({ type: "session.created" }));
             connectionAttempts = 0; // Reset connection attempts on successful connection
           };
           
           openAISocket.onerror = (event) => {
             console.error("OpenAI WebSocket error:", event);
+            socket.send(JSON.stringify({ 
+              type: "error", 
+              error: "Connection error with OpenAI Realtime API" 
+            }));
+            
             if (connectionAttempts < maxConnectionAttempts) {
               connectionAttempts++;
-              const backoffTime = 1000 * Math.pow(1.5, connectionAttempts);
+              const backoffTime = 1000 * Math.pow(2, connectionAttempts);
               console.log(`Retrying OpenAI connection in ${backoffTime/1000}s, attempt ${connectionAttempts} of ${maxConnectionAttempts}`);
               reconnectTimeout = setTimeout(connectToOpenAI, backoffTime);
             } else {
@@ -77,6 +87,14 @@ serve(async (req) => {
           openAISocket.onmessage = (event) => {
             try {
               if (socket.readyState === socket.OPEN) {
+                // Log the event type for debugging
+                try {
+                  const data = JSON.parse(event.data);
+                  console.log("Received from OpenAI:", data.type || "unknown type");
+                } catch (e) {
+                  // If it's not JSON or has no type, just continue
+                }
+                
                 socket.send(event.data);
               } else {
                 console.warn("Client socket not open, can't forward OpenAI message");
@@ -88,12 +106,19 @@ serve(async (req) => {
           
           openAISocket.onclose = (event) => {
             console.log("OpenAI disconnected, code:", event.code, "reason:", event.reason);
+            
             // Only attempt reconnection for unexpected closures
             if (event.code !== 1000 && connectionAttempts < maxConnectionAttempts) {
               connectionAttempts++;
-              const backoffTime = 1000 * Math.pow(1.5, connectionAttempts);
+              const backoffTime = 1000 * Math.pow(2, connectionAttempts);
               console.log(`Attempting to reconnect to OpenAI in ${backoffTime/1000}s, attempt ${connectionAttempts} of ${maxConnectionAttempts}`);
               reconnectTimeout = setTimeout(connectToOpenAI, backoffTime);
+              
+              // Notify client of reconnection attempt
+              socket.send(JSON.stringify({ 
+                type: "warning", 
+                message: `Connection lost, attempting to reconnect (${connectionAttempts}/${maxConnectionAttempts})...` 
+              }));
             } else if (event.code !== 1000) {
               socket.send(JSON.stringify({ 
                 type: "error", 
@@ -111,6 +136,7 @@ serve(async (req) => {
         }
       };
       
+      // Initial connection
       connectToOpenAI();
       
       // Forward messages from client to OpenAI
@@ -118,8 +144,16 @@ serve(async (req) => {
         try {
           console.log("Message from client received");
           
+          // Try to parse the message to see what type it is
+          try {
+            const data = JSON.parse(event.data);
+            console.log("Client sending:", data.type || "unknown type");
+          } catch (e) {
+            // If it's not JSON, just continue
+          }
+          
           if (openAISocket && openAISocket.readyState === WebSocket.OPEN) {
-            console.log("Forwarding message to OpenAI");
+            console.log("Forwarding message to OpenAI Realtime API");
             openAISocket.send(event.data);
           } else {
             console.warn("OpenAI socket not ready, attempting reconnection");
@@ -178,7 +212,7 @@ serve(async (req) => {
     }
   }
 
-  // Handle regular HTTP requests for token generation
+  // Fall back to HTTP request handling
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     
@@ -187,7 +221,7 @@ serve(async (req) => {
     }
     
     // Create a session with OpenAI
-    console.log("Creating a new OpenAI session");
+    console.log("Creating a new OpenAI Realtime session");
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {

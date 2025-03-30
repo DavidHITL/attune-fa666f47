@@ -4,7 +4,7 @@
  */
 export class ReconnectionHandler {
   private reconnectAttempts: number = 0;
-  private readonly maxReconnectAttempts: number = 15; // Increased from 10 to 15
+  private readonly maxReconnectAttempts: number = 10; // Reduced from 15 to 10
   private reconnectTimeout: number | null = null;
   private onReconnect: () => Promise<void>;
   private isReconnecting: boolean = false;
@@ -27,9 +27,16 @@ export class ReconnectionHandler {
       return;
     }
     
-    // Improved backoff strategy: initial 500ms with smoother increase
-    // Cap max delay at 45 seconds for better UX
-    const delay = Math.min(500 * Math.pow(1.3, this.reconnectAttempts), 45000);
+    // Gentler exponential backoff with jitter to prevent thundering herd
+    // Start with 1.5 second base and cap at 20 seconds max
+    const baseDelay = 1500; // ms
+    const maxDelay = 20000; // 20 seconds max
+    const exponent = Math.min(this.reconnectAttempts, 6); // Cap the exponent to prevent excessive delays
+    
+    // Calculate delay with jitter (±20%)
+    let delay = Math.min(baseDelay * Math.pow(1.5, exponent), maxDelay);
+    const jitter = delay * 0.2 * (Math.random() - 0.5); // ±10% jitter
+    delay = Math.max(1000, delay + jitter); // Ensure minimum 1000ms
     
     console.log(`Attempting to reconnect in ${Math.round(delay / 1000)} seconds... (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
     

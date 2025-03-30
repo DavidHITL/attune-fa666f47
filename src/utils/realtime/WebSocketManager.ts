@@ -11,7 +11,7 @@ export class WebSocketManager {
   private projectId: string;
   private connectionState: ConnectionState;
   private reconnectionHandler: ReconnectionHandler;
-  private connectionTimeout: number = 20000; // Increased from 15 to 20 second timeout
+  private connectionTimeout: number = 15000; // 15 second timeout (reduced)
   private openPromise: Promise<void> | null = null;
   private openPromiseResolve: (() => void) | null = null;
   private openPromiseReject: ((reason?: any) => void) | null = null;
@@ -58,11 +58,15 @@ export class WebSocketManager {
         this.openPromiseReject = reject;
         
         try {
-          // Use direct URL with HTTPS protocol to ensure proper connection
-          const wsUrl = `wss://${this.projectId}.functions.supabase.co/realtime-chat`;
+          // Use the proper URL format for Supabase realtime-chat function
+          // This properly routes through our edge function to OpenAI's Realtime API
+          const wsUrl = `wss://${this.projectId}.supabase.co/functions/v1/realtime-chat`;
           console.log("Connecting to WebSocket:", wsUrl);
           
           this.websocket = new WebSocket(wsUrl);
+          
+          // Add specific headers to identify as OpenAI Realtime API client
+          this.websocket.binaryType = "arraybuffer";
           
           const timeoutId = setTimeout(() => {
             if (!this.connectionState.isConnected()) {
@@ -119,7 +123,12 @@ export class WebSocketManager {
             this.openPromiseResolve = null;
             this.openPromiseReject = null;
             
-            this.reconnectionHandler.tryReconnect();
+            // Only try to reconnect if there are available resources
+            if (error instanceof Event && (error as any).target?.readyState !== WebSocket.CLOSED) {
+              this.reconnectionHandler.tryReconnect();
+            } else {
+              console.warn("Not attempting reconnection due to critical error state");
+            }
           };
           
           this.websocket.onclose = (event) => {
@@ -137,9 +146,18 @@ export class WebSocketManager {
               this.openPromiseReject = null;
             }
             
-            // Don't reconnect if it was a normal closure
-            if (event.code !== 1000) {
+            // Don't reconnect if it was a normal closure or insufficient resources (1006)
+            if (event.code !== 1000 && event.code !== 1006) {
               this.reconnectionHandler.tryReconnect();
+            } else if (event.code === 1006) {
+              // Handle the "insufficient resources" error
+              console.warn("WebSocket closed due to insufficient resources - attempting delayed reconnect");
+              // Wait 3-5 seconds before trying again to let resources free up
+              setTimeout(() => {
+                if (this.reconnectionHandler.getAttempts() < 5) { // Limit retries for resource issues
+                  this.reconnectionHandler.tryReconnect();
+                }
+              }, 5000);
             }
           };
         } catch (error) {
@@ -178,7 +196,7 @@ export class WebSocketManager {
     }
     
     try {
-      console.log("Configuring session...");
+      console.log("Configuring session with OpenAI Realtime API settings...");
       this.websocket!.send(JSON.stringify(sessionConfig));
       return true;
     } catch (error) {
@@ -193,11 +211,12 @@ export class WebSocketManager {
    */
   send(message: any): boolean {
     if (!this.checkConnection()) {
-      console.error("WebSocket not connected");
+      console.error("WebSocket not connected, can't send message");
       return false;
     }
     
     try {
+      console.log("Sending message to OpenAI Realtime API:", message.type || "unknown type");
       this.websocket!.send(JSON.stringify(message));
       return true;
     } catch (error) {

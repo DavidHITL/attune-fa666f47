@@ -18,12 +18,13 @@ const VoiceCallButton: React.FC<VoiceCallButtonProps> = ({ onClick }) => {
     setIsClicked(true);
     setIsLoading(true);
     
+    // Show a more detailed toast message
     uiToast({
-      title: "Connecting to voice service",
-      description: "Please wait while we establish a connection...",
+      title: "Connecting to OpenAI voice service",
+      description: "Establishing WebSocket connection to the Realtime API...",
     });
     
-    // Show a more visible toast using sonner
+    // Show a more visible toast using sonner with longer timeout
     toast.promise(
       new Promise((resolve, reject) => {
         setTimeout(() => {
@@ -39,12 +40,13 @@ const VoiceCallButton: React.FC<VoiceCallButtonProps> = ({ onClick }) => {
           } finally {
             setIsLoading(false);
           }
-        }, 300);
+        }, 500); // Slightly longer animation for better feedback
       }),
       {
-        loading: 'Connecting to voice service...',
-        success: 'Connection established!',
-        error: 'Connection failed. Please try again later.'
+        loading: 'Connecting to OpenAI Realtime API...',
+        success: 'Connection to voice service established!',
+        error: 'Connection failed. Please try again later.',
+        duration: 5000 // Longer duration to ensure user sees the message
       }
     );
   };
@@ -58,7 +60,7 @@ const VoiceCallButton: React.FC<VoiceCallButtonProps> = ({ onClick }) => {
         isClicked ? 'bg-blue-100 scale-95' : ''
       } ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
       onClick={handleClick}
-      title="Start voice conversation"
+      title="Start voice conversation with OpenAI Realtime API"
     >
       <Phone className={`text-blue-600 ${isLoading ? 'animate-pulse' : ''}`} size={20} />
     </Button>
