@@ -80,10 +80,14 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
         </DialogHeader>
         
         <div className="flex flex-col h-[60vh]">
-          <VoiceMessageList messages={messages} />
+          <VoiceMessageList 
+            messages={messages} 
+            transcript={transcript} 
+          />
           
           <VoiceInputArea
             transcript={transcript}
+            setTranscript={setTranscript}
             onSendMessage={sendMessage}
             onAudioData={processSpeechInput}
             connectionStatus={connectionStatus}

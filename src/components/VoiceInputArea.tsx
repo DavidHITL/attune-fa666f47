@@ -2,17 +2,26 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { ConnectionStatus } from "@/hooks/useVoiceChatConnection";
 
 interface VoiceInputAreaProps {
   transcript: string;
-  setTranscript: (transcript: string) => void;
-  onSend: () => void;
+  setTranscript?: (transcript: string) => void;
+  onSend?: () => void; 
+  onSendMessage?: () => Promise<void>; // Added to match what's passed from VoiceChat
+  onAudioData?: (audioData: Float32Array) => void;
+  connectionStatus?: ConnectionStatus;
+  isConnecting?: boolean;
 }
 
 const VoiceInputArea: React.FC<VoiceInputAreaProps> = ({ 
   transcript, 
-  setTranscript, 
-  onSend 
+  setTranscript = () => {}, 
+  onSend = () => {}, 
+  onSendMessage, // New prop to match VoiceChat component
+  onAudioData,
+  connectionStatus,
+  isConnecting
 }) => {
   // Function to check if the user's message count has reached the threshold
   const checkMessageAnalysisThreshold = async (userId: string) => {
@@ -49,8 +58,12 @@ const VoiceInputArea: React.FC<VoiceInputAreaProps> = ({
       console.log("User not authenticated, message will not be attributed");
     }
     
-    // Call the original onSend function
-    onSend();
+    // Call the appropriate send function
+    if (onSendMessage) {
+      await onSendMessage();
+    } else {
+      onSend();
+    }
   };
 
   return (
@@ -59,7 +72,7 @@ const VoiceInputArea: React.FC<VoiceInputAreaProps> = ({
         <input
           type="text"
           value={transcript}
-          onChange={(e) => setTranscript(e.target.value)}
+          onChange={(e) => setTranscript?.(e.target.value)}
           placeholder="Type a message..."
           className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         />
