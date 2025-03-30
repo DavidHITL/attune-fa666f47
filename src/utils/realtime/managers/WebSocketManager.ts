@@ -1,13 +1,14 @@
 
+import { PromiseManager } from './PromiseManager';
+import { TimeoutManager } from './TimeoutManager';
+
 /**
  * Manager for handling WebSocket connections
  */
 export class WebSocketManager {
   private websocket: WebSocket | null = null;
-  private connectionTimeout: number = 15000; // 15 second timeout
-  private openPromise: Promise<void> | null = null;
-  private openPromiseResolve: (() => void) | null = null;
-  private openPromiseReject: ((reason?: any) => void) | null = null;
+  private promiseManager: PromiseManager = new PromiseManager();
+  private timeoutManager: TimeoutManager = new TimeoutManager();
 
   /**
    * Create a WebSocket connection to the specified URL
@@ -15,10 +16,7 @@ export class WebSocketManager {
   async connect(wsUrl: string, setupEventHandlers: (websocket: WebSocket, timeoutId: number) => void): Promise<void> {
     try {
       // Don't attempt multiple connections simultaneously
-      if (this.openPromise) {
-        console.log("Connection already in progress, returning existing promise");
-        return this.openPromise;
-      }
+      const connectionPromise = this.promiseManager.createPromise();
       
       // Close any existing connection first
       if (this.websocket) {
@@ -30,66 +28,41 @@ export class WebSocketManager {
         this.websocket = null;
       }
       
-      // Create a new promise for this connection attempt
-      this.openPromise = new Promise<void>((resolve, reject) => {
-        this.openPromiseResolve = resolve;
-        this.openPromiseReject = reject;
+      try {
+        console.log("Connecting to WebSocket:", wsUrl);
         
-        try {
-          console.log("Connecting to WebSocket:", wsUrl);
-          
-          this.websocket = new WebSocket(wsUrl);
-          this.websocket.binaryType = "arraybuffer";
-          
-          // Use window.setTimeout to ensure correct type
-          const timeoutId = window.setTimeout(() => {
-            if (this.websocket?.readyState !== WebSocket.OPEN) {
-              console.error("WebSocket connection timeout after", this.connectionTimeout, "ms");
-              if (this.websocket) {
-                try {
-                  this.websocket.close();
-                } catch (err) {
-                  console.warn("Error closing WebSocket after timeout:", err);
-                }
+        this.websocket = new WebSocket(wsUrl);
+        this.websocket.binaryType = "arraybuffer";
+        
+        // Create a timeout for connection attempt
+        const timeoutId = this.timeoutManager.createTimeout(() => {
+          if (this.websocket?.readyState !== WebSocket.OPEN) {
+            console.error("WebSocket connection timeout after", this.timeoutManager.getConnectionTimeout(), "ms");
+            if (this.websocket) {
+              try {
+                this.websocket.close();
+              } catch (err) {
+                console.warn("Error closing WebSocket after timeout:", err);
               }
-              
-              if (this.openPromiseReject) {
-                this.openPromiseReject(new Error("Connection timeout"));
-              }
-              
-              // Reset the promise
-              this.resetPromise();
             }
-          }, this.connectionTimeout);
-          
-          setupEventHandlers(this.websocket, timeoutId);
-          
-        } catch (error) {
-          console.error("Error creating WebSocket:", error);
-          
-          if (this.openPromiseReject) {
-            this.openPromiseReject(error);
+            
+            this.promiseManager.rejectPromise(new Error("Connection timeout"));
           }
-          
-          this.resetPromise();
-          throw error;
-        }
-      });
+        });
+        
+        setupEventHandlers(this.websocket, timeoutId);
+        
+      } catch (error) {
+        console.error("Error creating WebSocket:", error);
+        this.promiseManager.rejectPromise(error);
+        throw error;
+      }
       
-      return this.openPromise;
+      return connectionPromise;
     } catch (error) {
       console.error("Failed to connect:", error);
       throw error;
     }
-  }
-
-  /**
-   * Reset the connection promise state
-   */
-  resetPromise(): void {
-    this.openPromise = null;
-    this.openPromiseResolve = null;
-    this.openPromiseReject = null;
   }
 
   /**
@@ -105,7 +78,7 @@ export class WebSocketManager {
       this.websocket = null;
     }
     
-    this.resetPromise();
+    this.promiseManager.resetPromise();
   }
   
   /**
@@ -116,29 +89,23 @@ export class WebSocketManager {
   }
 
   /**
-   * Resolve the open promise
+   * Resolve the connection promise
    */
   resolveOpenPromise(): void {
-    if (this.openPromiseResolve) {
-      this.openPromiseResolve();
-      this.resetPromise();
-    }
+    this.promiseManager.resolvePromise();
   }
 
   /**
-   * Reject the open promise
+   * Reject the connection promise
    */
   rejectOpenPromise(error: any): void {
-    if (this.openPromiseReject) {
-      this.openPromiseReject(error);
-      this.resetPromise();
-    }
+    this.promiseManager.rejectPromise(error);
   }
 
   /**
    * Set the connection timeout
    */
   setConnectionTimeout(timeout: number): void {
-    this.connectionTimeout = timeout;
+    this.timeoutManager.setConnectionTimeout(timeout);
   }
 }
