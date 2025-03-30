@@ -1,5 +1,5 @@
 
-import { WebSocketManager } from './managers/WebSocketManager';
+import { WebSocketManager } from './WebSocketManager';
 import { EventEmitter } from './EventEmitter';
 import { ChatError, ErrorType } from './types';
 

@@ -1,7 +1,5 @@
 
 import { SessionConfig } from './types';
-import { ConnectionManager } from './managers/ConnectionManager';
-import { MessageManager } from './managers/MessageManager';
 
 /**
  * Manages WebSocket connections to the realtime chat service
@@ -9,6 +7,14 @@ import { MessageManager } from './managers/MessageManager';
 export class WebSocketManager {
   private websocket: WebSocket | null = null;
   private messageHandler: ((event: MessageEvent) => void) | null = null;
+  private wsUrl: string | null = null;
+  
+  /**
+   * Set the WebSocket URL
+   */
+  setUrl(url: string): void {
+    this.wsUrl = url;
+  }
   
   /**
    * Get the WebSocket instance
@@ -20,9 +26,13 @@ export class WebSocketManager {
   /**
    * Connect to the WebSocket server
    */
-  async connect(wsUrl: string, setupHandlers: (websocket: WebSocket, timeoutId: number) => void): Promise<void> {
+  async connect(setupHandlers: (websocket: WebSocket, timeoutId: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        if (!this.wsUrl) {
+          throw new Error("WebSocket URL not set");
+        }
+        
         // Close any existing connection
         if (this.websocket) {
           try {
@@ -34,8 +44,8 @@ export class WebSocketManager {
         }
         
         // Create a new WebSocket connection
-        console.log("Connecting to WebSocket:", wsUrl);
-        this.websocket = new WebSocket(wsUrl);
+        console.log("Connecting to WebSocket:", this.wsUrl);
+        this.websocket = new WebSocket(this.wsUrl);
         
         // Set up binary type for audio data
         this.websocket.binaryType = "arraybuffer";
@@ -61,12 +71,14 @@ export class WebSocketManager {
         // Original onopen handler in the promise
         this.websocket.addEventListener('open', () => {
           console.log("WebSocket opened in connect promise");
+          window.clearTimeout(timeoutId);
           resolve();
         });
         
         // Original onerror handler in the promise
         this.websocket.addEventListener('error', (event) => {
           console.error("WebSocket error in connect promise:", event);
+          window.clearTimeout(timeoutId);
           reject(event);
         });
       } catch (error) {
@@ -118,20 +130,6 @@ export class WebSocketManager {
     if (this.websocket) {
       this.websocket.onmessage = this.messageHandler;
     }
-  }
-  
-  /**
-   * Helper for external promise resolution
-   */
-  resolveOpenPromise(): void {
-    // This is handled internally now
-  }
-  
-  /**
-   * Helper for external promise rejection
-   */
-  rejectOpenPromise(error: any): void {
-    // This is handled internally now
   }
   
   /**

@@ -1,5 +1,5 @@
 
-import { WebSocketManager } from './managers/WebSocketManager';
+import { WebSocketManager } from './WebSocketManager';
 
 /**
  * Manages realtime chat sessions
@@ -30,7 +30,7 @@ export class SessionManager {
         }
       };
       
-      if (!webSocketManager || !webSocketManager.send) {
+      if (!webSocketManager) {
         console.error("WebSocketManager not available or not properly initialized");
         return false;
       }
