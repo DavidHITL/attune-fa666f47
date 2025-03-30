@@ -1,3 +1,4 @@
+
 import { EventEmitter } from './EventEmitter';
 import { ChatError, ErrorType } from './types';
 import { ConnectionManager } from './ConnectionManager';
@@ -22,7 +23,9 @@ export class RealtimeChat {
    * @param transcriptCallback Function to call with updated transcript text
    */
   constructor(transcriptCallback: (text: string) => void = () => {}) {
-    const projectId = 'oseowhythgbqvllwonaz'; // Your Supabase project ID
+    // Use the correct Supabase project ID
+    const projectId = 'oseowhythgbqvllwonaz'; 
+    console.log("[RealtimeChat] Initializing with project ID:", projectId);
     
     // Initialize event emitter
     this.eventEmitter = new EventEmitter();

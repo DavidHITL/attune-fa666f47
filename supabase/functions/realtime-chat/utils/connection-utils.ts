@@ -21,9 +21,11 @@ export function connectToOpenAI(options: OpenAISocketOptions): void {
 
   try {
     console.log(`Connecting to OpenAI Realtime API (attempt ${connectionAttemptsRef.current + 1}/${maxConnectionAttempts})...`);
+    console.log("API Key length check:", apiKey ? `Valid (${apiKey.length} characters)` : "Missing");
     
     // Initialize OpenAI WebSocket
     try {
+      console.log("Creating OpenAI WebSocket connection to wss://api.openai.com/v1/realtime");
       const openAISocket = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01");
       openAISocketRef.current = openAISocket;
       console.log("OpenAI WebSocket instance created successfully");
@@ -44,7 +46,8 @@ export function connectToOpenAI(options: OpenAISocketOptions): void {
       console.error("Socket creation error details:", JSON.stringify({
         name: socketError.name,
         message: socketError.message,
-        stack: socketError.stack
+        stack: socketError.stack,
+        type: typeof socketError
       }));
       
       // Notify client of failure
@@ -52,7 +55,8 @@ export function connectToOpenAI(options: OpenAISocketOptions): void {
         socket.send(JSON.stringify({
           type: "error",
           error: "Failed to create connection to OpenAI",
-          details: socketError instanceof Error ? socketError.message : String(socketError)
+          details: socketError instanceof Error ? socketError.message : String(socketError),
+          time: new Date().toISOString()
         }));
       } catch (sendError) {
         console.error("Failed to send error notification to client:", sendError);
@@ -75,7 +79,8 @@ export function connectToOpenAI(options: OpenAISocketOptions): void {
         socket.send(JSON.stringify({
           type: "error",
           error: "Unexpected error occurred during connection setup",
-          details: error instanceof Error ? error.message : String(error)
+          details: error instanceof Error ? error.message : String(error),
+          time: new Date().toISOString()
         }));
       }
     } catch (sendError) {
@@ -124,7 +129,8 @@ export function handleReconnection(options: OpenAISocketOptions): void {
           type: "reconnecting",
           attempts: connectionAttemptsRef.current,
           maxAttempts: maxConnectionAttempts,
-          nextAttemptIn: backoffTime
+          nextAttemptIn: backoffTime,
+          time: new Date().toISOString()
         }));
       }
     } catch (sendError) {
@@ -139,7 +145,8 @@ export function handleReconnection(options: OpenAISocketOptions): void {
         socket.send(JSON.stringify({
           type: "error",
           error: "Maximum reconnection attempts reached",
-          details: `Failed to connect after ${maxConnectionAttempts} attempts.`
+          details: `Failed to connect after ${maxConnectionAttempts} attempts.`,
+          time: new Date().toISOString()
         }));
       }
     } catch (sendError) {

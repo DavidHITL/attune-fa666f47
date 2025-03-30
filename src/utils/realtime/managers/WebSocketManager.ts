@@ -48,6 +48,7 @@ export class WebSocketManager {
         }
         
         // Get auth token if available from Supabase
+        let finalUrl = this.wsUrl;
         try {
           const { supabase } = await import('@/integrations/supabase/client');
           const { data } = await supabase.auth.getSession();
@@ -55,42 +56,35 @@ export class WebSocketManager {
           if (data.session?.access_token) {
             console.log("[Managers/WebSocketManager] Adding auth token to connection");
             // Add token to URL as a query parameter
-            const separator = this.wsUrl.includes('?') ? '&' : '?';
-            this.wsUrl = `${this.wsUrl}${separator}token=${data.session.access_token}`;
+            const separator = finalUrl.includes('?') ? '&' : '?';
+            finalUrl = `${finalUrl}${separator}token=${data.session.access_token}`;
           }
         } catch (error) {
           console.warn("[Managers/WebSocketManager] Could not get auth token:", error);
         }
         
+        console.log("[Managers/WebSocketManager] Final connection URL:", finalUrl);
+        
         // Create new connection
-        this.websocket = new WebSocket(this.wsUrl);
-        
-        // Set binary type for audio data
-        this.websocket.binaryType = "arraybuffer";
-        
-        // Set connection timeout
-        const timeoutId = window.setTimeout(() => {
-          console.error("[Managers/WebSocketManager] Connection timed out");
-          this.rejectOpenPromise(new Error("Connection timeout"));
-          this.websocket?.close();
-        }, 10000);
-        
-        // Configure handlers
-        setupHandlers(this.websocket, timeoutId);
-        
-        // Handle successful connection
-        this.websocket.addEventListener('open', () => {
-          console.log("[Managers/WebSocketManager] Connection established");
-          window.clearTimeout(timeoutId);
-          this.resolveOpenPromise();
-        });
-        
-        // Handle connection errors
-        this.websocket.addEventListener('error', (event) => {
-          console.error("[Managers/WebSocketManager] Connection error:", event);
-          window.clearTimeout(timeoutId);
-          this.rejectOpenPromise(event);
-        });
+        try {
+          this.websocket = new WebSocket(finalUrl);
+          
+          // Set binary type for audio data
+          this.websocket.binaryType = "arraybuffer";
+          
+          // Set connection timeout
+          const timeoutId = window.setTimeout(() => {
+            console.error("[Managers/WebSocketManager] Connection timed out");
+            this.rejectOpenPromise(new Error("Connection timeout"));
+            this.websocket?.close();
+          }, 10000);
+          
+          // Configure handlers
+          setupHandlers(this.websocket, timeoutId);
+        } catch (wsError) {
+          console.error("[Managers/WebSocketManager] Error creating WebSocket:", wsError);
+          reject(wsError);
+        }
       } catch (error) {
         console.error("[Managers/WebSocketManager] Error setting up connection:", error);
         this.rejectOpenPromise(error);
