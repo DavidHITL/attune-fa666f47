@@ -4,6 +4,8 @@ import { WebSocketManager } from './WebSocketManager';
 import { ConnectionEventHandler } from './ConnectionEventHandler';
 import { ReconnectionHandler } from '../ReconnectionHandler';
 import { EventEmitter } from '../EventEmitter';
+import { HeartbeatConfig } from './HeartbeatConfig';
+import { ConnectionInitializer } from './ConnectionInitializer';
 
 /**
  * Manages WebSocket connections and reconnection logic
@@ -15,11 +17,8 @@ export class ConnectionManager {
   private reconnectionHandler: ReconnectionHandler;
   private projectId: string;
   private eventEmitter: EventEmitter;
-  private heartbeatConfig = {
-    pingInterval: 30000,  // 30 seconds
-    pongTimeout: 5000,    // 5 seconds
-    maxMissed: 3          // 3 missed pongs before reconnect
-  };
+  private heartbeatConfig: HeartbeatConfig;
+  private connectionInitializer: ConnectionInitializer;
   
   constructor(projectId: string, eventEmitter: EventEmitter, onReconnect: () => Promise<void>) {
     this.projectId = projectId;
@@ -33,23 +32,21 @@ export class ConnectionManager {
       this.reconnectionHandler,
       this.eventEmitter
     );
+    this.heartbeatConfig = new HeartbeatConfig();
+    this.connectionInitializer = new ConnectionInitializer();
   }
 
   /**
    * Set heartbeat configuration
    */
   setHeartbeatConfig(pingInterval: number, pongTimeout: number, maxMissed: number): void {
-    this.heartbeatConfig = {
-      pingInterval,
-      pongTimeout,
-      maxMissed
-    };
+    this.heartbeatConfig.setConfig(pingInterval, pongTimeout, maxMissed);
     
     // If already initialized, update the WebSocketManager
     this.webSocketManager.setHeartbeatConfig(
-      this.heartbeatConfig.pingInterval,
-      this.heartbeatConfig.pongTimeout,
-      this.heartbeatConfig.maxMissed
+      this.heartbeatConfig.getPingInterval(),
+      this.heartbeatConfig.getPongTimeout(),
+      this.heartbeatConfig.getMaxMissed()
     );
   }
 
@@ -57,44 +54,21 @@ export class ConnectionManager {
    * Create a WebSocket connection
    */
   async connect(): Promise<void> {
-    try {
-      this.reconnectionHandler.clearTimeout();
-      
-      // Build the WebSocket URL with the correct format
-      const wsUrl = `wss://${this.projectId}.supabase.co/functions/v1/realtime-chat`;
-      
-      console.log("[ConnectionManager] Initializing connection to:", wsUrl);
-      console.log("[ConnectionManager] Project ID:", this.projectId);
-      
-      // Set the WebSocket URL and protocols
-      this.webSocketManager.setUrl(wsUrl);
-      this.webSocketManager.setProtocols(['json', 'openai-realtime']);
-      
-      // Set heartbeat configuration
-      this.webSocketManager.setHeartbeatConfig(
-        this.heartbeatConfig.pingInterval,
-        this.heartbeatConfig.pongTimeout,
-        this.heartbeatConfig.maxMissed
-      );
-      
-      // Connect to the WebSocket server
-      return await this.webSocketManager.connect((websocket, timeoutId) => 
-        this.connectionEventHandler.setupEventHandlers(websocket, timeoutId)
-      );
-    } catch (error) {
-      console.error("[ConnectionManager] Failed to connect:", error);
-      this.connectionState.setConnected(false);
-      this.reconnectionHandler.tryReconnect();
-      
-      // Dispatch error event
-      this.eventEmitter.dispatchEvent('error', {
-        type: 'connection',
-        message: 'Failed to connect to WebSocket',
-        error
-      });
-      
-      throw error;
-    }
+    // Set heartbeat configuration before connecting
+    this.webSocketManager.setHeartbeatConfig(
+      this.heartbeatConfig.getPingInterval(),
+      this.heartbeatConfig.getPongTimeout(),
+      this.heartbeatConfig.getMaxMissed()
+    );
+    
+    // Initialize connection
+    return this.connectionInitializer.initializeConnection(
+      this.projectId,
+      this.webSocketManager,
+      this.connectionState,
+      this.reconnectionHandler,
+      this.eventEmitter
+    );
   }
 
   /**
