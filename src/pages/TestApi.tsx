@@ -1,7 +1,7 @@
 
 import React from 'react';
-import Container from '@/components/ui/Container';
-import PageHeader from '@/components/ui/PageHeader';
+import { Container } from '@/components/ui/Container';
+import { PageHeader } from '@/components/ui/PageHeader';
 import EndpointTester from '@/components/realtime/EndpointTester';
 
 const TestApi: React.FC = () => {

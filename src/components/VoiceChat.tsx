@@ -1,10 +1,11 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { RealtimeChat } from "@/utils/RealtimeAudio";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ChatError, ErrorType } from "@/utils/realtime/types";
 
-// Import the new EndpointTester component
+// Import the EndpointTester component
 import EndpointTester from './realtime/EndpointTester';
 
 export function useVoiceChat(user: any | null) {
@@ -194,12 +195,25 @@ export function useVoiceChat(user: any | null) {
   };
 }
 
-// Add the EndpointTester component to the render output, 
-// likely near the bottom of the component's JSX
-// This is just a suggestion - you'll need to find an appropriate
-// location in the existing VoiceChat component
-
-// For example, add this somewhere in the returned JSX:
-// <div className="mt-4">
-//   <EndpointTester />
-// </div>
+// Create and export the VoiceChat component
+export function VoiceChat({ 
+  open, 
+  onOpenChange 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+}) {
+  // This is just a placeholder component structure
+  // The actual implementation would depend on your requirements
+  return (
+    <div className={`voice-chat ${open ? 'open' : 'closed'}`}>
+      {/* Voice chat content would go here */}
+      <button onClick={() => onOpenChange(false)}>Close</button>
+      
+      {/* Add endpoint tester for debugging */}
+      <div className="mt-4">
+        <EndpointTester />
+      </div>
+    </div>
+  );
+}

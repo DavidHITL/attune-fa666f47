@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import NavBar from "@/components/NavBar";
 import ChatInterface from "@/components/ChatInterface";
-import VoiceChat from "@/components/VoiceChat";
+import { VoiceChat } from "@/components/VoiceChat"; // Changed to named import
 import SessionStartModal from "@/components/chat/SessionStartModal";
 import EndSessionDialog from "@/components/chat/EndSessionDialog";
 import ChatHeader from "@/components/chat/ChatHeader";
