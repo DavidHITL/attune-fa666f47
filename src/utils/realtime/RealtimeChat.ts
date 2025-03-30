@@ -1,4 +1,3 @@
-
 import { EventEmitter } from './EventEmitter';
 import { ChatError, ErrorType } from './types';
 import { ConnectionManager } from './ConnectionManager';

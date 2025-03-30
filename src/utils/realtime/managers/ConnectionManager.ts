@@ -38,14 +38,14 @@ export class ConnectionManager {
       this.reconnectionHandler.clearTimeout();
       
       // Build the WebSocket URL with the correct format
-      // Format should be: wss://[project-id].functions.supabase.co/functions/v1/realtime-chat
       const wsUrl = `wss://${this.projectId}.supabase.co/functions/v1/realtime-chat`;
       
       console.log("[ConnectionManager] Initializing connection to:", wsUrl);
       console.log("[ConnectionManager] Project ID:", this.projectId);
       
-      // Set the WebSocket URL
+      // Set the WebSocket URL and protocols
       this.webSocketManager.setUrl(wsUrl);
+      this.webSocketManager.setProtocols(['json', 'openai-realtime']);
       
       // Connect to the WebSocket server
       return await this.webSocketManager.connect((websocket, timeoutId) => 

@@ -6,7 +6,7 @@ export const testWebSocketConnection = (): {success: boolean, message: string, c
   console.log("[testWebSocketConnection] Starting WebSocket connection test");
   
   try {
-    // Use the correct project ID
+    // Use the correct project ID from your Supabase configuration
     const projectId = 'oseowhythgbqvllwonaz';
     const wsUrl = `wss://${projectId}.supabase.co/functions/v1/realtime-chat`;
     
