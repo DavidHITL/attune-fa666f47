@@ -43,7 +43,7 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     let upgradeResult;
     try {
       // Upgrade the connection to WebSocket, passing along any requested protocols
-      console.log("Attempting to upgrade connection to WebSocket...");
+      console.log("Attempting to upgrade connection to WebSocket with protocols:", requestedProtocols);
       upgradeResult = Deno.upgradeWebSocket(req, {
         protocol: requestedProtocols ? requestedProtocols[0] : undefined
       });

@@ -12,12 +12,15 @@ export const testWebSocketConnection = (): {success: boolean, message: string, c
     
     console.log("[testWebSocketConnection] Connecting to:", wsUrl);
     
-    // Create a WebSocket connection
-    const ws = new WebSocket(wsUrl);
+    // Create a WebSocket connection with protocols
+    const protocols = ['json', 'openai-realtime'];
+    console.log("[testWebSocketConnection] Using protocols:", protocols);
+    const ws = new WebSocket(wsUrl, protocols);
     
     // Handle connection events
     ws.onopen = () => {
       console.log("[testWebSocketConnection] Connection established successfully");
+      console.log("[testWebSocketConnection] Selected protocol:", ws.protocol || "none");
       try {
         ws.send(JSON.stringify({type: "ping", message: "Connection test"}));
         console.log("[testWebSocketConnection] Sent test ping message");

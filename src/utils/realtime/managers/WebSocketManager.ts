@@ -11,6 +11,7 @@ export class WebSocketManager {
   private connectionAttempt = 0;
   private maxConnectionAttempts = 3;
   private connectionLogInterval: number | null = null;
+  private protocols: string[] = ['json', 'openai-realtime']; // Define supported protocols
 
   /**
    * Set the WebSocket URL
@@ -18,6 +19,14 @@ export class WebSocketManager {
   setUrl(url: string): void {
     console.log("[Managers/WebSocketManager] Setting URL:", url);
     this.wsUrl = url;
+  }
+
+  /**
+   * Set the WebSocket protocols
+   */
+  setProtocols(protocols: string[]): void {
+    console.log("[Managers/WebSocketManager] Setting protocols:", protocols);
+    this.protocols = protocols;
   }
 
   /**
@@ -36,6 +45,7 @@ export class WebSocketManager {
         }
         
         console.log("[Managers/WebSocketManager] Connecting to:", this.wsUrl);
+        console.log("[Managers/WebSocketManager] Using protocols:", this.protocols);
         
         // Store reference to resolve/reject functions
         this.openPromiseResolve = resolve;
@@ -78,9 +88,9 @@ export class WebSocketManager {
         
         console.log("[Managers/WebSocketManager] Final connection URL:", finalUrl);
         
-        // Create new connection
+        // Create new connection with protocols
         try {
-          this.websocket = new WebSocket(finalUrl);
+          this.websocket = new WebSocket(finalUrl, this.protocols);
           
           // Log connection readyState changes for debugging
           this.logReadyStateChange();
