@@ -11,6 +11,7 @@ export class MessageHandler {
   private eventEmitter: EventEmitter;
   private transcriptCallback: (text: string) => void;
   private lastTranscriptUpdate: number = 0;
+  private sessionEstablished: boolean = false;
 
   constructor(
     websocketManager: WebSocketManager,
@@ -32,9 +33,21 @@ export class MessageHandler {
         console.log("Received WebSocket message:", data.type);
         
         switch (data.type) {
+          case 'connection.established':
+            console.log("Connection established with server");
+            break;
+            
           case 'session.created':
             console.log("Session created successfully");
+            this.sessionEstablished = true;
             this.eventEmitter.dispatchEvent('session.created', { status: "created" });
+            
+            // Send session configuration after session is created
+            this.configureSession();
+            break;
+            
+          case 'session.updated':
+            console.log("Session configuration updated", data);
             break;
             
           case 'response.audio.delta':
@@ -84,6 +97,43 @@ export class MessageHandler {
   }
 
   /**
+   * Configure session settings after session is created
+   */
+  private configureSession(): void {
+    if (!this.websocketManager) {
+      console.error("Cannot configure session: WebSocketManager not available");
+      return;
+    }
+    
+    console.log("Configuring session with optimal settings");
+    
+    const sessionConfig = {
+      "event_id": `event_${Date.now()}`,
+      "type": "session.update",
+      "session": {
+        "modalities": ["text", "audio"],
+        "instructions": "You are a helpful AI assistant that responds concisely and clearly.",
+        "voice": "alloy",
+        "input_audio_format": "pcm16",
+        "output_audio_format": "pcm16",
+        "input_audio_transcription": {
+          "model": "whisper-1"
+        },
+        "turn_detection": {
+          "type": "server_vad",
+          "threshold": 0.5,
+          "prefix_padding_ms": 300,
+          "silence_duration_ms": 1000
+        },
+        "temperature": 0.8,
+        "max_response_output_tokens": "inf"
+      }   
+    };
+    
+    this.websocketManager.send(sessionConfig);
+  }
+
+  /**
    * Send a text message
    */
   sendMessage(message: string): boolean {
@@ -99,6 +149,18 @@ export class MessageHandler {
       const chatError: ChatError = {
         type: ErrorType.CONNECTION,
         message: errorMsg
+      };
+      
+      this.eventEmitter.dispatchEvent('error', chatError);
+      return false;
+    }
+    
+    if (!this.sessionEstablished) {
+      console.warn("Cannot send message: Session not yet established");
+      
+      const chatError: ChatError = {
+        type: ErrorType.CONNECTION,
+        message: "Session not yet established"
       };
       
       this.eventEmitter.dispatchEvent('error', chatError);
@@ -146,6 +208,11 @@ export class MessageHandler {
       return false;
     }
     
+    if (!this.sessionEstablished) {
+      console.warn("Cannot send speech data: Session not yet established");
+      return false;
+    }
+    
     try {
       // Send audio buffer
       const audioEvent = {
@@ -153,6 +220,7 @@ export class MessageHandler {
         audio: base64Audio
       };
       
+      console.log("Sending audio data chunk");
       return this.websocketManager.send(audioEvent);
     } catch (error) {
       console.error("Error sending speech data:", error);
@@ -174,5 +242,12 @@ export class MessageHandler {
   updateTranscript(text: string): void {
     this.lastTranscriptUpdate = Date.now();
     this.transcriptCallback(text);
+  }
+  
+  /**
+   * Check if session is established
+   */
+  isSessionEstablished(): boolean {
+    return this.sessionEstablished;
   }
 }

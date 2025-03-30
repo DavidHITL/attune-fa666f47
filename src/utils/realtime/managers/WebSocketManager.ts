@@ -1,3 +1,4 @@
+
 /**
  * Manages WebSocket connections
  */
@@ -69,6 +70,9 @@ export class WebSocketManager {
         try {
           this.websocket = new WebSocket(finalUrl);
           
+          // Log connection readyState changes for debugging
+          this.logReadyStateChange();
+          
           // Set binary type for audio data
           this.websocket.binaryType = "arraybuffer";
           
@@ -90,6 +94,40 @@ export class WebSocketManager {
         this.rejectOpenPromise(error);
       }
     });
+  }
+  
+  /**
+   * Log WebSocket readyState changes
+   */
+  private logReadyStateChange(): void {
+    if (!this.websocket) return;
+    
+    const getReadyStateString = (state: number): string => {
+      switch (state) {
+        case WebSocket.CONNECTING: return "CONNECTING (0)";
+        case WebSocket.OPEN: return "OPEN (1)";
+        case WebSocket.CLOSING: return "CLOSING (2)";
+        case WebSocket.CLOSED: return "CLOSED (3)";
+        default: return `UNKNOWN (${state})`;
+      }
+    };
+    
+    console.log("[Managers/WebSocketManager] Initial state:", getReadyStateString(this.websocket.readyState));
+    
+    // Set up interval to log state changes
+    const stateCheckInterval = setInterval(() => {
+      if (!this.websocket) {
+        clearInterval(stateCheckInterval);
+        return;
+      }
+      console.log("[Managers/WebSocketManager] Current state:", getReadyStateString(this.websocket.readyState));
+    }, 3000); // Check every 3 seconds
+    
+    // Clear interval when connection closes
+    this.websocket.onclose = (event) => {
+      clearInterval(stateCheckInterval);
+      console.log("[Managers/WebSocketManager] WebSocket closed. Code:", event.code, "Reason:", event.reason);
+    };
   }
   
   /**

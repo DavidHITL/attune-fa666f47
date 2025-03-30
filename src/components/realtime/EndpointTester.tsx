@@ -9,12 +9,18 @@ const EndpointTester: React.FC = () => {
   const { 
     httpStatus, 
     wsStatus, 
+    flowStatus,
     httpMessage, 
     wsMessage, 
+    flowMessage,
     isLoading, 
     testHttpEndpoint, 
     testWsConnection, 
-    closeWsConnection 
+    testFullChatFlow,
+    closeWsConnection,
+    closeFlowConnection,
+    hasActiveWsConnection,
+    hasActiveFlowConnection
   } = useEndpointTest();
 
   return (
@@ -87,12 +93,54 @@ const EndpointTester: React.FC = () => {
             </Button>
             <Button 
               onClick={closeWsConnection}
-              disabled={!isLoading.ws} 
+              disabled={!hasActiveWsConnection} 
               variant="destructive"
             >
               Close
             </Button>
           </div>
+        </div>
+      </div>
+      
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-medium mb-4 flex items-center">
+          Complete Chat Flow Test
+          {flowStatus === 'success' && <CheckCircle className="ml-2 h-5 w-5 text-green-500" />}
+          {flowStatus === 'error' && <XCircle className="ml-2 h-5 w-5 text-red-500" />}
+        </h3>
+        
+        <div className="mb-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            Tests the complete voice chat flow including session establishment and audio handling.
+          </p>
+          {flowMessage && (
+            <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-md text-sm font-mono whitespace-pre-wrap max-h-40 overflow-auto">
+              {flowMessage}
+            </div>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          <Button 
+            onClick={testFullChatFlow} 
+            disabled={isLoading.flow}
+            variant="outline" 
+            className="flex-1"
+          >
+            {isLoading.flow ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Testing Flow...
+              </>
+            ) : 'Test Complete Flow'}
+          </Button>
+          <Button 
+            onClick={closeFlowConnection}
+            disabled={!hasActiveFlowConnection} 
+            variant="destructive"
+          >
+            Close
+          </Button>
         </div>
       </div>
       

@@ -1,83 +1,175 @@
+import { testRealtimeFunctionEndpoint } from './testRealtimeFunctionEndpoint';
 
 /**
- * Utility to test the Supabase edge function reachability
+ * Test the HTTP endpoint
  */
-export const testRealtimeFunctionEndpoint = async (): Promise<{success: boolean; message: string}> => {
+export async function testRealtimeFunctionEndpoint(): Promise<{ success: boolean; message: string }> {
   try {
-    const projectId = 'oseowhythgbqvllwonaz';
-    const endpoint = `https://${projectId}.supabase.co/functions/v1/realtime-chat`;
-    
-    console.log("[TestEndpoint] Testing HTTP accessibility of realtime-chat function:", endpoint);
-    
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
+    const response = await fetch('/api/test-realtime-endpoint');
     const data = await response.json();
     
-    console.log("[TestEndpoint] Response status:", response.status);
-    console.log("[TestEndpoint] Response data:", data);
-    
-    return {
-      success: response.status >= 200 && response.status < 300,
-      message: `Endpoint responded with status ${response.status}: ${JSON.stringify(data)}`
-    };
+    if (response.ok) {
+      return { success: true, message: `Endpoint test successful: ${data.message}` };
+    } else {
+      return { success: false, message: `Endpoint test failed: ${data.error}` };
+    }
   } catch (error) {
-    console.error("[TestEndpoint] Error testing endpoint:", error);
-    return {
-      success: false,
-      message: `Error: ${error instanceof Error ? error.message : String(error)}`
-    };
+    console.error("Error testing endpoint:", error);
+    return { success: false, message: `Error testing endpoint: ${error}` };
   }
-};
+}
 
 /**
- * Utility to test WebSocket connection to the edge function
+ * Test the WebSocket connection
  */
-export const testWebSocketConnection = (): {
-  success: boolean;
-  message: string;
-  close: () => void;
-} => {
+export function testWebSocketConnection(): { success: boolean; message: string; close: () => void } {
   try {
     const projectId = 'oseowhythgbqvllwonaz';
     const wsUrl = `wss://${projectId}.supabase.co/functions/v1/realtime-chat`;
     
-    console.log("[TestEndpoint] Testing WebSocket connection:", wsUrl);
-    
+    console.log("Connecting to WebSocket:", wsUrl);
     const socket = new WebSocket(wsUrl);
-    let connected = false;
     
-    // Set up event listeners
-    socket.addEventListener('open', () => {
-      connected = true;
-      console.log("[TestEndpoint] WebSocket connection established successfully!");
-    });
+    socket.onopen = () => {
+      console.log("WebSocket connection established");
+    };
     
-    socket.addEventListener('error', (event) => {
-      console.error("[TestEndpoint] WebSocket connection error:", event);
-    });
+    socket.onmessage = (event) => {
+      console.log("Received message:", event.data);
+    };
     
-    // Return an object with the socket status and a close method
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+    
+    socket.onclose = (event) => {
+      console.log("WebSocket closed. Code:", event.code, "Reason:", event.reason);
+    };
+    
     return {
       success: true,
-      message: "WebSocket connection attempt started. Check console for results.",
+      message: "WebSocket connection attempt started. Check console for connection status.",
       close: () => {
-        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-          socket.close();
-          console.log("[TestEndpoint] WebSocket connection closed");
-        }
+        console.log("Closing WebSocket connection");
+        socket.close();
       }
     };
   } catch (error) {
-    console.error("[TestEndpoint] Error creating WebSocket:", error);
+    console.error("Error testing WebSocket connection:", error);
     return {
       success: false,
-      message: `Error creating WebSocket: ${error instanceof Error ? error.message : String(error)}`,
-      close: () => {} // Empty function as there's no socket to close
+      message: `Test failed: ${error instanceof Error ? error.message : String(error)}`,
+      close: () => {}
     };
   }
-};
+}
+
+/**
+ * Test the WebSocket connection with session establishment and audio flow
+ */
+export function testCompleteChatFlow(): { success: boolean; message: string; close: () => void } {
+  try {
+    console.log("Starting complete chat flow test...");
+    
+    // Create WebSocket connection
+    const projectId = 'oseowhythgbqvllwonaz';
+    const wsUrl = `wss://${projectId}.supabase.co/functions/v1/realtime-chat`;
+    
+    console.log("Connecting to WebSocket:", wsUrl);
+    const socket = new WebSocket(wsUrl);
+    
+    let sessionId: string | null = null;
+    let sessionEstablished = false;
+    
+    socket.onopen = () => {
+      console.log("WebSocket connection established");
+    };
+    
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("Received message:", data.type);
+        
+        if (data.type === "connection.established") {
+          console.log("Connection confirmed by server");
+        } 
+        else if (data.type === "session.created") {
+          console.log("Session created successfully", data);
+          sessionId = data.session?.id || "unknown-session";
+          
+          // Send session configuration
+          const sessionConfig = {
+            "event_id": `event_${Date.now()}`,
+            "type": "session.update",
+            "session": {
+              "modalities": ["text", "audio"],
+              "voice": "alloy",
+              "input_audio_format": "pcm16",
+              "output_audio_format": "pcm16"
+            }   
+          };
+          
+          console.log("Sending session configuration");
+          socket.send(JSON.stringify(sessionConfig));
+        }
+        else if (data.type === "session.updated") {
+          console.log("Session configuration updated successfully");
+          sessionEstablished = true;
+          
+          // Send a test message
+          setTimeout(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+              console.log("Sending test message");
+              const testMessage = {
+                type: 'conversation.item.create',
+                item: {
+                  type: 'message',
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'input_text',
+                      text: 'Hello, this is a test message'
+                    }
+                  ]
+                }
+              };
+              
+              socket.send(JSON.stringify(testMessage));
+              socket.send(JSON.stringify({type: 'response.create'}));
+            }
+          }, 1000);
+        }
+        else if (data.type === "response.audio.delta" || data.type === "response.audio_transcript.delta") {
+          console.log("Received response data");
+        }
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
+    };
+    
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+    
+    socket.onclose = (event) => {
+      console.log("WebSocket closed. Code:", event.code, "Reason:", event.reason);
+    };
+    
+    // Return control object
+    return {
+      success: true,
+      message: "Started complete chat flow test. Check console for progress.",
+      close: () => {
+        console.log("Closing test connection");
+        socket.close();
+      }
+    };
+  } catch (error) {
+    console.error("Error testing complete chat flow:", error);
+    return {
+      success: false,
+      message: `Test failed: ${error instanceof Error ? error.message : String(error)}`,
+      close: () => {} // No-op since connection failed
+    };
+  }
+}

@@ -1,12 +1,8 @@
-
 import { WebSocketManager } from './WebSocketManager';
 import { ConnectionState } from './ConnectionState';
 import { ReconnectionHandler } from '../ReconnectionHandler';
 import { EventEmitter } from '../EventEmitter';
 
-/**
- * Handles WebSocket connection events
- */
 export class ConnectionEventHandler {
   private webSocketManager: WebSocketManager;
   private connectionState: ConnectionState;
@@ -25,86 +21,68 @@ export class ConnectionEventHandler {
     this.eventEmitter = eventEmitter;
   }
 
-  /**
-   * Set up WebSocket event handlers
-   */
   setupEventHandlers(websocket: WebSocket, timeoutId: number): void {
-    websocket.onopen = (event) => {
-      console.log("WebSocket connection established successfully", event);
-      this.connectionState.setConnected(true);
-      this.reconnectionHandler.resetAttempts();
+    console.log("[ConnectionEventHandler] Setting up WebSocket event handlers");
+    
+    websocket.onopen = (event: Event) => {
+      console.log("[ConnectionEventHandler] WebSocket connection opened", event);
+      
+      // Clear connection timeout
       window.clearTimeout(timeoutId);
       
+      // Mark connection as successful
+      this.connectionState.setConnected(true);
+      this.connectionState.setConnecting(false);
+      
+      // Resolve the connection promise
       this.webSocketManager.resolveOpenPromise();
       
-      // Dispatch connected event
-      this.eventEmitter.dispatchEvent('connected', { status: "connected" });
+      // Reset reconnection attempt counter
+      this.reconnectionHandler.resetAttempts();
+      
+      // Dispatch connection event
+      this.eventEmitter.dispatchEvent('connection', { 
+        status: "connected",
+        timestamp: new Date()
+      });
     };
     
-    websocket.onerror = (error) => {
-      console.error("WebSocket connection error:", error);
-      this.connectionState.setConnected(false);
-      window.clearTimeout(timeoutId);
-      
-      this.webSocketManager.rejectOpenPromise(error);
+    websocket.onclose = (event: CloseEvent) => {
+      console.log("[ConnectionEventHandler] WebSocket connection closed", event);
+      this.handleDisconnect(event, "closed");
+    };
+    
+    websocket.onerror = (event: Event) => {
+      console.error("[ConnectionEventHandler] WebSocket connection error", event);
+      // Will be followed by onclose, so don't handle disconnect here
       
       // Dispatch error event
       this.eventEmitter.dispatchEvent('error', {
         type: 'connection',
-        message: 'WebSocket connection error',
-        error
+        message: 'WebSocket error occurred',
+        error: event
       });
-      
-      // Gentler approach to reconnection - don't immediately discard on error
-      // This will allow the onclose handler to attempt reconnection
-      console.log("WebSocket error - will attempt reconnection on close event");
     };
     
-    websocket.onclose = (event) => {
-      console.log("WebSocket connection closed:", event.code, event.reason);
-      this.connectionState.setConnected(false);
-      window.clearTimeout(timeoutId);
-      
-      this.webSocketManager.rejectOpenPromise(
-        new Error(`Connection closed: ${event.code} ${event.reason}`)
-      );
-      
-      // Dispatch disconnected event
-      this.eventEmitter.dispatchEvent('disconnected', {
-        code: event.code,
-        reason: event.reason
-      });
-      
-      // Always attempt reconnection except for normal closure
-      const normalCloseCode = 1000;
-      const abnormalCloseCode = 1006;
-      
-      if (event.code !== normalCloseCode) {
-        console.log(`Abnormal close (${event.code}), attempting reconnection`);
-        this.reconnectionHandler.tryReconnect();
-      } else if (Number(event.code) === abnormalCloseCode) {
-        // Code 1006 means abnormal closure, could be network issues
-        console.log("Abnormal closure detected, attempting reconnection");
-        setTimeout(() => {
-          if (this.reconnectionHandler.getAttempts() < 5) {
-            this.reconnectionHandler.tryReconnect();
-          }
-        }, 2000); // Add a small delay before reconnection attempt
-      }
-    };
+    // Message handler is set up by the MessageHandler class
+  }
+  
+  private handleDisconnect(event: Event, reason: string): void {
+    // Update connection state
+    this.connectionState.setConnected(false);
+    this.connectionState.setConnecting(false);
     
-    websocket.onmessage = (event) => {
-      try {
-        // Forward the message to any listeners
-        this.eventEmitter.dispatchEvent('message', event.data);
-      } catch (error) {
-        console.error("Error processing WebSocket message:", error);
-        this.eventEmitter.dispatchEvent('error', {
-          type: 'message',
-          message: 'Error processing WebSocket message',
-          error
-        });
-      }
-    };
+    // Attempt reconnection
+    if (this.connectionState.shouldTryReconnect()) {
+      console.log("[ConnectionEventHandler] Attempting to reconnect...");
+      this.reconnectionHandler.tryReconnect();
+    }
+    
+    // Dispatch disconnection event
+    this.eventEmitter.dispatchEvent('disconnection', { 
+      status: "disconnected",
+      reason: reason,
+      timestamp: new Date()
+    });
   }
 }
