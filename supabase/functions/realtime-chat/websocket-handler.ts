@@ -19,6 +19,18 @@ const defaultOptions: WebSocketOptions = {
 export async function handleWebSocketRequest(req: Request, options: WebSocketOptions = defaultOptions): Promise<Response> {
   try {
     console.log("Processing WebSocket upgrade request for OpenAI Realtime API");
+    
+    // Check if request is a valid WebSocket upgrade
+    const upgradeHeader = req.headers.get("upgrade") || "";
+    if (upgradeHeader.toLowerCase() !== "websocket") {
+      console.error("Not a valid WebSocket upgrade request");
+      return new Response("Expected WebSocket upgrade", { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+    
+    // Upgrade the connection to WebSocket
     const { socket, response } = Deno.upgradeWebSocket(req);
     const OPENAI_API_KEY = getOpenAIApiKey();
     
@@ -98,6 +110,18 @@ function setupClientConnectionHandlers(options: ConnectionHandlerOptions) {
   
   socket.onerror = (error) => {
     console.error("Client WebSocket error:", error);
+    // Notify client of the error
+    try {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify({
+          type: "error",
+          error: "WebSocket error occurred",
+          details: error instanceof Error ? error.message : "Unknown error"
+        }));
+      }
+    } catch (sendError) {
+      console.error("Error sending error notification to client:", sendError);
+    }
   };
 }
 

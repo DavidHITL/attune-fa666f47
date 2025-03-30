@@ -28,8 +28,8 @@ export class ReconnectionHandler {
     }
     
     // Gentler exponential backoff with jitter to prevent thundering herd
-    // Start with 1.5 second base and cap at 20 seconds max
-    const baseDelay = 1500; // ms
+    // Start with 2 second base and cap at 20 seconds max
+    const baseDelay = 2000; // ms
     const maxDelay = 20000; // 20 seconds max
     const exponent = Math.min(this.reconnectAttempts, 6); // Cap the exponent to prevent excessive delays
     
@@ -43,6 +43,7 @@ export class ReconnectionHandler {
     this.isReconnecting = true;
     this.reconnectAttempts++;
     
+    // Fix: Use window.setTimeout to ensure number type compatibility
     this.reconnectTimeout = window.setTimeout(async () => {
       console.log(`Executing reconnection attempt ${this.reconnectAttempts} of ${this.maxReconnectAttempts}`);
       
@@ -74,8 +75,8 @@ export class ReconnectionHandler {
    * Clear any pending reconnection timeout
    */
   clearTimeout(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
+    if (this.reconnectTimeout !== null) {
+      window.clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
     this.isReconnecting = false;

@@ -132,11 +132,9 @@ export class ConnectionManager {
       
       this.resetPromise();
       
-      if (error instanceof Event && (error as any).target?.readyState !== WebSocket.CLOSED) {
-        this.reconnectionHandler.tryReconnect();
-      } else {
-        console.warn("Not attempting reconnection due to critical error state");
-      }
+      // Gentler approach to reconnection - don't immediately discard on error
+      // This will allow the onclose handler to attempt reconnection
+      console.log("WebSocket error - will attempt reconnection on close event");
     };
     
     this.websocket.onclose = (event) => {
@@ -149,14 +147,18 @@ export class ConnectionManager {
         this.resetPromise();
       }
       
-      if (event.code !== 1000 && event.code !== 1006) {
+      // Always attempt reconnection except for normal closure
+      if (event.code !== 1000) {
+        console.log(`Abnormal close (${event.code}), attempting reconnection`);
         this.reconnectionHandler.tryReconnect();
       } else if (event.code === 1006) {
+        // Code 1006 means abnormal closure, could be network issues
+        console.log("Abnormal closure detected, attempting reconnection");
         setTimeout(() => {
           if (this.reconnectionHandler.getAttempts() < 5) {
             this.reconnectionHandler.tryReconnect();
           }
-        }, 5000);
+        }, 2000); // Add a small delay before reconnection attempt
       }
     };
   }

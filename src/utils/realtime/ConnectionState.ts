@@ -23,8 +23,19 @@ export class ConnectionState {
    * Check if WebSocket is connected and in OPEN state
    */
   checkConnection(websocket: WebSocket | null): boolean {
-    return this._isConnected && 
-           !!websocket && 
-           websocket.readyState === WebSocket.OPEN;
+    if (!websocket) {
+      return false;
+    }
+    
+    // Double-check the actual WebSocket state
+    const isActuallyConnected = websocket.readyState === WebSocket.OPEN;
+    
+    // If our state says connected but WebSocket is closed, update our state
+    if (this._isConnected && !isActuallyConnected) {
+      console.warn("Connection state mismatch - updating state to match actual WebSocket state");
+      this._isConnected = false;
+    }
+    
+    return this._isConnected && isActuallyConnected;
   }
 }
