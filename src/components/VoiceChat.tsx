@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,9 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import VoiceVisualization from "./voice/VoiceVisualization";
-import { useVoiceChatRecognition } from "@/hooks/useVoiceChatRecognition";
+import { RealtimeChat } from "@/utils/RealtimeAudio";
+import { useVoiceChatConnection } from "@/hooks/useVoiceChatConnection";
+import { toast } from "sonner";
 
 interface VoiceChatProps {
   open: boolean;
@@ -18,29 +20,50 @@ interface VoiceChatProps {
 
 const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
   const { user } = useAuth();
-  const { 
-    isRecording, 
-    startRecording, 
-    stopRecording 
-  } = useVoiceChatRecognition();
-
-  // Start recording when opened
-  useEffect(() => {
-    if (open && user) {
-      console.log("[VoiceChat] Dialog opened, starting recording");
-      startRecording();
+  const chatRef = useRef<RealtimeChat | null>(null);
+  
+  // Initialize chat functionality with transcript handling
+  const handleTranscript = (text: string) => {
+    console.log("[VoiceChat] Transcript update:", text);
+  };
+  
+  // Connect to OpenAI's Realtime API
+  const connect = async () => {
+    try {
+      if (chatRef.current) return;
+      
+      console.log("[VoiceChat] Initializing real-time connection");
+      chatRef.current = new RealtimeChat(handleTranscript);
+      await chatRef.current.connect();
+      
+      console.log("[VoiceChat] Connection established");
+      toast.success("Voice connection established");
+    } catch (error) {
+      console.error("[VoiceChat] Connection error:", error);
+      toast.error("Failed to connect to voice service");
+      throw error;
     }
-    
-    return () => {
-      if (isRecording) {
-        console.log("[VoiceChat] Dialog closed, stopping recording");
-        stopRecording();
-      }
-    };
-  }, [open, user, isRecording, startRecording, stopRecording]);
+  };
+  
+  // Disconnect from service
+  const disconnect = () => {
+    if (chatRef.current) {
+      console.log("[VoiceChat] Closing connection");
+      chatRef.current.disconnect();
+      chatRef.current = null;
+    }
+  };
+  
+  // Manage connection state
+  const { connectionStatus } = useVoiceChatConnection({
+    open,
+    connect,
+    disconnect,
+    chatRef
+  });
 
   const handleClose = () => {
-    stopRecording();
+    disconnect();
     onOpenChange(false);
   };
 
@@ -52,7 +75,13 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
         </DialogHeader>
         
         <div className="flex flex-col items-center justify-center h-[60vh] gap-6">
-          <VoiceVisualization isActive={isRecording} />
+          <VoiceVisualization isActive={connectionStatus === 'connected'} />
+          
+          <div className="text-center text-sm text-gray-500">
+            {connectionStatus === 'connecting' ? 'Connecting to AI voice service...' : 
+             connectionStatus === 'connected' ? 'Listening... Speak naturally with the AI.' :
+             'Connection not established'}
+          </div>
           
           <Button 
             onClick={handleClose}

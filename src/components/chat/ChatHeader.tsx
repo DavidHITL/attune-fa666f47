@@ -1,7 +1,7 @@
 
 import React from "react";
 import SessionTimer from "./SessionTimer";
-import VoiceCallButton from "./VoiceCallButton";
+import VoiceCallButton from "../voice/VoiceCallButton";
 import EndSessionButton from "./EndSessionButton";
 
 interface ChatHeaderProps {
