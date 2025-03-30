@@ -1,8 +1,6 @@
 
-import { SessionConfig } from './types';
-
 /**
- * Manages WebSocket connections to the realtime chat service
+ * Manages WebSocket connections
  */
 export class WebSocketManager {
   private websocket: WebSocket | null = null;

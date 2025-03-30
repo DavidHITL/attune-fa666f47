@@ -43,12 +43,3 @@ export function createErrorResponse(error: unknown, status = 500): Response {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
   });
 }
-
-export function createUpgradeResponse(req: Request): {socket: WebSocket; response: Response} | null {
-  try {
-    return Deno.upgradeWebSocket(req);
-  } catch (error) {
-    console.error("Failed to upgrade WebSocket:", error);
-    return null;
-  }
-}

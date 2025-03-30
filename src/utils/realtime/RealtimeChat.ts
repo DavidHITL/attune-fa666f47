@@ -1,176 +1,137 @@
 
-import { TranscriptCallback, ChatError, ErrorType } from './types';
 import { EventEmitter } from './EventEmitter';
+import { ChatError, ErrorType } from './types';
 import { ConnectionManager } from './ConnectionManager';
-import { SessionManager } from './SessionManager';
-import { AudioHandler } from './AudioHandler';
 import { MessageHandler } from './MessageHandler';
+import { AudioHandler } from './AudioHandler';
+import { SessionManager } from './SessionManager';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Main class for handling realtime chat with audio capabilities
+ * Main class for managing realtime chat functionality
  */
 export class RealtimeChat {
-  private connectionManager: ConnectionManager;
-  private sessionManager: SessionManager;
-  private audioHandler: AudioHandler;
-  private messageHandler: MessageHandler;
   private eventEmitter: EventEmitter;
-  private processingTimeout: NodeJS.Timeout | null = null;
-  
-  public isConnected: boolean = false;
+  private connectionManager: ConnectionManager;
+  private messageHandler: MessageHandler;
+  private audioHandler: AudioHandler;
+  private sessionManager: SessionManager;
+  private _isConnected: boolean = false;
 
-  constructor(transcriptCallback: TranscriptCallback) {
-    // Initialize components
+  /**
+   * Create a new RealtimeChat instance
+   * @param transcriptCallback Function to call with updated transcript text
+   */
+  constructor(transcriptCallback: (text: string) => void = () => {}) {
+    const projectId = 'oseowhythgbqvllwonaz'; // Your Supabase project ID
+    
+    // Initialize event emitter
     this.eventEmitter = new EventEmitter();
     
-    // Initialize with Supabase project ID - ensure this is correct
-    const projectId = 'oseowhythgbqvllwonaz'; 
-    console.log("[RealtimeChat] Initializing with project ID:", projectId);
-    
-    // Create connection manager
+    // Initialize connection manager
     this.connectionManager = new ConnectionManager(projectId, this.eventEmitter);
     
-    this.sessionManager = new SessionManager();
-    this.audioHandler = new AudioHandler(this.eventEmitter);
+    // Initialize handlers
     this.messageHandler = new MessageHandler(
       this.connectionManager.getWebSocketManager(),
-      this.eventEmitter, 
+      this.eventEmitter,
       transcriptCallback
     );
     
-    // Set up event listeners
-    this.setupEventListeners();
+    this.audioHandler = new AudioHandler(this.eventEmitter);
+    this.sessionManager = new SessionManager(this.connectionManager, this.eventEmitter);
+    
+    // Set up error handlers
+    this.setupErrorHandlers();
   }
 
   /**
-   * Set up internal event listeners
-   */
-  private setupEventListeners(): void {
-    console.log("[RealtimeChat] Setting up event listeners");
-    
-    // Handle audio deltas
-    this.eventEmitter.addEventListener('audio.delta', async (base64Audio: string) => {
-      console.log("[RealtimeChat] Received audio delta");
-      await this.audioHandler.processAudioDelta(base64Audio);
-    });
-    
-    // Handle session creation
-    this.eventEmitter.addEventListener('session.created', () => {
-      console.log("[RealtimeChat] Session created event received");
-      this.sessionManager.configureSession(this.connectionManager.getWebSocketManager());
-    });
-    
-    // Update connection status
-    this.eventEmitter.addEventListener('connected', () => {
-      console.log("[RealtimeChat] Connected event received");
-      this.isConnected = true;
-    });
-    
-    this.eventEmitter.addEventListener('disconnected', () => {
-      console.log("[RealtimeChat] Disconnected event received");
-      this.isConnected = false;
-    });
-    
-    // Handle connection errors
-    this.eventEmitter.addEventListener('error', (error: ChatError) => {
-      console.error('[RealtimeChat] Error event received:', error);
-    });
-  }
-
-  /**
-   * Connect to the realtime chat service
+   * Connect to the OpenAI Realtime API
    */
   async connect(): Promise<void> {
+    console.log("[RealtimeChat] Connecting to server");
+    
     try {
-      console.log("[RealtimeChat] Initiating connection");
-      
-      // Connect to WebSocket
       await this.connectionManager.connect();
-      this.isConnected = this.connectionManager.checkConnection();
+      this._isConnected = true;
       
-      if (this.isConnected) {
-        console.log("[RealtimeChat] Connection successful");
-        // Set up message handlers
-        this.messageHandler.setupMessageHandlers();
-        
-        // Initialize audio
-        await this.audioHandler.initializeAudio();
-      } else {
-        console.error("[RealtimeChat] Connection failed");
-        throw new Error("Failed to establish connection");
-      }
+      // Set up message handlers after connection is established
+      this.messageHandler.setupMessageHandlers();
       
+      console.log("[RealtimeChat] Connection established");
     } catch (error) {
-      console.error("[RealtimeChat] Failed to connect:", error);
-      this.isConnected = false;
+      console.error("[RealtimeChat] Connection failed:", error);
+      this._isConnected = false;
+      
+      const chatError: ChatError = {
+        type: ErrorType.CONNECTION,
+        message: "Failed to connect to chat service",
+        originalError: error instanceof Error ? error : new Error(String(error))
+      };
+      
+      this.eventEmitter.dispatchEvent('error', chatError);
       throw error;
     }
   }
-  
+
   /**
-   * Send a message to the AI
-   */
-  sendMessage(message: string): void {
-    // Clear any processing timeout
-    if (this.processingTimeout) {
-      clearTimeout(this.processingTimeout);
-      this.processingTimeout = null;
-    }
-    
-    // Check connection and attempt reconnect if needed
-    if (!this.connectionManager.checkConnection()) {
-      this.connectionManager.tryReconnect();
-      return;
-    }
-    
-    this.messageHandler.sendMessage(message);
-  }
-  
-  /**
-   * Send speech data to the AI
-   */
-  sendSpeechData(audioData: Float32Array): void {
-    if (!audioData || audioData.length === 0) return;
-    
-    if (!this.connectionManager.checkConnection()) {
-      return;
-    }
-    
-    const base64Audio = this.audioHandler.encodeAudioData(audioData);
-    if (base64Audio) {
-      this.messageHandler.sendSpeechData(base64Audio);
-    }
-  }
-  
-  /**
-   * Disconnect from the realtime chat service
+   * Disconnect from the OpenAI Realtime API
    */
   disconnect(): void {
-    console.log("Disconnecting from voice service");
-    
-    if (this.processingTimeout) {
-      clearTimeout(this.processingTimeout);
-      this.processingTimeout = null;
-    }
-    
+    console.log("[RealtimeChat] Disconnecting");
     this.connectionManager.disconnect();
-    this.audioHandler.dispose();
-    this.eventEmitter.removeAllEventListeners();
-    
-    this.isConnected = false;
+    this._isConnected = false;
   }
 
   /**
-   * Register an event listener
+   * Get connection status
    */
-  addEventListener(eventName: string, callback: Function): void {
-    this.eventEmitter.addEventListener(eventName, callback);
+  get isConnected(): boolean {
+    return this._isConnected && this.connectionManager.checkConnection();
   }
 
   /**
-   * Remove an event listener
+   * Send a message to the OpenAI Realtime API
    */
-  removeEventListener(eventName: string, callback: Function): void {
-    this.eventEmitter.removeEventListener(eventName, callback);
+  sendMessage(message: string): boolean {
+    return this.messageHandler.sendMessage(message);
+  }
+
+  /**
+   * Send audio data to the OpenAI Realtime API
+   * @param speechData Raw PCM audio data as Float32Array
+   */
+  sendSpeechData(speechData: Float32Array): boolean {
+    // Convert to base64 for transmission
+    const base64Data = this.audioHandler.encodeAudioData(speechData);
+    return this.messageHandler.sendSpeechData(base64Data);
+  }
+
+  /**
+   * Set up error handlers
+   */
+  private setupErrorHandlers(): void {
+    this.eventEmitter.addEventListener('error', (error: ChatError) => {
+      console.error("[RealtimeChat] Error:", error.message);
+      
+      if (error.type === ErrorType.CONNECTION) {
+        this._isConnected = false;
+        this.connectionManager.tryReconnect();
+      }
+    });
+  }
+
+  /**
+   * Add event listener
+   */
+  addEventListener(event: string, listener: (data: any) => void): void {
+    this.eventEmitter.addEventListener(event, listener);
+  }
+
+  /**
+   * Remove event listener
+   */
+  removeEventListener(event: string, listener: (data: any) => void): void {
+    this.eventEmitter.removeEventListener(event, listener);
   }
 }
