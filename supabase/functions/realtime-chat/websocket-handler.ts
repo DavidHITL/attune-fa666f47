@@ -37,6 +37,13 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     const maxConnectionAttempts = options.reconnectAttempts || defaultOptions.reconnectAttempts;
     let reconnectTimeout: number | undefined;
     
+    // Send confirmation message to client
+    try {
+      socket.send(JSON.stringify({ type: "connection.established", message: "WebSocket connection established" }));
+    } catch (err) {
+      console.error("Error sending confirmation message:", err);
+    }
+    
     // Set up client connection handlers
     setupClientConnectionHandlers({
       socket,
@@ -58,6 +65,7 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     
     return response;
   } catch (error) {
+    console.error("WebSocket handler error:", error);
     return createErrorResponse(error);
   }
 }

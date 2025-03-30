@@ -7,18 +7,23 @@ import { handleWebSocketRequest } from "./websocket-handler.ts";
 import { handleHttpRequest } from "./http-handler.ts";
 
 serve(async (req) => {
+  console.log(`Received ${req.method} request to ${req.url}`);
+  
   // Handle CORS preflight requests
   const corsResponse = handleCorsPreflightRequest(req);
   if (corsResponse) {
+    console.log("Responding to CORS preflight request");
     return corsResponse;
   }
 
   // Handle WebSocket upgrades
   const upgradeHeader = req.headers.get("upgrade") || "";
   if (upgradeHeader.toLowerCase() === "websocket") {
+    console.log("Handling WebSocket upgrade request");
     return handleWebSocketRequest(req);
   }
 
   // Fall back to HTTP request handling
+  console.log("Handling HTTP request");
   return handleHttpRequest(req);
 });

@@ -31,6 +31,7 @@ export class WebSocketManager {
       try {
         console.log("Connecting to WebSocket:", wsUrl);
         
+        // Create a new WebSocket connection
         this.websocket = new WebSocket(wsUrl);
         this.websocket.binaryType = "arraybuffer";
         

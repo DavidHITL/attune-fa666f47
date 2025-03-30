@@ -23,9 +23,14 @@ export class RealtimeChat {
     // Initialize components
     this.eventEmitter = new EventEmitter();
     
-    // Initialize with Supabase project ID
+    // Initialize with Supabase project ID - ensure this is correct
     const projectId = 'oseowhythgbqvllwonaz'; 
-    this.connectionManager = new ConnectionManager(projectId, this.eventEmitter);
+    
+    // Create connection manager with reconnect function
+    this.connectionManager = new ConnectionManager(
+      projectId, 
+      () => this.connect()
+    );
     
     const websocketManager = this.connectionManager.getWebSocketManager();
     this.sessionManager = new SessionManager(websocketManager);
@@ -54,6 +59,11 @@ export class RealtimeChat {
     this.eventEmitter.addEventListener('connected', () => {
       this.isConnected = true;
     });
+    
+    // Handle connection errors
+    this.eventEmitter.addEventListener('error', (error: ChatError) => {
+      console.error('RealtimeChat error event:', error);
+    });
   }
 
   /**
@@ -61,18 +71,26 @@ export class RealtimeChat {
    */
   async connect(): Promise<void> {
     try {
+      console.log("RealtimeChat: Initiating connection");
+      
       // Connect to WebSocket
       await this.connectionManager.connect();
       this.isConnected = this.connectionManager.isConnected;
       
-      // Set up message handlers
-      this.messageHandler.setupMessageHandlers();
-      
-      // Initialize audio
-      await this.audioHandler.initializeAudio();
+      if (this.isConnected) {
+        console.log("RealtimeChat: Connection successful");
+        // Set up message handlers
+        this.messageHandler.setupMessageHandlers();
+        
+        // Initialize audio
+        await this.audioHandler.initializeAudio();
+      } else {
+        console.error("RealtimeChat: Connection failed");
+        throw new Error("Failed to establish connection");
+      }
       
     } catch (error) {
-      console.error("Failed to connect:", error);
+      console.error("RealtimeChat: Failed to connect:", error);
       this.isConnected = false;
       throw error;
     }

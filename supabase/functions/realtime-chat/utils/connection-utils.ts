@@ -4,6 +4,7 @@
  */
 
 import { OpenAISocketOptions, ConnectionHandlerOptions } from "../types.ts";
+import { setupOpenAISocketHandlers } from "./socket-handlers.ts";
 
 /**
  * Connect to OpenAI's Realtime API with retry logic
@@ -29,7 +30,15 @@ export function connectToOpenAI(options: ConnectionHandlerOptions & { apiKey: st
     
     // Connect to the correct OpenAI Realtime API endpoint with gpt-4o
     console.log("Connecting to OpenAI Realtime API with model: gpt-4o-realtime-preview-2024-10-01");
+    
+    // Make sure we're using the correct URL
     openAISocketRef.current = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01");
+    
+    // Send confirmation to client
+    socket.send(JSON.stringify({ 
+      type: "info", 
+      message: "Establishing connection to OpenAI Realtime API" 
+    }));
     
     setupOpenAISocketHandlers({
       socket,

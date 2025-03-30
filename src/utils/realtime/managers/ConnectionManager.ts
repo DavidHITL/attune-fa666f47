@@ -33,7 +33,10 @@ export class ConnectionManager {
     try {
       this.reconnectionHandler.clearTimeout();
       
+      // Fix the WebSocket URL format to ensure it's correct
+      // Use https and convert to wss protocol for secure connection
       const wsUrl = `wss://${this.projectId}.supabase.co/functions/v1/realtime-chat`;
+      console.log("Attempting to connect to:", wsUrl);
       
       return await this.webSocketManager.connect(
         wsUrl,

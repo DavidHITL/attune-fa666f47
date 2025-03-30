@@ -25,8 +25,8 @@ export class ConnectionEventHandler {
    * Set up WebSocket event handlers
    */
   setupEventHandlers(websocket: WebSocket, timeoutId: number): void {
-    websocket.onopen = () => {
-      console.log("WebSocket connection established successfully");
+    websocket.onopen = (event) => {
+      console.log("WebSocket connection established successfully", event);
       this.connectionState.setConnected(true);
       this.reconnectionHandler.resetAttempts();
       window.clearTimeout(timeoutId);
