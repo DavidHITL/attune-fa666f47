@@ -11,7 +11,7 @@ export class ConnectionManager {
   private eventEmitter: EventEmitter;
   private reconnecting: boolean = false;
   
-  public isConnected: boolean = false;
+  private _isConnected: boolean = false;
 
   constructor(projectId: string, eventEmitter: EventEmitter) {
     this.websocketManager = new WebSocketManager();
@@ -34,13 +34,13 @@ export class ConnectionManager {
         // Setup event handlers
         websocket.onopen = () => {
           console.log("WebSocket connection established");
-          this.isConnected = true;
+          this._isConnected = true;
           this.eventEmitter.dispatchEvent('connected', { status: "connected" });
         };
         
         websocket.onerror = (event) => {
           console.error("WebSocket error:", event);
-          this.isConnected = false;
+          this._isConnected = false;
           this.eventEmitter.dispatchEvent('error', {
             type: ErrorType.CONNECTION,
             message: "WebSocket connection error"
@@ -49,7 +49,7 @@ export class ConnectionManager {
         
         websocket.onclose = () => {
           console.log("WebSocket connection closed");
-          this.isConnected = false;
+          this._isConnected = false;
           this.eventEmitter.dispatchEvent('disconnected', { status: "disconnected" });
         };
         
@@ -64,11 +64,11 @@ export class ConnectionManager {
       });
       
       // Update connection state
-      this.isConnected = this.websocketManager.checkConnection();
+      this._isConnected = this.websocketManager.checkConnection();
       
     } catch (error) {
       console.error("Failed to connect:", error);
-      this.isConnected = false;
+      this._isConnected = false;
       
       const chatError: ChatError = {
         type: ErrorType.CONNECTION,
@@ -86,7 +86,7 @@ export class ConnectionManager {
    */
   disconnect(): void {
     this.websocketManager.disconnect();
-    this.isConnected = false;
+    this._isConnected = false;
     this.reconnecting = false;
   }
 
@@ -101,7 +101,7 @@ export class ConnectionManager {
    * Check if the connection is active
    */
   checkConnection(): boolean {
-    return this.isConnected && this.websocketManager.checkConnection();
+    return this._isConnected && this.websocketManager.checkConnection();
   }
 
   /**
@@ -127,6 +127,6 @@ export class ConnectionManager {
    * Check if connection is active
    */
   isConnected(): boolean {
-    return this.isConnected;
+    return this._isConnected;
   }
 }

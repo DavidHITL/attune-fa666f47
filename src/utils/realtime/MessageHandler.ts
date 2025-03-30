@@ -123,7 +123,8 @@ export class MessageHandler {
     };
     
     // Send the message
-    if (!this.websocketManager.send(messageEvent)) {
+    const sent = this.websocketManager.send(messageEvent);
+    if (!sent) {
       return false;
     }
     

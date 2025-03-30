@@ -1,3 +1,4 @@
+
 import { TranscriptCallback, ChatError, ErrorType } from './types';
 import { EventEmitter } from './EventEmitter';
 import { ConnectionManager } from './ConnectionManager';
@@ -78,7 +79,7 @@ export class RealtimeChat {
       
       // Connect to WebSocket
       await this.connectionManager.connect();
-      this.isConnected = this.connectionManager.isConnected();
+      this.isConnected = this.connectionManager.checkConnection();
       
       if (this.isConnected) {
         console.log("RealtimeChat: Connection successful");
