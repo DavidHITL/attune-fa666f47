@@ -27,7 +27,13 @@ const LandingNavBar: React.FC = () => {
         </div>
         
         <div className="flex-1 text-right">
-          <Link to="/" className="text-apple-gray hover:text-apple-gray-3 transition-colors">
+          <Link 
+            to="/methodology" 
+            className={cn(
+              "text-apple-gray hover:text-apple-gray-3 transition-colors",
+              currentPath === "/methodology" && "text-black font-medium"
+            )}
+          >
             Methodology
           </Link>
         </div>
