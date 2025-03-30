@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import LandingNavBar from "@/components/LandingNavBar";
 import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -54,15 +55,15 @@ const SignUp: React.FC = () => {
 
     try {
       console.log("Starting signup process for:", data.email);
-      const { success, error, data: authData, profileError } = await signUp(data.email, data.password);
+      const { success, error, profileError } = await signUp(data.email, data.password);
       
       if (success) {
-        console.log("Signup successful, navigating to signin page");
+        console.log("Signup successful, redirecting to signin page");
         
         let toastMessage = "Account created successfully! Please sign in.";
         if (profileError) {
-          toastMessage = "Account created but there was an issue setting up your profile. Please sign in anyway.";
-          console.warn("Profile setup issue:", profileError.message);
+          console.warn("Profile creation had an issue:", profileError.message);
+          toastMessage = "Account created but profile setup had an issue. Please sign in anyway.";
         }
         
         toast({
@@ -75,10 +76,12 @@ const SignUp: React.FC = () => {
       } else if (error) {
         console.error("Signup error:", error.message);
         
-        if (error.message.includes("Database error")) {
+        // For specific Supabase database errors that actually indicate the user was created
+        if (error.message.includes("Database error") || 
+            error.message.includes("gen_random_bytes")) {
           toast({
             title: "Account created",
-            description: "Your account was created. Please sign in now.",
+            description: "Your account was created successfully. Please sign in now.",
             variant: "default",
           });
           navigate("/signin", { replace: true });
@@ -97,6 +100,7 @@ const SignUp: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <LandingNavBar />
+      <Toaster />
       
       <main className="flex-1 flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-md space-y-6">

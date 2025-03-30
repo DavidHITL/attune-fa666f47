@@ -4,7 +4,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/auth";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import LandingNavBar from "@/components/LandingNavBar";
 import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -51,7 +52,7 @@ const SignIn: React.FC = () => {
 
     try {
       console.log("Attempting to sign in with:", data.email);
-      const { success, error } = await signIn(data.email, data.password);
+      const { success, error, data: authData } = await signIn(data.email, data.password);
       
       if (success) {
         console.log("Login successful, navigating to:", from);
@@ -62,15 +63,16 @@ const SignIn: React.FC = () => {
         navigate(from, { replace: true });
       } else if (error) {
         console.error("Login error:", error.message);
-        setError(error.message);
-        
-        // Check if the error might be due to an unconfirmed email
+
         if (error.message.includes("Invalid login credentials")) {
+          // Special case for when a user just created an account but the database trigger failed
           toast({
             title: "Login failed",
-            description: "Please check your email and password. If you just created your account, try signing up again.",
+            description: "If you just created your account, please wait a moment and try again. Otherwise, check your credentials.",
             variant: "destructive"
           });
+        } else {
+          setError(error.message);
         }
       }
     } catch (err) {
@@ -81,9 +83,23 @@ const SignIn: React.FC = () => {
     }
   };
 
+  // Add a dependency to uuid
+  React.useEffect(() => {
+    // Check URL parameters for any signup success indicators
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('signup') === 'success') {
+      toast({
+        title: "Account created",
+        description: "Your account was created successfully. Please sign in.",
+        variant: "default",
+      });
+    }
+  }, [toast]);
+
   return (
     <div className="flex flex-col min-h-screen">
       <LandingNavBar />
+      <Toaster />
       
       <main className="flex-1 flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-md space-y-6">
