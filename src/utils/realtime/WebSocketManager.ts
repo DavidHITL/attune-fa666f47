@@ -1,5 +1,7 @@
 
 import { SessionConfig, WebSocketMessageEvent } from './types';
+import { ReconnectionHandler } from './ReconnectionHandler';
+import { ConnectionState } from './ConnectionState';
 
 /**
  * Manages WebSocket connections to the realtime chat service
@@ -7,13 +9,20 @@ import { SessionConfig, WebSocketMessageEvent } from './types';
 export class WebSocketManager {
   private websocket: WebSocket | null = null;
   private projectId: string;
-  public isConnected: boolean = false;
-  private reconnectAttempts: number = 0;
-  private readonly maxReconnectAttempts: number = 3;
-  private reconnectTimeout: number | null = null;
+  private connectionState: ConnectionState;
+  private reconnectionHandler: ReconnectionHandler;
   
   constructor(projectId: string) {
     this.projectId = projectId;
+    this.connectionState = new ConnectionState();
+    this.reconnectionHandler = new ReconnectionHandler(() => this.connect());
+  }
+
+  /**
+   * Get connection state
+   */
+  get isConnected(): boolean {
+    return this.connectionState.isConnected();
   }
 
   /**
@@ -21,10 +30,7 @@ export class WebSocketManager {
    */
   async connect(): Promise<void> {
     try {
-      if (this.reconnectTimeout) {
-        clearTimeout(this.reconnectTimeout);
-        this.reconnectTimeout = null;
-      }
+      this.reconnectionHandler.clearTimeout();
       
       const wsUrl = `wss://${this.projectId}.functions.supabase.co/realtime-chat`;
       console.log("Connecting to WebSocket:", wsUrl);
@@ -38,83 +44,64 @@ export class WebSocketManager {
         }
         
         const timeout = setTimeout(() => {
-          if (!this.isConnected) {
+          if (!this.connectionState.isConnected()) {
             console.error("WebSocket connection timeout");
             reject(new Error("Connection timeout"));
-            this.tryReconnect();
+            this.reconnectionHandler.tryReconnect();
           }
         }, 10000); // 10 second timeout
         
         this.websocket.onopen = () => {
           console.log("WebSocket connection established");
-          this.isConnected = true;
-          this.reconnectAttempts = 0;
+          this.connectionState.setConnected(true);
+          this.reconnectionHandler.resetAttempts();
           clearTimeout(timeout);
           resolve();
         };
         
         this.websocket.onerror = (error) => {
           console.error("WebSocket connection error:", error);
-          this.isConnected = false;
+          this.connectionState.setConnected(false);
           clearTimeout(timeout);
           reject(error);
-          this.tryReconnect();
+          this.reconnectionHandler.tryReconnect();
         };
         
         this.websocket.onclose = (event) => {
           console.log("WebSocket connection closed:", event.code, event.reason);
-          this.isConnected = false;
+          this.connectionState.setConnected(false);
           clearTimeout(timeout);
           
           // Don't reconnect if it was a normal closure
           if (event.code !== 1000) {
-            this.tryReconnect();
+            this.reconnectionHandler.tryReconnect();
           }
         };
       });
     } catch (error) {
       console.error("Failed to connect:", error);
-      this.isConnected = false;
-      this.tryReconnect();
+      this.connectionState.setConnected(false);
+      this.reconnectionHandler.tryReconnect();
       throw error;
     }
   }
   
   /**
-   * Try to reconnect to the WebSocket server with exponential backoff
-   */
-  private tryReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("Maximum reconnection attempts reached");
-      return;
-    }
-    
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-    console.log(`Attempting to reconnect in ${delay / 1000} seconds...`);
-    
-    this.reconnectAttempts++;
-    this.reconnectTimeout = window.setTimeout(() => {
-      console.log(`Reconnection attempt ${this.reconnectAttempts} of ${this.maxReconnectAttempts}`);
-      this.connect().catch(err => console.error("Reconnection failed:", err));
-    }, delay);
-  }
-
-  /**
    * Configure the session settings
    */
   configureSession(sessionConfig: SessionConfig): boolean {
-    if (!this.websocket || !this.isConnected) {
+    if (!this.checkConnection()) {
       console.error("Cannot configure session: WebSocket not connected");
       return false;
     }
     
     try {
       console.log("Configuring session...");
-      this.websocket.send(JSON.stringify(sessionConfig));
+      this.websocket!.send(JSON.stringify(sessionConfig));
       return true;
     } catch (error) {
       console.error("Failed to configure session:", error);
-      this.tryReconnect();
+      this.reconnectionHandler.tryReconnect();
       return false;
     }
   }
@@ -123,17 +110,17 @@ export class WebSocketManager {
    * Send a message through the WebSocket
    */
   send(message: any): boolean {
-    if (!this.websocket || !this.isConnected) {
+    if (!this.checkConnection()) {
       console.error("WebSocket not connected");
       return false;
     }
     
     try {
-      this.websocket.send(JSON.stringify(message));
+      this.websocket!.send(JSON.stringify(message));
       return true;
     } catch (error) {
       console.error("Failed to send message:", error);
-      this.tryReconnect();
+      this.reconnectionHandler.tryReconnect();
       return false;
     }
   }
@@ -150,10 +137,7 @@ export class WebSocketManager {
    * Close the WebSocket connection
    */
   disconnect(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
+    this.reconnectionHandler.clearTimeout();
     
     if (this.websocket) {
       try {
@@ -163,14 +147,14 @@ export class WebSocketManager {
       }
       this.websocket = null;
     }
-    this.isConnected = false;
-    this.reconnectAttempts = 0;
+    this.connectionState.setConnected(false);
+    this.reconnectionHandler.resetAttempts();
   }
   
   /**
    * Check if WebSocket is currently connected
    */
   checkConnection(): boolean {
-    return this.isConnected && !!this.websocket && this.websocket.readyState === WebSocket.OPEN;
+    return this.connectionState.checkConnection(this.websocket);
   }
 }

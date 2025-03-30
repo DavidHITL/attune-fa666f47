@@ -1,0 +1,57 @@
+
+/**
+ * Handles reconnection attempts with exponential backoff
+ */
+export class ReconnectionHandler {
+  private reconnectAttempts: number = 0;
+  private readonly maxReconnectAttempts: number = 3;
+  private reconnectTimeout: number | null = null;
+  private onReconnect: () => Promise<void>;
+
+  constructor(onReconnect: () => Promise<void>) {
+    this.onReconnect = onReconnect;
+  }
+
+  /**
+   * Attempt to reconnect with exponential backoff
+   */
+  tryReconnect(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error("Maximum reconnection attempts reached");
+      return;
+    }
+    
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    console.log(`Attempting to reconnect in ${delay / 1000} seconds...`);
+    
+    this.reconnectAttempts++;
+    this.reconnectTimeout = window.setTimeout(() => {
+      console.log(`Reconnection attempt ${this.reconnectAttempts} of ${this.maxReconnectAttempts}`);
+      this.onReconnect().catch(err => console.error("Reconnection failed:", err));
+    }, delay);
+  }
+
+  /**
+   * Reset reconnection attempts counter
+   */
+  resetAttempts(): void {
+    this.reconnectAttempts = 0;
+  }
+
+  /**
+   * Clear any pending reconnection timeout
+   */
+  clearTimeout(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+  }
+
+  /**
+   * Get current reconnection attempt count
+   */
+  getAttempts(): number {
+    return this.reconnectAttempts;
+  }
+}
