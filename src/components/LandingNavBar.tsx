@@ -11,13 +11,19 @@ const LandingNavBar: React.FC = () => {
     <nav className="w-full backdrop-blur-md bg-white/90 border-b border-apple-gray-5 sticky top-0 z-10">
       <div className="max-w-4xl mx-auto py-4 px-6 flex justify-between items-center">
         <div className="flex-1">
-          <Link to="/" className="text-apple-gray hover:text-apple-gray-3 transition-colors">
+          <Link 
+            to="/about" 
+            className={cn(
+              "text-apple-gray hover:text-apple-gray-3 transition-colors",
+              currentPath === "/about" && "text-black font-medium"
+            )}
+          >
             About
           </Link>
         </div>
         
         <div className="text-center flex-1">
-          <span className="text-xl font-medium">Attune</span>
+          <Link to="/" className="text-xl font-medium">Attune</Link>
         </div>
         
         <div className="flex-1 text-right">
