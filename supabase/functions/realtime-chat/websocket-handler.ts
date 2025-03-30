@@ -1,6 +1,6 @@
 
 import { corsHeaders, getOpenAIApiKey } from "./utils.ts";
-import { WebSocketOptions, defaultOptions, createErrorResponse, createUpgradeResponse } from "./types.ts";
+import { WebSocketOptions, defaultOptions, createErrorResponse, MutableRef, ConnectionHandlerOptions } from "./types.ts";
 import { setupClientConnectionHandlers } from "./client-handler.ts";
 import { setupOpenAIConnection } from "./openai-handler.ts";
 

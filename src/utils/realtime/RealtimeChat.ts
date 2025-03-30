@@ -28,8 +28,19 @@ export class RealtimeChat {
     // Initialize event emitter
     this.eventEmitter = new EventEmitter();
     
-    // Initialize connection manager
-    this.connectionManager = new ConnectionManager(projectId, this.eventEmitter);
+    // Create a self-contained reconnect function for the connection manager
+    const reconnect = async () => {
+      try {
+        console.log("[RealtimeChat] Attempting to reconnect...");
+        return await this.connect();
+      } catch (error) {
+        console.error("[RealtimeChat] Reconnection failed:", error);
+        throw error;
+      }
+    };
+    
+    // Initialize connection manager with the reconnect function
+    this.connectionManager = new ConnectionManager(projectId, this.eventEmitter, reconnect);
     
     // Initialize handlers
     this.messageHandler = new MessageHandler(

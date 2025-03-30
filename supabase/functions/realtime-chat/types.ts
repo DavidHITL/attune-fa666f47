@@ -29,8 +29,6 @@ export interface ConnectionHandlerOptions {
 
 export interface OpenAISocketOptions extends ConnectionHandlerOptions {
   apiKey: string;
-  openAISocket: WebSocket;
-  retryConnect: () => void;
 }
 
 // Response helper functions

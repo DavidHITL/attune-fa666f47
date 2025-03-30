@@ -16,24 +16,16 @@ export class ConnectionManager {
   private projectId: string;
   private eventEmitter: EventEmitter;
   
-  constructor(projectId: string, eventEmitter: EventEmitter) {
+  constructor(projectId: string, eventEmitter: EventEmitter, onReconnect: () => Promise<void>) {
     this.projectId = projectId;
     this.eventEmitter = eventEmitter;
     this.webSocketManager = new WebSocketManager();
     this.connectionState = new ConnectionState();
     
-    // Create a self-contained reconnect function
-    const reconnect = async () => {
-      try {
-        console.log("[ConnectionManager] Attempting to reconnect...");
-        return await this.connect();
-      } catch (error) {
-        console.error("[ConnectionManager] Reconnection failed:", error);
-        throw error;
-      }
-    };
+    // Initialize reconnection handler with the provided callback
+    this.reconnectionHandler = new ReconnectionHandler(onReconnect);
     
-    this.reconnectionHandler = new ReconnectionHandler(reconnect);
+    // Initialize connection event handler
     this.connectionEventHandler = new ConnectionEventHandler(
       this.webSocketManager,
       this.connectionState,
@@ -54,9 +46,12 @@ export class ConnectionManager {
       const wsUrl = `wss://${this.projectId}.supabase.co/functions/v1/realtime-chat`;
       console.log("[ConnectionManager] Attempting to connect to:", wsUrl);
       
-      return await this.webSocketManager.connect(
-        wsUrl,
-        (websocket, timeoutId) => this.connectionEventHandler.setupEventHandlers(websocket, timeoutId)
+      // Set the WebSocket URL
+      this.webSocketManager.setUrl(wsUrl);
+      
+      // Connect to the WebSocket server
+      return await this.webSocketManager.connect((websocket, timeoutId) => 
+        this.connectionEventHandler.setupEventHandlers(websocket, timeoutId)
       );
     } catch (error) {
       console.error("[ConnectionManager] Failed to connect:", error);
