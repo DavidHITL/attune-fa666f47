@@ -4,7 +4,7 @@ import VoiceMessageBubble from './VoiceMessageBubble';
 
 interface VoiceMessageListProps {
   messages: Array<{role: 'user' | 'assistant', text: string, timestamp?: Date}>;
-  transcript?: string; // Making transcript optional to fix TypeScript error
+  transcript?: string; // Making transcript optional
 }
 
 const VoiceMessageList: React.FC<VoiceMessageListProps> = ({ messages, transcript }) => {
