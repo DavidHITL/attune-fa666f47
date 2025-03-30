@@ -10,7 +10,7 @@ interface VoiceVisualizationProps {
 const VoiceVisualization: React.FC<VoiceVisualizationProps> = ({ isActive, className }) => {
   return (
     <div className={cn("relative flex items-center justify-center", className)}>
-      <div className="w-48 h-48 rounded-full overflow-hidden bg-gradient-to-b from-blue-300 to-blue-500">
+      <div className="w-64 h-64 rounded-full overflow-hidden bg-gradient-to-b from-blue-300 to-blue-500">
         {/* Inner circle with subtle animation */}
         <div 
           className={cn(
@@ -40,6 +40,31 @@ const VoiceVisualization: React.FC<VoiceVisualizationProps> = ({ isActive, class
             />
           </>
         )}
+        
+        {/* Microphone icon or pulse indicator in the center */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className={cn(
+            "w-16 h-16 rounded-full bg-white/70 flex items-center justify-center",
+            isActive && "animate-pulse"
+          )}>
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="32" 
+              height="32" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className="text-blue-600"
+            >
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" x2="12" y1="19" y2="22"></line>
+            </svg>
+          </div>
+        </div>
       </div>
 
       {/* Add keyframes for animations using standard style element */}
