@@ -1,5 +1,5 @@
 
-import { WebSocketManager } from './WebSocketManager';
+import { WebSocketManager } from './managers/WebSocketManager';
 
 /**
  * Manages realtime chat sessions

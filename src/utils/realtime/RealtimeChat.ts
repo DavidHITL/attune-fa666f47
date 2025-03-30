@@ -1,4 +1,3 @@
-
 import { EventEmitter } from './EventEmitter';
 import { ChatError, ErrorType } from './types';
 import { ConnectionManager } from './ConnectionManager';
@@ -50,7 +49,7 @@ export class RealtimeChat {
     );
     
     this.audioHandler = new AudioHandler(this.eventEmitter);
-    this.sessionManager = new SessionManager(this.connectionManager, this.eventEmitter);
+    this.sessionManager = new SessionManager();
     
     // Set up error handlers
     this.setupErrorHandlers();
