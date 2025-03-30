@@ -6,11 +6,12 @@ import { prepareMessages, createSuccessResponse, createErrorResponse } from "./m
 import { callAnthropicAPI } from "./anthropicClient.ts";
 
 export async function handleRequest(req: Request): Promise<Response> {
-  // Get the Anthropic API key from environment variables
-  const anthropicApiKey = Deno.env.get("anthropic-attune-api-key");
+  // Get the OpenAI API key from environment variables
+  // Try different possible environment variable names
+  const openAiApiKey = Deno.env.get("openai") || Deno.env.get("OPENAI_API_KEY");
   
-  if (!anthropicApiKey) {
-    console.error("Missing API key: anthropic-attune-api-key environment variable is not set");
+  if (!openAiApiKey) {
+    console.error("Missing API key: openai environment variable is not set");
     return createErrorResponse("API key configuration error", 500);
   }
 
@@ -32,11 +33,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Generate system prompt with phase-specific instructions
   const systemPrompt = generateSystemPrompt(phase, instructions);
 
-  // Prepare messages for Anthropic API
+  // Prepare messages for OpenAI API
   const messages = prepareMessages(message, conversationHistory);
 
-  // Call Anthropic's API
-  const reply = await callAnthropicAPI(anthropicApiKey, messages, systemPrompt);
+  // Call OpenAI API (function name kept for compatibility)
+  const reply = await callAnthropicAPI(openAiApiKey, messages, systemPrompt);
 
   // Return the response
   return createSuccessResponse(reply);

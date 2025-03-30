@@ -22,14 +22,14 @@ export class SessionManager {
     }
     
     try {
-      console.log("Configuring session...");
+      console.log("Configuring session for OpenAI GPT-4o...");
       
       const sessionConfig: SessionConfig = {
         "event_id": "config_event",
         "type": "session.update",
         "session": {
           "modalities": ["text", "audio"],
-          "instructions": "You are a helpful voice assistant that speaks naturally with users. Keep responses concise and conversational.",
+          "instructions": "You are a helpful voice assistant that speaks naturally with users. Keep responses concise and conversational. You're using the GPT-4o model with advanced reasoning capabilities.",
           "voice": "alloy",
           "input_audio_format": "pcm16",
           "output_audio_format": "pcm16",
@@ -37,7 +37,7 @@ export class SessionManager {
             "model": "whisper-1"
           },
           "turn_detection": {
-            "type": "server_vad", 
+            "type": "server_vad",
             "threshold": 0.5,
             "prefix_padding_ms": 300,
             "silence_duration_ms": 1000

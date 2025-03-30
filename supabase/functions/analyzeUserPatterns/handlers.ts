@@ -19,7 +19,7 @@ export async function processUserMessages(userId: string): Promise<AnalysisRespo
   console.log(`Analyzing ${userMessages.length} messages from user ${userId} (with bot responses as context)`);
 
   // Create a text corpus from ALL messages to provide full conversation context
-  // But clearly mark which ones are from the user vs bot for Claude to understand
+  // But clearly mark which ones are from the user vs bot for OpenAI to understand
   const messageCorpus = messages
     .map(msg => {
       const senderPrefix = msg.sender_type === 'user' ? "[USER]: " : "[BOT]: ";
@@ -30,14 +30,14 @@ export async function processUserMessages(userId: string): Promise<AnalysisRespo
   console.log(`Providing full conversation context of ${messages.length} messages (${userMessages.length} from user)`);
   console.log(`Analysis will focus on USER messages while using BOT messages as context only`);
 
-  // Call Claude API to analyze the messages
-  const claudeData = await analyzeWithAnthropic(messageCorpus);
-  const analysisText = claudeData.content[0].text;
+  // Call OpenAI API to analyze the messages
+  const openaiData = await analyzeWithAnthropic(messageCorpus);
+  const analysisText = openaiData.content[0].text;
   
-  // Extract JSON from Claude's response
+  // Extract JSON from OpenAI's response
   const jsonMatch = analysisText.match(/\{[\s\S]+\}/);
   if (!jsonMatch) {
-    throw new Error("Could not extract JSON from Claude's response");
+    throw new Error("Could not extract JSON from OpenAI's response");
   }
 
   const analysisResult = JSON.parse(jsonMatch[0]) as AnalysisResponse;

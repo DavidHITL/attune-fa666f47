@@ -23,8 +23,8 @@ export function connectToOpenAI(options: ConnectionHandlerOptions & { apiKey: st
       }
     }
     
-    // Connect to the correct OpenAI Realtime API endpoint
-    console.log("Connecting to OpenAI Realtime API with model: gpt-4o-realtime-preview");
+    // Connect to the correct OpenAI Realtime API endpoint with gpt-4o
+    console.log("Connecting to OpenAI Realtime API with model: gpt-4o-realtime-preview-2024-10-01");
     openAISocketRef.current = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01");
     
     setupOpenAISocketHandlers({

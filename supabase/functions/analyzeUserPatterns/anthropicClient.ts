@@ -1,9 +1,9 @@
 
-// Get Anthropic API key from environment variables
-export const anthropicApiKey = Deno.env.get("anthropic");
+// Get OpenAI API key from environment variables
+export const anthropicApiKey = Deno.env.get("openai");
 
 if (!anthropicApiKey) {
-  console.error("Missing Anthropic API key");
+  console.error("Missing OpenAI API key");
 }
 
 // Create the system prompt with detailed explanation of Terry Real's five losing strategies
@@ -45,20 +45,22 @@ Provide your analysis in this JSON format:
 }`;
 };
 
-// Function to call Anthropic API
+// Function to call OpenAI API
 export async function analyzeWithAnthropic(messageCorpus: string) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": anthropicApiKey,
-      "anthropic-version": "2023-06-01"
+      "Authorization": `Bearer ${anthropicApiKey}`
     },
     body: JSON.stringify({
-      model: "claude-3-opus-20240229",
+      model: "gpt-4o",
       max_tokens: 4000,
-      system: createSystemPrompt(),
       messages: [
+        {
+          role: "system",
+          content: createSystemPrompt()
+        },
         {
           role: "user",
           content: `Please analyze these messages from a conversation to identify patterns in the USER's communication based on Terry Real's therapeutic framework, focusing on the five losing strategies and adaptive child vs functional adult patterns.
@@ -75,9 +77,14 @@ export async function analyzeWithAnthropic(messageCorpus: string) {
 
   if (!response.ok) {
     const errorData = await response.text();
-    console.error("Claude API error:", errorData);
-    throw new Error(`Failed to analyze messages with Claude: ${errorData}`);
+    console.error("OpenAI API error:", errorData);
+    throw new Error(`Failed to analyze messages with OpenAI: ${errorData}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+  return {
+    content: [
+      { text: data.choices[0].message.content }
+    ]
+  };
 }

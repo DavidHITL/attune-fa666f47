@@ -9,7 +9,7 @@ export async function handleHttpRequest(req: Request): Promise<Response> {
     const OPENAI_API_KEY = getOpenAIApiKey();
     
     // Create a session with OpenAI
-    console.log("Creating a new OpenAI Realtime session");
+    console.log("Creating a new OpenAI Realtime session with gpt-4o");
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {

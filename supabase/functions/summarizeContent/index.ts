@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const ANTHROPIC_API_KEY = Deno.env.get("anthropic") || "";
+const OPENAI_API_KEY = Deno.env.get("openai") || "";
 
 interface RequestBody {
   text: string;
@@ -34,18 +34,21 @@ serve(async (req) => {
       );
     }
 
-    // Call Claude API instead of OpenAI
-    const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    // Call OpenAI API instead of Anthropic
+    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
+        "Authorization": `Bearer ${OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: "claude-3-opus-20240229",
+        model: "gpt-4o",
         max_tokens: 600,
         messages: [
+          {
+            role: "system",
+            content: "You are an expert in creating concise summaries of therapeutic concepts."
+          },
           {
             role: "user",
             content: `Create a concise summary (maximum 200 words) of the following text about therapeutic concepts.
@@ -59,13 +62,13 @@ serve(async (req) => {
       }),
     });
 
-    if (!claudeResponse.ok) {
-      const errorText = await claudeResponse.text();
-      throw new Error(`Claude API error: ${errorText}`);
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
 
-    const claudeData = await claudeResponse.json();
-    const summary = claudeData.content[0].text.trim();
+    const openaiData = await openaiResponse.json();
+    const summary = openaiData.choices[0].message.content.trim();
 
     return new Response(
       JSON.stringify({
