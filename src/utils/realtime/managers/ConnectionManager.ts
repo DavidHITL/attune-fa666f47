@@ -39,7 +39,7 @@ export class ConnectionManager {
       
       // Build the WebSocket URL with the correct format
       // Format should be: wss://[project-id].functions.supabase.co/functions/v1/realtime-chat
-      const wsUrl = `https://${this.projectId}.supabase.co/functions/v1/realtime-chat`;
+      const wsUrl = `wss://${this.projectId}.supabase.co/functions/v1/realtime-chat`;
       
       console.log("[ConnectionManager] Initializing connection to:", wsUrl);
       console.log("[ConnectionManager] Project ID:", this.projectId);
