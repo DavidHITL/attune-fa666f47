@@ -3,16 +3,13 @@ import React, { useEffect } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
 import { useAuth } from "@/context/AuthContext";
-import VoiceInputArea from "./VoiceInputArea";
-import VoiceMessageList from "./VoiceMessageList";
-import VoiceUIControls from "./voice/VoiceUIControls";
+import { Button } from "@/components/ui/button";
+import VoiceVisualization from "./voice/VoiceVisualization";
 import { useVoiceChatRecognition } from "@/hooks/useVoiceChatRecognition";
-import { useVoiceChatMessages } from "@/hooks/useVoiceChatMessages";
 
 interface VoiceChatProps {
   open: boolean;
@@ -22,36 +19,28 @@ interface VoiceChatProps {
 const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
   const { user } = useAuth();
   const { 
-    transcript, 
-    setTranscript, 
     isRecording, 
     startRecording, 
     stopRecording 
   } = useVoiceChatRecognition();
-  
-  const {
-    messages,
-    isProcessing,
-    loadMessages,
-    sendMessage
-  } = useVoiceChatMessages();
 
-  // Load previous messages when opened
+  // Start recording when opened
   useEffect(() => {
     if (open && user) {
-      console.log("[VoiceChat] Dialog opened, loading messages");
-      loadMessages();
+      console.log("[VoiceChat] Dialog opened, starting recording");
+      startRecording();
     }
-  }, [open, user, loadMessages]);
-
-  const handleSendMessage = async () => {
-    await sendMessage(transcript);
-    setTranscript("");
-  };
+    
+    return () => {
+      if (isRecording) {
+        console.log("[VoiceChat] Dialog closed, stopping recording");
+        stopRecording();
+      }
+    };
+  }, [open, user, isRecording, startRecording, stopRecording]);
 
   const handleClose = () => {
     stopRecording();
-    setTranscript("");
     onOpenChange(false);
   };
 
@@ -59,32 +48,20 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md mx-auto">
         <DialogHeader>
-          <DialogTitle>Voice Chat</DialogTitle>
-          <DialogDescription>
-            Speak with the AI using your microphone
-          </DialogDescription>
+          <DialogTitle className="text-center">Voice Chat</DialogTitle>
         </DialogHeader>
         
-        <div className="flex flex-col h-[60vh]">
-          <VoiceMessageList 
-            messages={messages} 
-            transcript={transcript} 
-          />
+        <div className="flex flex-col items-center justify-center h-[60vh] gap-6">
+          <VoiceVisualization isActive={isRecording} />
           
-          <VoiceInputArea
-            transcript={transcript}
-            setTranscript={setTranscript}
-            onSend={handleSendMessage}
-            isRecording={isRecording}
-            startRecording={startRecording}
-            stopRecording={stopRecording}
-          />
+          <Button 
+            onClick={handleClose}
+            size="lg"
+            className="mt-4"
+          >
+            Switch Back to Text
+          </Button>
         </div>
-        
-        <VoiceUIControls 
-          isConnecting={isProcessing}
-          connectionStatus={isProcessing ? 'connecting' : 'connected'}
-        />
       </DialogContent>
     </Dialog>
   );
