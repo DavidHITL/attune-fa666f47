@@ -6,8 +6,8 @@ import { SessionConfig } from './types';
  */
 export class WebSocketManager {
   private websocket: WebSocket | null = null;
-  private messageHandler: ((event: MessageEvent) => void) | null = null;
-  private wsUrl: string | null = null;
+  public messageHandler: ((event: MessageEvent) => void) | null = null;
+  public wsUrl: string | null = null;
   
   /**
    * Set the WebSocket URL

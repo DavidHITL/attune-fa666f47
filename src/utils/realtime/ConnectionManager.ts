@@ -115,4 +115,18 @@ export class ConnectionManager {
       });
     }
   }
+  
+  /**
+   * Try to reconnect if connection is lost
+   */
+  tryReconnect(): void {
+    this.handleReconnection();
+  }
+  
+  /**
+   * Check if connection is active
+   */
+  isConnected(): boolean {
+    return this.isConnected;
+  }
 }

@@ -1,7 +1,6 @@
-
 import { TranscriptCallback, ChatError, ErrorType } from './types';
 import { EventEmitter } from './EventEmitter';
-import { ConnectionManager } from './managers/ConnectionManager';
+import { ConnectionManager } from './ConnectionManager';
 import { SessionManager } from './SessionManager';
 import { AudioHandler } from './AudioHandler';
 import { MessageHandler } from './MessageHandler';
@@ -26,12 +25,8 @@ export class RealtimeChat {
     // Initialize with Supabase project ID - ensure this is correct
     const projectId = 'oseowhythgbqvllwonaz'; 
     
-    // Create connection manager with reconnect function
-    this.connectionManager = new ConnectionManager(
-      projectId, 
-      this.eventEmitter,
-      () => this.connect()
-    );
+    // Create connection manager
+    this.connectionManager = new ConnectionManager(projectId, this.eventEmitter);
     
     this.sessionManager = new SessionManager();
     this.audioHandler = new AudioHandler(this.eventEmitter);
