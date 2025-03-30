@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { testRealtimeFunctionEndpoint, testWebSocketConnection, testCompleteChatFlow } from '@/utils/realtime/testEndpoint';
+import { testRealtimeEndpoint, testRealtimeFunctionEndpoint, testWebSocketConnection, testCompleteChatFlow } from '@/utils/realtime/testEndpoint';
 import { toast } from 'sonner';
 
 export function useEndpointTest() {
