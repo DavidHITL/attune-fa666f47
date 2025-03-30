@@ -28,7 +28,6 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     if (token) {
       console.log("Authentication token provided in WebSocket connection");
       // You can validate the token here if needed
-      // For now we'll just log its presence since we disabled JWT verification
     }
     
     // Extract any requested WebSocket subprotocol
@@ -39,17 +38,37 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
       console.log("Client requested WebSocket subprotocols:", requestedProtocols);
     }
     
+    let upgradeResult;
     try {
       // Upgrade the connection to WebSocket, passing along any requested protocols
-      const upgradeResult = Deno.upgradeWebSocket(req, {
+      console.log("Attempting to upgrade connection to WebSocket...");
+      upgradeResult = Deno.upgradeWebSocket(req, {
         protocol: requestedProtocols ? requestedProtocols[0] : undefined
       });
       
       console.log("WebSocket upgrade successful" + 
                  (upgradeResult.socket.protocol ? ` with protocol: ${upgradeResult.socket.protocol}` : ""));
-      
-      const { socket, response } = upgradeResult;
+    } catch (upgradeError) {
+      console.error("Critical: WebSocket upgrade failed with error:", upgradeError);
+      console.error("Error details:", JSON.stringify({
+        name: upgradeError.name,
+        message: upgradeError.message,
+        stack: upgradeError.stack
+      }));
+      return new Response(JSON.stringify({ 
+        error: "WebSocket upgrade failed", 
+        details: upgradeError instanceof Error ? upgradeError.message : String(upgradeError) 
+      }), { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+    
+    const { socket, response } = upgradeResult;
+    
+    try {
       const OPENAI_API_KEY = getOpenAIApiKey();
+      console.log("API key retrieved successfully");
       
       console.log("WebSocket connection established with client");
       
@@ -61,42 +80,76 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
       // Send confirmation message to client
       try {
         socket.send(JSON.stringify({ type: "connection.established", message: "WebSocket connection established" }));
-      } catch (err) {
-        console.error("Error sending confirmation message:", err);
+        console.log("Sent connection established message to client");
+      } catch (sendError) {
+        console.error("Error sending confirmation message:", sendError);
       }
       
-      // Set up client connection handlers
-      setupClientConnectionHandlers({
-        socket,
-        openAISocketRef: { current: openAISocket },
-        reconnectTimeoutRef: { current: reconnectTimeout },
-        connectionAttemptsRef: { current: connectionAttempts },
-        maxConnectionAttempts,
-      });
+      // Set up client connection handlers with detailed error handling
+      try {
+        console.log("Setting up client connection handlers...");
+        setupClientConnectionHandlers({
+          socket,
+          openAISocketRef: { current: openAISocket },
+          reconnectTimeoutRef: { current: reconnectTimeout },
+          connectionAttemptsRef: { current: connectionAttempts },
+          maxConnectionAttempts,
+        });
+        console.log("Client connection handlers set up successfully");
+      } catch (handlerError) {
+        console.error("Failed to set up client connection handlers:", handlerError);
+        // Continue execution - don't return yet as we want to try setting up the OpenAI connection
+      }
       
-      // Connect to OpenAI Realtime API
-      setupOpenAIConnection({
-        socket,
-        apiKey: OPENAI_API_KEY,
-        openAISocketRef: { current: openAISocket },
-        reconnectTimeoutRef: { current: reconnectTimeout },
-        connectionAttemptsRef: { current: connectionAttempts },
-        maxConnectionAttempts,
-      });
+      // Connect to OpenAI Realtime API with detailed error handling
+      try {
+        console.log("Setting up OpenAI connection...");
+        setupOpenAIConnection({
+          socket,
+          apiKey: OPENAI_API_KEY,
+          openAISocketRef: { current: openAISocket },
+          reconnectTimeoutRef: { current: reconnectTimeout },
+          connectionAttemptsRef: { current: connectionAttempts },
+          maxConnectionAttempts,
+        });
+        console.log("OpenAI connection setup initiated successfully");
+      } catch (openAIError) {
+        console.error("Failed to set up OpenAI connection:", openAIError);
+        try {
+          socket.send(JSON.stringify({ 
+            type: "error", 
+            error: "Failed to establish connection with OpenAI",
+            details: openAIError instanceof Error ? openAIError.message : String(openAIError)
+          }));
+        } catch (sendError) {
+          console.error("Failed to send error message to client:", sendError);
+        }
+        // We still return the response as the WebSocket has been upgraded
+      }
       
+      console.log("WebSocket handler completed successfully, returning response");
       return response;
-    } catch (upgradeError) {
-      console.error("Failed to upgrade WebSocket connection:", upgradeError);
-      return new Response(JSON.stringify({ 
-        error: "WebSocket upgrade failed", 
-        details: upgradeError instanceof Error ? upgradeError.message : String(upgradeError) 
-      }), { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
+    } catch (setupError) {
+      console.error("Error during connection setup:", setupError);
+      try {
+        socket.send(JSON.stringify({ 
+          type: "error", 
+          error: "Error during connection setup",
+          details: setupError instanceof Error ? setupError.message : String(setupError)
+        }));
+      } catch (sendError) {
+        console.error("Failed to send error notification to client:", sendError);
+      }
+      // We still return the response since the WebSocket has been upgraded
+      return response;
     }
   } catch (error) {
     console.error("WebSocket handler error:", error);
+    console.error("Error details:", JSON.stringify({
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    }));
     return createErrorResponse(error);
   }
 }

@@ -1,15 +1,15 @@
 
 /**
- * Utility functions for connecting to OpenAI's Realtime API
+ * Utility functions for establishing and managing WebSocket connections
  */
 
-import { OpenAISocketOptions, ConnectionHandlerOptions } from "../types.ts";
+import { OpenAISocketOptions } from "../types.ts";
 import { setupOpenAISocketHandlers } from "./socket-handlers.ts";
 
 /**
- * Connect to OpenAI's Realtime API with retry logic
+ * Connect to the OpenAI Realtime API and set up event handlers
  */
-export function connectToOpenAI(options: ConnectionHandlerOptions & { apiKey: string }): void {
+export function connectToOpenAI(options: OpenAISocketOptions): void {
   const { 
     socket, 
     apiKey,
@@ -18,75 +18,132 @@ export function connectToOpenAI(options: ConnectionHandlerOptions & { apiKey: st
     connectionAttemptsRef,
     maxConnectionAttempts
   } = options;
-  
+
   try {
-    if (openAISocketRef.current) {
+    console.log(`Connecting to OpenAI Realtime API (attempt ${connectionAttemptsRef.current + 1}/${maxConnectionAttempts})...`);
+    
+    // Initialize OpenAI WebSocket
+    try {
+      const openAISocket = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01");
+      openAISocketRef.current = openAISocket;
+      console.log("OpenAI WebSocket instance created successfully");
+      
+      // Set up event handlers
+      setupOpenAISocketHandlers({
+        socket,
+        apiKey,
+        openAISocket,
+        reconnectTimeoutRef,
+        connectionAttemptsRef,
+        maxConnectionAttempts,
+        retryConnect: () => connectToOpenAI(options)
+      });
+      console.log("OpenAI socket handlers set up successfully");
+    } catch (socketError) {
+      console.error("Failed to create OpenAI WebSocket:", socketError);
+      console.error("Socket creation error details:", JSON.stringify({
+        name: socketError.name,
+        message: socketError.message,
+        stack: socketError.stack
+      }));
+      
+      // Notify client of failure
       try {
-        openAISocketRef.current.close();
-      } catch (err) {
-        console.warn("Error closing existing OpenAI WebSocket:", err);
+        socket.send(JSON.stringify({
+          type: "error",
+          error: "Failed to create connection to OpenAI",
+          details: socketError instanceof Error ? socketError.message : String(socketError)
+        }));
+      } catch (sendError) {
+        console.error("Failed to send error notification to client:", sendError);
       }
+      
+      // Handle reconnection
+      handleReconnection(options);
+    }
+  } catch (error) {
+    console.error("Error in connectToOpenAI function:", error);
+    console.error("Error details:", JSON.stringify({
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    }));
+    
+    // Notify client of unexpected error
+    try {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify({
+          type: "error",
+          error: "Unexpected error occurred during connection setup",
+          details: error instanceof Error ? error.message : String(error)
+        }));
+      }
+    } catch (sendError) {
+      console.error("Failed to send error notification to client:", sendError);
     }
     
-    // Connect to the correct OpenAI Realtime API endpoint with gpt-4o
-    console.log("Connecting to OpenAI Realtime API with model: gpt-4o-realtime-preview-2024-10-01");
-    
-    // Make sure we're using the correct URL
-    openAISocketRef.current = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01");
-    
-    // Send confirmation to client
-    socket.send(JSON.stringify({ 
-      type: "info", 
-      message: "Establishing connection to OpenAI Realtime API" 
-    }));
-    
-    setupOpenAISocketHandlers({
-      socket,
-      apiKey,
-      openAISocket: openAISocketRef.current,
-      reconnectTimeoutRef,
-      connectionAttemptsRef,
-      maxConnectionAttempts,
-      retryConnect: () => connectToOpenAI(options),
-    });
-  } catch (error) {
-    console.error("Error connecting to OpenAI:", error);
-    socket.send(JSON.stringify({ 
-      type: "error", 
-      error: "Failed to connect to OpenAI: " + (error instanceof Error ? error.message : String(error)) 
-    }));
+    // Try to reconnect despite the error
+    handleReconnection(options);
   }
 }
 
 /**
- * Handle reconnection attempts with exponential backoff
+ * Handle reconnection logic for the WebSocket
  */
 export function handleReconnection(options: OpenAISocketOptions): void {
-  const { 
-    connectionAttemptsRef, 
-    maxConnectionAttempts, 
+  const {
     reconnectTimeoutRef,
-    socket,
-    retryConnect
+    connectionAttemptsRef,
+    maxConnectionAttempts,
+    socket
   } = options;
+
+  connectionAttemptsRef.current += 1;
   
   if (connectionAttemptsRef.current < maxConnectionAttempts) {
-    connectionAttemptsRef.current++;
-    const backoffTime = 1000 * Math.pow(2, connectionAttemptsRef.current);
-    console.log(`Retrying OpenAI connection in ${backoffTime/1000}s, attempt ${connectionAttemptsRef.current} of ${maxConnectionAttempts}`);
+    console.log(`Scheduling reconnection attempt ${connectionAttemptsRef.current + 1}/${maxConnectionAttempts}...`);
     
-    // Use proper type for setTimeout with Deno
-    reconnectTimeoutRef.current = setTimeout(retryConnect, backoffTime);
+    // Clear any existing timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    
+    // Set exponential backoff: 1s, 2s, 4s, etc.
+    const backoffTime = Math.min(1000 * Math.pow(2, connectionAttemptsRef.current - 1), 10000);
+    console.log(`Will attempt reconnect in ${backoffTime}ms`);
+    
+    reconnectTimeoutRef.current = setTimeout(() => {
+      console.log("Attempting reconnection now...");
+      connectToOpenAI(options);
+    }, backoffTime);
     
     // Notify client of reconnection attempt
-    socket.send(JSON.stringify({ 
-      type: "warning", 
-      message: `Connection lost, attempting to reconnect (${connectionAttemptsRef.current}/${maxConnectionAttempts})...` 
-    }));
+    try {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify({
+          type: "reconnecting",
+          attempts: connectionAttemptsRef.current,
+          maxAttempts: maxConnectionAttempts,
+          nextAttemptIn: backoffTime
+        }));
+      }
+    } catch (sendError) {
+      console.error("Failed to send reconnection notification to client:", sendError);
+    }
   } else {
-    socket.send(JSON.stringify({ 
-      type: "error", 
-      error: "Failed to connect to OpenAI API after multiple attempts" 
-    }));
+    console.error(`Maximum reconnection attempts (${maxConnectionAttempts}) reached. Giving up.`);
+    
+    // Notify client that we've given up trying to reconnect
+    try {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify({
+          type: "error",
+          error: "Maximum reconnection attempts reached",
+          details: `Failed to connect after ${maxConnectionAttempts} attempts.`
+        }));
+      }
+    } catch (sendError) {
+      console.error("Failed to send max attempts notification to client:", sendError);
+    }
   }
 }
