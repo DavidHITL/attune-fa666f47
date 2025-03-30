@@ -102,18 +102,20 @@ export class WebSocketManager {
   /**
    * Configure the session settings
    */
-  configureSession(sessionConfig: SessionConfig): void {
+  configureSession(sessionConfig: SessionConfig): boolean {
     if (!this.websocket || !this.isConnected) {
       console.error("Cannot configure session: WebSocket not connected");
-      return;
+      return false;
     }
     
     try {
       console.log("Configuring session...");
       this.websocket.send(JSON.stringify(sessionConfig));
+      return true;
     } catch (error) {
       console.error("Failed to configure session:", error);
       this.tryReconnect();
+      return false;
     }
   }
 

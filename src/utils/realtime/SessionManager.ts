@@ -47,7 +47,8 @@ export class SessionManager {
         }
       };
       
-      return this.websocketManager.configureSession(sessionConfig);
+      this.websocketManager.configureSession(sessionConfig);
+      return true;
     } catch (error) {
       console.error("Failed to configure session:", error);
       return false;
