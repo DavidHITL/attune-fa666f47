@@ -1,13 +1,13 @@
 
 /**
- * Calls the OpenAI API to get a response
+ * Calls the OpenAI API to get a response using GPT-4o
  */
 export async function callAnthropicAPI(
   apiKey: string, 
   messages: Array<{ role: string; content: string }>,
   systemPrompt: string
 ): Promise<string> {
-  console.log("Sending request to OpenAI API");
+  console.log("Sending request to OpenAI API with GPT-4o model");
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

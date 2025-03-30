@@ -34,7 +34,7 @@ serve(async (req) => {
       );
     }
 
-    // Call OpenAI API instead of Anthropic
+    // Call OpenAI API with GPT-4o model
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {

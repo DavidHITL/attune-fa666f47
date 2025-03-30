@@ -19,7 +19,7 @@ export async function handleHttpRequest(req: Request): Promise<Response> {
       body: JSON.stringify({
         model: "gpt-4o-realtime-preview-2024-10-01",
         voice: "alloy",
-        instructions: "You are a helpful AI assistant that speaks naturally with users. Keep responses concise and conversational. You're here to help with any questions or tasks."
+        instructions: "You are a helpful AI assistant that speaks naturally with users. Keep responses concise and conversational. You're using the GPT-4o model with advanced reasoning capabilities."
       }),
     });
     
