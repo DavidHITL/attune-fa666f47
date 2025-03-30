@@ -1,4 +1,3 @@
-
 import { SessionConfig, WebSocketMessageEvent } from '../types';
 import { ReconnectionHandler } from '../ReconnectionHandler';
 import { ConnectionState } from '../ConnectionState';
@@ -149,10 +148,13 @@ export class ConnectionManager {
       }
       
       // Always attempt reconnection except for normal closure
-      if (event.code !== 1000) {
+      const normalCloseCode = 1000;
+      const abnormalCloseCode = 1006;
+      
+      if (event.code !== normalCloseCode) {
         console.log(`Abnormal close (${event.code}), attempting reconnection`);
         this.reconnectionHandler.tryReconnect();
-      } else if (event.code === 1006) { // Fix: This comparison now uses proper number comparison
+      } else if (Number(event.code) === abnormalCloseCode) { // Fix: Explicit conversion to Number for comparison
         // Code 1006 means abnormal closure, could be network issues
         console.log("Abnormal closure detected, attempting reconnection");
         setTimeout(() => {
