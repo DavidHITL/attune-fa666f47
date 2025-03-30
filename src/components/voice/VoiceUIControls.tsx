@@ -12,6 +12,11 @@ const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
   isConnecting, 
   connectionStatus 
 }) => {
+  // Check if the browser supports speech recognition
+  const isSpeechRecognitionSupported = 
+    typeof window !== 'undefined' && 
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
   return (
     <DialogFooter>
       <div className="flex gap-2 items-center justify-between w-full">
@@ -22,7 +27,7 @@ const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
            "Disconnected"}
         </div>
         <div className="text-xs text-blue-500">
-          {recognition ? "Voice recognition available" : "Voice recognition not supported"}
+          {isSpeechRecognitionSupported ? "Voice recognition available" : "Voice recognition not supported"}
         </div>
       </div>
     </DialogFooter>
