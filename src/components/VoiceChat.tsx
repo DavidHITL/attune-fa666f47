@@ -41,9 +41,7 @@ export function VoiceChat({
             <DialogTitle className="text-lg font-medium">Voice Conversation</DialogTitle>
             <VoiceConnectionStatus status={connectionStatus} />
           </div>
-          <DialogDescription className="text-sm text-muted-foreground">
-            Speak naturally with the AI assistant or use the button below to return to text chat.
-          </DialogDescription>
+          
         </DialogHeader>
         
         <div className="flex-1 flex flex-col items-center justify-center w-full">
