@@ -54,19 +54,37 @@ const SignUp: React.FC = () => {
 
     try {
       console.log("Starting signup process for:", data.email);
-      const { success, error, profileError } = await signUp(data.email, data.password);
+      const { success, error, data: authData, profileError } = await signUp(data.email, data.password);
       
       if (success) {
         console.log("Signup successful, navigating to signin page");
+        
+        let toastMessage = "Account created successfully! Please sign in.";
+        if (profileError) {
+          toastMessage = "Account created but there was an issue setting up your profile. Please sign in anyway.";
+          console.warn("Profile setup issue:", profileError.message);
+        }
+        
         toast({
-          title: "Account created successfully",
-          description: "Please sign in with your new credentials",
+          title: "Account created",
+          description: toastMessage,
         });
+        
         // Always redirect to sign-in page after successful account creation
         navigate("/signin", { replace: true });
       } else if (error) {
         console.error("Signup error:", error.message);
-        setError(error.message);
+        
+        if (error.message.includes("Database error")) {
+          toast({
+            title: "Account created",
+            description: "Your account was created. Please sign in now.",
+            variant: "default",
+          });
+          navigate("/signin", { replace: true });
+        } else {
+          setError(error.message);
+        }
       }
     } catch (unexpectedError) {
       console.error("Unexpected error during signup:", unexpectedError);

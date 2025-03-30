@@ -1,8 +1,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { AuthResult } from "./types";
 
 export const authService = {
-  signUp: async (email: string, password: string) => {
+  signUp: async (email: string, password: string): Promise<AuthResult> => {
     try {
       console.log("Attempting to sign up user:", email);
       
@@ -45,15 +46,15 @@ export const authService = {
         if (profileError) {
           console.error("Failed to create profile:", profileError.message);
           // Even if profile creation fails, the auth account was created
-          return { data, success: true, profileError };
+          return { data, success: true, profileError, error: null };
         }
         
         console.log("User profile created successfully");
-        return { data, success: true };
+        return { data, success: true, error: null };
       } catch (profileErr) {
         console.error("Error during profile creation:", profileErr);
         // Return success true since the auth account was created
-        return { data, success: true, profileError: profileErr };
+        return { data, success: true, profileError: profileErr as Error, error: null };
       }
     } catch (err) {
       console.error("An unexpected error occurred during signup:", err);
@@ -61,7 +62,7 @@ export const authService = {
     }
   },
 
-  signIn: async (email: string, password: string) => {
+  signIn: async (email: string, password: string): Promise<AuthResult> => {
     try {
       console.log("Attempting to sign in user:", email);
       
