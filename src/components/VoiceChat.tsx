@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -11,29 +10,31 @@ import { ArrowLeft } from "lucide-react";
 import VoiceUIControls from "./voice/VoiceUIControls";
 
 // Create and export the VoiceChat component
-export function VoiceChat({ 
-  open, 
-  onOpenChange 
-}: { 
-  open: boolean; 
+export function VoiceChat({
+  open,
+  onOpenChange
+}: {
+  open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
   const {
     chatRef,
     connect,
-    disconnect,
+    disconnect
   } = useVoiceChat(user);
-
-  const { connectionStatus, isConnecting } = useVoiceChatConnection({
+  const {
+    connectionStatus,
+    isConnecting
+  } = useVoiceChatConnection({
     open,
     connect,
     disconnect,
     chatRef
   });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col items-center justify-between p-8">
         <DialogHeader className="w-full">
           <div className="flex justify-between items-center w-full">
@@ -46,10 +47,7 @@ export function VoiceChat({
         </DialogHeader>
         
         <div className="flex-1 flex flex-col items-center justify-center w-full">
-          <VoiceVisualization 
-            isActive={connectionStatus === 'connected'} 
-            className="mb-8" 
-          />
+          <VoiceVisualization isActive={connectionStatus === 'connected'} className="mb-8" />
           
           <p className="text-center text-lg text-gray-700 dark:text-gray-300 max-w-md mb-8">
             Speak naturally with the AI assistant or click the button below to return to text chat.
@@ -57,21 +55,13 @@ export function VoiceChat({
         </div>
         
         <div className="w-full space-y-4">
-          <VoiceUIControls
-            isConnecting={isConnecting}
-            connectionStatus={connectionStatus}
-          />
+          <VoiceUIControls isConnecting={isConnecting} connectionStatus={connectionStatus} />
           
-          <Button
-            onClick={() => onOpenChange(false)}
-            className="w-full max-w-xs mx-auto"
-            variant="outline"
-          >
+          <Button onClick={() => onOpenChange(false)} variant="outline" className="w-full max-w-xs mx-auto text-center">
             <ArrowLeft className="mr-2" size={16} />
             Back to Text
           </Button>
         </div>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 }
