@@ -2,7 +2,7 @@
 import { corsHeaders, getOpenAIApiKey } from "./utils.ts";
 import { WebSocketOptions, defaultOptions, createErrorResponse, createUpgradeResponse } from "./types.ts";
 import { setupClientConnectionHandlers } from "./client-handler.ts";
-import { connectToOpenAI } from "./openai-handler.ts";
+import { setupOpenAIConnection } from "./openai-handler.ts";
 
 /**
  * Handle WebSocket upgrade requests and manage the connection to OpenAI's Realtime API
@@ -47,7 +47,7 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     });
     
     // Connect to OpenAI Realtime API
-    connectToOpenAI({
+    setupOpenAIConnection({
       socket,
       apiKey: OPENAI_API_KEY,
       openAISocketRef: { current: openAISocket },
