@@ -1,6 +1,6 @@
 
 // Get OpenAI API key from environment variables
-export const anthropicApiKey = Deno.env.get("openai");
+export const anthropicApiKey = Deno.env.get("OPENAI_API_KEY");
 
 if (!anthropicApiKey) {
   console.error("Missing OpenAI API key");

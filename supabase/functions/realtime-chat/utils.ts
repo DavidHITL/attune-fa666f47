@@ -31,9 +31,10 @@ export function createErrorResponse(error: Error | string, status = 500): Respon
 
 // Helper to check for required API key
 export function getOpenAIApiKey(): string {
+  // Use OPENAI_API_KEY as the primary key name
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) {
-    throw new Error('API key not configured');
+    throw new Error('OpenAI API key not configured. Please add OPENAI_API_KEY to your environment variables.');
   }
   return apiKey;
 }

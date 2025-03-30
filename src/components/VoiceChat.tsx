@@ -13,6 +13,7 @@ import { RealtimeChat } from "@/utils/RealtimeAudio";
 import { useVoiceChatConnection } from "@/hooks/useVoiceChatConnection";
 import { toast } from "sonner";
 import VoiceConnectionStatus from "./voice/VoiceConnectionStatus";
+import VoiceUIControls from "./voice/VoiceUIControls";
 
 interface VoiceChatProps {
   open: boolean;
@@ -41,7 +42,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
       toast.success("Voice connection established");
     } catch (error) {
       console.error("[VoiceChat] Connection error:", error);
-      toast.error("Failed to connect to voice service");
+      toast.error("Failed to connect to voice service. Please check that your API key is correctly set.");
       throw error;
     }
   };
@@ -56,7 +57,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
   };
   
   // Manage connection state
-  const { connectionStatus } = useVoiceChatConnection({
+  const { connectionStatus, isConnecting } = useVoiceChatConnection({
     open,
     connect,
     disconnect,
@@ -96,6 +97,11 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
             Switch Back to Text
           </Button>
         </div>
+        
+        <VoiceUIControls 
+          isConnecting={isConnecting} 
+          connectionStatus={connectionStatus}
+        />
       </DialogContent>
     </Dialog>
   );
