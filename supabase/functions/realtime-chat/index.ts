@@ -214,7 +214,7 @@ serve(async (req) => {
 
   // Fall back to HTTP request handling
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
       throw new Error('API key not configured');

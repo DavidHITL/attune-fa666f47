@@ -21,7 +21,7 @@ const VoiceCallButton: React.FC<VoiceCallButtonProps> = ({ onClick }) => {
     // Show a more detailed toast message
     uiToast({
       title: "Connecting to OpenAI voice service",
-      description: "Establishing WebSocket connection to the Realtime API...",
+      description: "Establishing WebSocket connection to the OpenAI Realtime API...",
     });
     
     // Show a more visible toast using sonner with longer timeout
