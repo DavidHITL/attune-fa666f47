@@ -9,8 +9,8 @@ const TestApi: React.FC = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <Container>
         <PageHeader
-          heading="API Connection Test"
-          text="Verify that the Supabase Edge Functions are accessible and WebSocket connections are working"
+          title="API Connection Test"
+          description="Verify that the Supabase Edge Functions are accessible and WebSocket connections are working"
         />
         
         <div className="mt-8">
