@@ -17,16 +17,27 @@ const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
     typeof window !== 'undefined' && 
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 
+  // Create unique IDs for accessibility
+  const statusId = "voice-connection-status";
+  const supportId = "voice-recognition-support";
+
   return (
     <DialogFooter>
       <div className="flex gap-2 items-center justify-between w-full">
-        <div className="text-xs text-gray-500 flex items-center">
+        <div 
+          id={statusId}
+          className="text-xs text-gray-500 flex items-center"
+          aria-live="polite"
+        >
           {isConnecting && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
           {isConnecting ? "Processing..." : 
            connectionStatus === 'connected' ? "Ready" : 
            "Disconnected"}
         </div>
-        <div className="text-xs text-blue-500">
+        <div 
+          id={supportId}
+          className="text-xs text-blue-500"
+        >
           {isSpeechRecognitionSupported ? "Voice recognition available" : "Voice recognition not supported"}
         </div>
       </div>

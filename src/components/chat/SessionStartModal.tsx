@@ -1,14 +1,17 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import AvailableSessions from "./AvailableSessions";
+
 interface SessionStartModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStartSession: () => void;
 }
+
 const SessionStartModal: React.FC<SessionStartModalProps> = ({
   open,
   onOpenChange,
@@ -19,14 +22,18 @@ const SessionStartModal: React.FC<SessionStartModalProps> = ({
     // Redirect to the "you" page when user clicks X
     navigate("/you");
   };
-  return <Dialog open={open} onOpenChange={isOpen => {
-    if (!isOpen) handleCloseModal();
-    onOpenChange(isOpen);
-  }}>
+  
+  return (
+    <Dialog open={open} onOpenChange={isOpen => {
+      if (!isOpen) handleCloseModal();
+      onOpenChange(isOpen);
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-center">
           <DialogTitle className="text-xl text-center">Start Your Session</DialogTitle>
-          
+          <DialogDescription className="text-center text-sm mt-2">
+            Begin a coaching session to get personalized support.
+          </DialogDescription>
         </DialogHeader>
         
         {/* Available Sessions Component */}
@@ -36,8 +43,8 @@ const SessionStartModal: React.FC<SessionStartModalProps> = ({
         
         <div className="flex flex-col space-y-4">
           <p className="text-center">Sessions are limited to three per week and 25 minutes each to create an effective coaching.</p>
-          
         </div>
+        
         <DialogFooter className="mt-6">
           <Button onClick={onStartSession} className="w-full">
             Start 25-Minute Session
@@ -50,6 +57,8 @@ const SessionStartModal: React.FC<SessionStartModalProps> = ({
           <span className="sr-only">Close</span>
         </DialogClose>
       </DialogContent>
-    </Dialog>;
+    </Dialog>
+  );
 };
+
 export default SessionStartModal;
