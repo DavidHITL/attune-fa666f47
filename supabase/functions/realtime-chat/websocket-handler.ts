@@ -1,4 +1,3 @@
-
 import { corsHeaders, getOpenAIApiKey } from "./utils.ts";
 import { WebSocketOptions, defaultOptions, createErrorResponse, MutableRef, ConnectionHandlerOptions } from "./types.ts";
 import { setupClientConnectionHandlers } from "./client-handler.ts";
@@ -98,6 +97,25 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
         const maxConnectionAttempts = options.reconnectAttempts || defaultOptions.reconnectAttempts;
         let reconnectTimeout: number | undefined;
         
+        // Start server-side heartbeat for keep-alive
+        const pingInterval = setInterval(() => {
+          try {
+            if (socket.readyState === WebSocket.OPEN) {
+              console.log("Sending server ping to client");
+              socket.send(JSON.stringify({
+                type: "ping",
+                timestamp: new Date().toISOString()
+              }));
+            } else {
+              console.log("Stopping server pings, socket state:", socket.readyState);
+              clearInterval(pingInterval);
+            }
+          } catch (error) {
+            console.error("Error sending server ping:", error);
+            clearInterval(pingInterval);
+          }
+        }, 30000); // Send ping every 30 seconds
+        
         // Send confirmation message to client
         try {
           socket.send(JSON.stringify({ 
@@ -175,6 +193,18 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
             console.error("Failed to send error message to client:", sendError);
           }
         }
+        
+        // Add cleanup for heartbeat when socket closes
+        const originalOnClose = socket.onclose;
+        socket.onclose = (event) => {
+          clearInterval(pingInterval);
+          console.log("Cleared server-side ping interval due to socket close");
+          
+          // Call the original onclose handler if it exists
+          if (originalOnClose) {
+            originalOnClose.call(socket, event);
+          }
+        };
         
         console.log("WebSocket handler completed successfully, returning response");
         return response;

@@ -16,6 +16,11 @@ export class RealtimeChat {
   private audioHandler: AudioHandler;
   private sessionManager: SessionManager;
   private _isConnected: boolean = false;
+  private heartbeatConfig = {
+    pingInterval: 30000,  // 30 seconds
+    pongTimeout: 5000,    // 5 seconds
+    maxMissed: 3          // 3 missed pongs before reconnect
+  };
 
   /**
    * Create a new RealtimeChat instance
@@ -43,6 +48,13 @@ export class RealtimeChat {
     // Initialize connection manager with the reconnect function
     this.connectionManager = new ConnectionManager(projectId, this.eventEmitter, reconnect);
     
+    // Set heartbeat configuration
+    this.connectionManager.setHeartbeatConfig(
+      this.heartbeatConfig.pingInterval,
+      this.heartbeatConfig.pongTimeout,
+      this.heartbeatConfig.maxMissed
+    );
+    
     // Initialize handlers
     this.messageHandler = new MessageHandler(
       this.connectionManager.getWebSocketManager(),
@@ -55,6 +67,21 @@ export class RealtimeChat {
     
     // Set up error handlers
     this.setupErrorHandlers();
+  }
+
+  /**
+   * Set heartbeat configuration
+   * @param pingInterval Interval in milliseconds between ping messages
+   * @param pongTimeout Timeout in milliseconds to wait for pong response
+   * @param maxMissed Maximum number of missed pongs before reconnecting
+   */
+  setHeartbeatConfig(pingInterval: number, pongTimeout: number, maxMissed: number): void {
+    this.heartbeatConfig = {
+      pingInterval,
+      pongTimeout,
+      maxMissed
+    };
+    this.connectionManager.setHeartbeatConfig(pingInterval, pongTimeout, maxMissed);
   }
 
   /**

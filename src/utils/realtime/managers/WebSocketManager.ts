@@ -1,4 +1,3 @@
-
 /**
  * Manages WebSocket connections
  */
@@ -12,6 +11,12 @@ export class WebSocketManager {
   private maxConnectionAttempts = 3;
   private connectionLogInterval: number | null = null;
   private protocols: string[] = ['json', 'openai-realtime']; // Define supported protocols
+  private heartbeatInterval: number | null = null;
+  private heartbeatTimeout: number | null = null;
+  private heartbeatMissedResponses = 0;
+  private maxMissedHeartbeats = 3;
+  private pingIntervalMs = 30000; // 30 seconds between pings
+  private pongTimeoutMs = 5000;  // 5 seconds to wait for pong
 
   /**
    * Set the WebSocket URL
@@ -27,6 +32,17 @@ export class WebSocketManager {
   setProtocols(protocols: string[]): void {
     console.log("[Managers/WebSocketManager] Setting protocols:", protocols);
     this.protocols = protocols;
+  }
+
+  /**
+   * Set heartbeat configuration
+   */
+  setHeartbeatConfig(pingIntervalMs: number, pongTimeoutMs: number, maxMissedHeartbeats: number): void {
+    console.log("[Managers/WebSocketManager] Setting heartbeat config:", 
+                { pingIntervalMs, pongTimeoutMs, maxMissedHeartbeats });
+    this.pingIntervalMs = pingIntervalMs;
+    this.pongTimeoutMs = pongTimeoutMs;
+    this.maxMissedHeartbeats = maxMissedHeartbeats;
   }
 
   /**
@@ -179,12 +195,100 @@ export class WebSocketManager {
       }));
     };
   }
+
+  /**
+   * Start heartbeat mechanism for keeping connection alive
+   */
+  startHeartbeat(): void {
+    console.log("[Managers/WebSocketManager] Starting heartbeat mechanism");
+    this.stopHeartbeat(); // Clear any existing heartbeat
+    
+    this.heartbeatMissedResponses = 0;
+    
+    // Set up the ping interval
+    this.heartbeatInterval = window.setInterval(() => {
+      if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+        console.log("[Managers/WebSocketManager] WebSocket not open, stopping heartbeat");
+        this.stopHeartbeat();
+        return;
+      }
+      
+      try {
+        console.log("[Managers/WebSocketManager] Sending ping");
+        // Send ping message
+        this.websocket.send(JSON.stringify({ type: "ping", timestamp: new Date().toISOString() }));
+        
+        // Set timeout for pong response
+        this.heartbeatTimeout = window.setTimeout(() => {
+          this.heartbeatMissedResponses++;
+          console.warn(`[Managers/WebSocketManager] Pong not received, missed responses: ${this.heartbeatMissedResponses}`);
+          
+          if (this.heartbeatMissedResponses >= this.maxMissedHeartbeats) {
+            console.error("[Managers/WebSocketManager] Max missed heartbeats reached, reconnecting");
+            this.stopHeartbeat();
+            this.reconnect();
+          }
+        }, this.pongTimeoutMs);
+      } catch (error) {
+        console.error("[Managers/WebSocketManager] Error sending ping:", error);
+      }
+    }, this.pingIntervalMs);
+  }
+  
+  /**
+   * Stop heartbeat mechanism
+   */
+  stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+  }
+  
+  /**
+   * Handle pong response
+   */
+  handlePong(): void {
+    console.log("[Managers/WebSocketManager] Received pong");
+    this.heartbeatMissedResponses = 0;
+    
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+  }
+  
+  /**
+   * Reconnect WebSocket
+   */
+  reconnect(): void {
+    console.log("[Managers/WebSocketManager] Attempting to reconnect");
+    if (this.websocket) {
+      try {
+        this.websocket.close();
+      } catch (error) {
+        console.warn("[Managers/WebSocketManager] Error closing WebSocket during reconnect:", error);
+      }
+      this.websocket = null;
+    }
+    
+    // Trigger reconnection through ConnectionManager
+    const event = new CustomEvent('websocket-reconnect-needed');
+    window.dispatchEvent(event);
+  }
   
   /**
    * Close WebSocket connection
    */
   disconnect(): void {
     console.log("[Managers/WebSocketManager] Disconnecting");
+    
+    this.stopHeartbeat();
     
     if (this.connectionLogInterval) {
       clearInterval(this.connectionLogInterval);

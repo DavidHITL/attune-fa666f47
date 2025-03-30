@@ -15,6 +15,11 @@ export class ConnectionManager {
   private reconnectionHandler: ReconnectionHandler;
   private projectId: string;
   private eventEmitter: EventEmitter;
+  private heartbeatConfig = {
+    pingInterval: 30000,  // 30 seconds
+    pongTimeout: 5000,    // 5 seconds
+    maxMissed: 3          // 3 missed pongs before reconnect
+  };
   
   constructor(projectId: string, eventEmitter: EventEmitter, onReconnect: () => Promise<void>) {
     this.projectId = projectId;
@@ -27,6 +32,24 @@ export class ConnectionManager {
       this.connectionState,
       this.reconnectionHandler,
       this.eventEmitter
+    );
+  }
+
+  /**
+   * Set heartbeat configuration
+   */
+  setHeartbeatConfig(pingInterval: number, pongTimeout: number, maxMissed: number): void {
+    this.heartbeatConfig = {
+      pingInterval,
+      pongTimeout,
+      maxMissed
+    };
+    
+    // If already initialized, update the WebSocketManager
+    this.webSocketManager.setHeartbeatConfig(
+      this.heartbeatConfig.pingInterval,
+      this.heartbeatConfig.pongTimeout,
+      this.heartbeatConfig.maxMissed
     );
   }
 
@@ -46,6 +69,13 @@ export class ConnectionManager {
       // Set the WebSocket URL and protocols
       this.webSocketManager.setUrl(wsUrl);
       this.webSocketManager.setProtocols(['json', 'openai-realtime']);
+      
+      // Set heartbeat configuration
+      this.webSocketManager.setHeartbeatConfig(
+        this.heartbeatConfig.pingInterval,
+        this.heartbeatConfig.pongTimeout,
+        this.heartbeatConfig.maxMissed
+      );
       
       // Connect to the WebSocket server
       return await this.webSocketManager.connect((websocket, timeoutId) => 
