@@ -25,6 +25,7 @@ export class RealtimeChat {
     
     // Initialize with Supabase project ID - ensure this is correct
     const projectId = 'oseowhythgbqvllwonaz'; 
+    console.log("[RealtimeChat] Initializing with project ID:", projectId);
     
     // Create connection manager
     this.connectionManager = new ConnectionManager(projectId, this.eventEmitter);
@@ -45,28 +46,34 @@ export class RealtimeChat {
    * Set up internal event listeners
    */
   private setupEventListeners(): void {
+    console.log("[RealtimeChat] Setting up event listeners");
+    
     // Handle audio deltas
     this.eventEmitter.addEventListener('audio.delta', async (base64Audio: string) => {
+      console.log("[RealtimeChat] Received audio delta");
       await this.audioHandler.processAudioDelta(base64Audio);
     });
     
     // Handle session creation
     this.eventEmitter.addEventListener('session.created', () => {
+      console.log("[RealtimeChat] Session created event received");
       this.sessionManager.configureSession(this.connectionManager.getWebSocketManager());
     });
     
     // Update connection status
     this.eventEmitter.addEventListener('connected', () => {
+      console.log("[RealtimeChat] Connected event received");
       this.isConnected = true;
     });
     
     this.eventEmitter.addEventListener('disconnected', () => {
+      console.log("[RealtimeChat] Disconnected event received");
       this.isConnected = false;
     });
     
     // Handle connection errors
     this.eventEmitter.addEventListener('error', (error: ChatError) => {
-      console.error('RealtimeChat error event:', error);
+      console.error('[RealtimeChat] Error event received:', error);
     });
   }
 
@@ -75,26 +82,26 @@ export class RealtimeChat {
    */
   async connect(): Promise<void> {
     try {
-      console.log("RealtimeChat: Initiating connection");
+      console.log("[RealtimeChat] Initiating connection");
       
       // Connect to WebSocket
       await this.connectionManager.connect();
       this.isConnected = this.connectionManager.checkConnection();
       
       if (this.isConnected) {
-        console.log("RealtimeChat: Connection successful");
+        console.log("[RealtimeChat] Connection successful");
         // Set up message handlers
         this.messageHandler.setupMessageHandlers();
         
         // Initialize audio
         await this.audioHandler.initializeAudio();
       } else {
-        console.error("RealtimeChat: Connection failed");
+        console.error("[RealtimeChat] Connection failed");
         throw new Error("Failed to establish connection");
       }
       
     } catch (error) {
-      console.error("RealtimeChat: Failed to connect:", error);
+      console.error("[RealtimeChat] Failed to connect:", error);
       this.isConnected = false;
       throw error;
     }

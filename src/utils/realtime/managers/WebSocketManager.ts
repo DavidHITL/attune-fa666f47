@@ -1,112 +1,90 @@
 
-import { PromiseManager } from './PromiseManager';
-import { TimeoutManager } from './TimeoutManager';
-
 /**
- * Manager for handling WebSocket connections
+ * Manages WebSocket connections
  */
 export class WebSocketManager {
   private websocket: WebSocket | null = null;
-  private promiseManager: PromiseManager = new PromiseManager();
-  private timeoutManager: TimeoutManager = new TimeoutManager();
 
   /**
-   * Create a WebSocket connection to the specified URL
+   * Connect to a WebSocket endpoint
    */
-  async connect(wsUrl: string, setupEventHandlers: (websocket: WebSocket, timeoutId: number) => void): Promise<void> {
-    try {
-      // Don't attempt multiple connections simultaneously
-      const connectionPromise = this.promiseManager.createPromise();
-      
-      // Close any existing connection first
-      if (this.websocket) {
-        try {
-          this.websocket.close(1000, "Reconnecting");
-        } catch (err) {
-          console.warn("Error closing existing WebSocket:", err);
-        }
-        this.websocket = null;
-      }
-      
+  async connect(
+    url: string,
+    setupHandlers: (websocket: WebSocket, timeoutId: number) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
       try {
-        console.log("Connecting to WebSocket:", wsUrl);
+        console.log("[Managers/WebSocketManager] Connecting to:", url);
         
-        // Create a new WebSocket connection
-        this.websocket = new WebSocket(wsUrl);
+        // Close existing connection if any
+        if (this.websocket) {
+          try {
+            console.log("[Managers/WebSocketManager] Closing existing connection");
+            this.websocket.close();
+          } catch (error) {
+            console.warn("[Managers/WebSocketManager] Error closing existing WebSocket:", error);
+          }
+        }
+        
+        // Create new connection
+        this.websocket = new WebSocket(url);
+        
+        // Set binary type for audio data
         this.websocket.binaryType = "arraybuffer";
         
-        // Create a timeout for connection attempt
-        const timeoutId = this.timeoutManager.createTimeout(() => {
-          if (this.websocket?.readyState !== WebSocket.OPEN) {
-            console.error("WebSocket connection timeout after", this.timeoutManager.getConnectionTimeout(), "ms");
-            if (this.websocket) {
-              try {
-                this.websocket.close();
-              } catch (err) {
-                console.warn("Error closing WebSocket after timeout:", err);
-              }
-            }
-            
-            this.promiseManager.rejectPromise(new Error("Connection timeout"));
-          }
+        // Set connection timeout
+        const timeoutId = window.setTimeout(() => {
+          console.error("[Managers/WebSocketManager] Connection timed out");
+          reject(new Error("Connection timeout"));
+          this.websocket?.close();
+        }, 10000);
+        
+        // Configure handlers
+        setupHandlers(this.websocket, timeoutId);
+        
+        // Handle successful connection
+        this.websocket.addEventListener('open', () => {
+          console.log("[Managers/WebSocketManager] Connection established");
+          window.clearTimeout(timeoutId);
+          resolve();
         });
         
-        setupEventHandlers(this.websocket, timeoutId);
-        
+        // Handle connection errors
+        this.websocket.addEventListener('error', (event) => {
+          console.error("[Managers/WebSocketManager] Connection error:", event);
+          window.clearTimeout(timeoutId);
+          reject(event);
+        });
       } catch (error) {
-        console.error("Error creating WebSocket:", error);
-        this.promiseManager.rejectPromise(error);
-        throw error;
+        console.error("[Managers/WebSocketManager] Error setting up connection:", error);
+        reject(error);
       }
-      
-      return connectionPromise;
-    } catch (error) {
-      console.error("Failed to connect:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Disconnect WebSocket connection
-   */
-  disconnect(): void {
-    if (this.websocket) {
-      try {
-        this.websocket.close(1000, "Client disconnected normally");
-      } catch (error) {
-        console.error("Error closing WebSocket:", error);
-      }
-      this.websocket = null;
-    }
-    
-    this.promiseManager.resetPromise();
+    });
   }
   
   /**
-   * Get the WebSocket instance
+   * Close WebSocket connection
+   */
+  disconnect(): void {
+    console.log("[Managers/WebSocketManager] Disconnecting");
+    this.websocket?.close();
+    this.websocket = null;
+  }
+  
+  /**
+   * Get WebSocket instance
    */
   getWebSocket(): WebSocket | null {
     return this.websocket;
   }
 
   /**
-   * Resolve the connection promise
+   * Check if WebSocket is connected
    */
-  resolveOpenPromise(): void {
-    this.promiseManager.resolvePromise();
-  }
-
-  /**
-   * Reject the connection promise
-   */
-  rejectOpenPromise(error: any): void {
-    this.promiseManager.rejectPromise(error);
-  }
-
-  /**
-   * Set the connection timeout
-   */
-  setConnectionTimeout(timeout: number): void {
-    this.timeoutManager.setConnectionTimeout(timeout);
+  checkConnection(): boolean {
+    const isConnected = !!this.websocket && this.websocket.readyState === WebSocket.OPEN;
+    console.log("[Managers/WebSocketManager] Connection check:", isConnected, 
+              "WebSocket state:", this.websocket ? this.websocket.readyState : "null");
+    return isConnected;
   }
 }

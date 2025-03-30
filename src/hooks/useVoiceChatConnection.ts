@@ -22,22 +22,29 @@ export function useVoiceChatConnection({
   
   // Handle connection to voice API
   useEffect(() => {
+    console.log("[useVoiceChatConnection] Dialog open:", open, "Chat ref exists:", !!chatRef.current, 
+               "Connection status:", connectionStatus);
+    
     if (open && !chatRef.current) {
       setConnectionStatus('connecting');
+      console.log("[useVoiceChatConnection] Initiating connection");
+      
       connect()
         .then(() => {
+          console.log("[useVoiceChatConnection] Connection successful");
           setConnectionStatus('connected');
           toast.success("Voice chat connected");
         })
         .catch((error) => {
+          console.error("[useVoiceChatConnection] Connection failed:", error);
           setConnectionStatus('disconnected');
           toast.error("Failed to connect to voice service");
-          console.error("Connection error:", error);
         });
     }
     
     return () => {
       if (chatRef.current) {
+        console.log("[useVoiceChatConnection] Cleaning up connection");
         disconnect();
         setConnectionStatus('disconnected');
       }

@@ -19,6 +19,7 @@ export class ConnectionManager {
     
     // Initialize the WebSocket URL with the project ID
     const wsUrl = `wss://${projectId}.supabase.co/functions/v1/realtime-chat`;
+    console.log("[ConnectionManager] Setting WebSocket URL:", wsUrl);
     this.websocketManager.setUrl(wsUrl);
   }
 
@@ -27,19 +28,21 @@ export class ConnectionManager {
    */
   async connect(): Promise<void> {
     try {
-      console.log("Connecting to voice service...");
+      console.log("[ConnectionManager] Connecting to voice service...");
       
       // Connect to WebSocket - pass this instance to handle setup
       await this.websocketManager.connect((websocket, timeoutId) => {
+        console.log("[ConnectionManager] WebSocket connection initiated, setting up handlers");
+        
         // Setup event handlers
         websocket.onopen = () => {
-          console.log("WebSocket connection established");
+          console.log("[ConnectionManager] WebSocket connection established");
           this._isConnected = true;
           this.eventEmitter.dispatchEvent('connected', { status: "connected" });
         };
         
         websocket.onerror = (event) => {
-          console.error("WebSocket error:", event);
+          console.error("[ConnectionManager] WebSocket error:", event);
           this._isConnected = false;
           this.eventEmitter.dispatchEvent('error', {
             type: ErrorType.CONNECTION,
@@ -48,7 +51,7 @@ export class ConnectionManager {
         };
         
         websocket.onclose = () => {
-          console.log("WebSocket connection closed");
+          console.log("[ConnectionManager] WebSocket connection closed");
           this._isConnected = false;
           this.eventEmitter.dispatchEvent('disconnected', { status: "disconnected" });
         };
@@ -56,18 +59,20 @@ export class ConnectionManager {
         websocket.onmessage = (event) => {
           // Forward messages to the event emitter
           try {
+            console.log("[ConnectionManager] WebSocket message received:", typeof event.data);
             this.eventEmitter.dispatchEvent('message', event.data);
           } catch (error) {
-            console.error("Error handling WebSocket message:", error);
+            console.error("[ConnectionManager] Error handling WebSocket message:", error);
           }
         };
       });
       
       // Update connection state
       this._isConnected = this.websocketManager.checkConnection();
+      console.log("[ConnectionManager] Connection status after connect:", this._isConnected);
       
     } catch (error) {
-      console.error("Failed to connect:", error);
+      console.error("[ConnectionManager] Failed to connect:", error);
       this._isConnected = false;
       
       const chatError: ChatError = {
