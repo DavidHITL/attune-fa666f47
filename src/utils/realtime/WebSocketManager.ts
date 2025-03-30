@@ -11,6 +11,7 @@ export class WebSocketManager {
   private projectId: string;
   private connectionState: ConnectionState;
   private reconnectionHandler: ReconnectionHandler;
+  private connectionTimeout: number = 15000; // 15 second timeout
   
   constructor(projectId: string) {
     this.projectId = projectId;
@@ -32,6 +33,17 @@ export class WebSocketManager {
     try {
       this.reconnectionHandler.clearTimeout();
       
+      // Close any existing connection first
+      if (this.websocket) {
+        try {
+          this.websocket.close(1000, "Reconnecting");
+        } catch (err) {
+          console.warn("Error closing existing WebSocket:", err);
+        }
+        this.websocket = null;
+      }
+      
+      // Use direct URL with HTTPS protocol to ensure proper connection
       const wsUrl = `wss://${this.projectId}.functions.supabase.co/realtime-chat`;
       console.log("Connecting to WebSocket:", wsUrl);
       
@@ -43,26 +55,33 @@ export class WebSocketManager {
           return;
         }
         
-        const timeout = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           if (!this.connectionState.isConnected()) {
             console.error("WebSocket connection timeout");
+            if (this.websocket) {
+              try {
+                this.websocket.close();
+              } catch (err) {
+                console.warn("Error closing WebSocket after timeout:", err);
+              }
+            }
             reject(new Error("Connection timeout"));
             this.reconnectionHandler.tryReconnect();
           }
-        }, 10000); // 10 second timeout
+        }, this.connectionTimeout);
         
         this.websocket.onopen = () => {
           console.log("WebSocket connection established");
           this.connectionState.setConnected(true);
           this.reconnectionHandler.resetAttempts();
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           resolve();
         };
         
         this.websocket.onerror = (error) => {
           console.error("WebSocket connection error:", error);
           this.connectionState.setConnected(false);
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           reject(error);
           this.reconnectionHandler.tryReconnect();
         };
@@ -70,7 +89,7 @@ export class WebSocketManager {
         this.websocket.onclose = (event) => {
           console.log("WebSocket connection closed:", event.code, event.reason);
           this.connectionState.setConnected(false);
-          clearTimeout(timeout);
+          clearTimeout(timeoutId);
           
           // Don't reconnect if it was a normal closure
           if (event.code !== 1000) {

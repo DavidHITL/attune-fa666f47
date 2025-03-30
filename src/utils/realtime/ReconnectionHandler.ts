@@ -4,7 +4,7 @@
  */
 export class ReconnectionHandler {
   private reconnectAttempts: number = 0;
-  private readonly maxReconnectAttempts: number = 3;
+  private readonly maxReconnectAttempts: number = 10; // Increased from 3 to 10
   private reconnectTimeout: number | null = null;
   private onReconnect: () => Promise<void>;
 
@@ -21,13 +21,19 @@ export class ReconnectionHandler {
       return;
     }
     
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    const delay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 30000);
     console.log(`Attempting to reconnect in ${delay / 1000} seconds...`);
     
     this.reconnectAttempts++;
     this.reconnectTimeout = window.setTimeout(() => {
       console.log(`Reconnection attempt ${this.reconnectAttempts} of ${this.maxReconnectAttempts}`);
-      this.onReconnect().catch(err => console.error("Reconnection failed:", err));
+      this.onReconnect().catch(err => {
+        console.error("Reconnection failed:", err);
+        // Continue trying to reconnect unless max attempts reached
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.tryReconnect();
+        }
+      });
     }, delay);
   }
 
