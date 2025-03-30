@@ -1,6 +1,6 @@
 
 import React from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,13 +35,9 @@ type FormData = z.infer<typeof formSchema>;
 const SignUp: React.FC = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  // Get the redirect path from location state or default to "/you"
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/you";
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -57,25 +53,20 @@ const SignUp: React.FC = () => {
     setError(null);
 
     try {
-      const { success, error } = await signUp(data.email, data.password);
+      console.log("Starting signup process for:", data.email);
+      const { success, error, profileError } = await signUp(data.email, data.password);
       
       if (success) {
+        console.log("Signup successful, navigating to signin page");
         toast({
-          title: "Account created",
-          description: "Your account has been created successfully. Welcome to Attune!",
+          title: "Account created successfully",
+          description: "Please sign in with your new credentials",
         });
-        navigate("/you", { replace: true });
+        // Always redirect to sign-in page after successful account creation
+        navigate("/signin", { replace: true });
       } else if (error) {
-        // If it's the database error we know about, redirect to signin
-        if (error.message.includes("Database error saving new user")) {
-          toast({
-            title: "Account created",
-            description: "Your account was created, but we had trouble setting up your profile. Please sign in to continue.",
-          });
-          navigate("/signin", { replace: true });
-        } else {
-          setError(error.message);
-        }
+        console.error("Signup error:", error.message);
+        setError(error.message);
       }
     } catch (unexpectedError) {
       console.error("Unexpected error during signup:", unexpectedError);
@@ -115,6 +106,7 @@ const SignUp: React.FC = () => {
                         placeholder="you@example.com"
                         type="email"
                         {...field}
+                        autoComplete="email"
                       />
                     </FormControl>
                     <FormMessage />
@@ -133,6 +125,7 @@ const SignUp: React.FC = () => {
                         placeholder="•••••••••••"
                         type="password"
                         {...field}
+                        autoComplete="new-password"
                       />
                     </FormControl>
                     <FormMessage />
@@ -151,6 +144,7 @@ const SignUp: React.FC = () => {
                         placeholder="•••••••••••"
                         type="password"
                         {...field}
+                        autoComplete="new-password"
                       />
                     </FormControl>
                     <FormMessage />

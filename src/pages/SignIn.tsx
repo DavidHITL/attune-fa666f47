@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import LandingNavBar from "@/components/LandingNavBar";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -29,6 +30,7 @@ const SignIn: React.FC = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -47,15 +49,36 @@ const SignIn: React.FC = () => {
     setIsSubmitting(true);
     setError(null);
 
-    const { success, error } = await signIn(data.email, data.password);
-    
-    if (success) {
-      navigate(from, { replace: true });
-    } else if (error) {
-      setError(error.message);
+    try {
+      console.log("Attempting to sign in with:", data.email);
+      const { success, error } = await signIn(data.email, data.password);
+      
+      if (success) {
+        console.log("Login successful, navigating to:", from);
+        toast({
+          title: "Welcome back",
+          description: "You have successfully signed in",
+        });
+        navigate(from, { replace: true });
+      } else if (error) {
+        console.error("Login error:", error.message);
+        setError(error.message);
+        
+        // Check if the error might be due to an unconfirmed email
+        if (error.message.includes("Invalid login credentials")) {
+          toast({
+            title: "Login failed",
+            description: "Please check your email and password. If you just created your account, try signing up again.",
+            variant: "destructive"
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Unexpected error during sign in:", err);
+      setError("An unexpected error occurred. Please try again later.");
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
   };
 
   return (
@@ -88,6 +111,7 @@ const SignIn: React.FC = () => {
                         placeholder="you@example.com"
                         type="email"
                         {...field}
+                        autoComplete="email"
                       />
                     </FormControl>
                     <FormMessage />
@@ -106,6 +130,7 @@ const SignIn: React.FC = () => {
                         placeholder="•••••••••••"
                         type="password"
                         {...field}
+                        autoComplete="current-password"
                       />
                     </FormControl>
                     <FormMessage />
