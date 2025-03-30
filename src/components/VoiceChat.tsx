@@ -35,7 +35,7 @@ export function VoiceChat({
     chatRef
   });
   return <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col items-center justify-between p-8">
+      <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col items-center justify-between">
         <DialogHeader className="w-full">
           <div className="flex justify-between items-center w-full">
             <DialogTitle className="text-lg font-medium">Voice Conversation</DialogTitle>
@@ -49,9 +49,7 @@ export function VoiceChat({
         <div className="flex-1 flex flex-col items-center justify-center w-full">
           <VoiceVisualization isActive={connectionStatus === 'connected'} className="mb-8" />
           
-          <p className="text-center text-lg text-gray-700 dark:text-gray-300 max-w-md mb-8">
-            Speak naturally with the AI assistant or click the button below to return to text chat.
-          </p>
+          
         </div>
         
         <div className="w-full space-y-4">
