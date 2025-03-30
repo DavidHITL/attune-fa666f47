@@ -19,40 +19,40 @@ interface UserProfileData {
   retaliation_value: number | null;
   withdrawal_value: number | null;
 }
-
 const You: React.FC = () => {
-  const { user, signOut } = useAuth();
+  const {
+    user,
+    signOut
+  } = useAuth();
   const navigate = useNavigate();
-
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
   };
 
   // Fetch user profile data from Supabase
-  const { data: profileData, isLoading, error } = useQuery({
+  const {
+    data: profileData,
+    isLoading,
+    error
+  } = useQuery({
     queryKey: ['userProfile', user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error("User not authenticated");
-      
-      const { data, error } = await supabase
-        .from('users_profile')
-        .select('beingright_value, unbridledselfexpression_value, controlling_value, retaliation_value, withdrawal_value')
-        .eq('user_id', user.id)
-        .single();
-
+      const {
+        data,
+        error
+      } = await supabase.from('users_profile').select('beingright_value, unbridledselfexpression_value, controlling_value, retaliation_value, withdrawal_value').eq('user_id', user.id).single();
       if (error) throw error;
       return data as UserProfileData;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id
   });
-
-  return (
-    <div className="flex flex-col min-h-screen">
+  return <div className="flex flex-col min-h-screen">
       <NavBar />
       <div className="flex-1 flex justify-center">
         <div className="max-w-4xl w-full py-8 px-4 flex flex-col space-y-6">
-          <h1 className="text-2xl font-semibold mb-6 mt-4">Your Dashboard</h1>
+          
           
           {/* Chat Sessions Left */}
           <div className="mt-2">
@@ -76,11 +76,7 @@ const You: React.FC = () => {
           
           {/* Sign Out */}
           <div className="mt-8 mb-6 flex justify-center">
-            <Button 
-              variant="outline" 
-              onClick={handleSignOut}
-              className="text-apple-gray hover:text-apple-red hover:bg-apple-gray-6 flex items-center gap-2"
-            >
+            <Button variant="outline" onClick={handleSignOut} className="text-apple-gray hover:text-apple-red hover:bg-apple-gray-6 flex items-center gap-2">
               <LogOut size={18} />
               Sign Out
             </Button>
@@ -91,8 +87,6 @@ const You: React.FC = () => {
         Attune<br />
         Napkin LLC — Zurich
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default You;
