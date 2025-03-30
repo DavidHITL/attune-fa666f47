@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import LandingNavBar from "@/components/LandingNavBar";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -35,6 +36,7 @@ const SignUp: React.FC = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -54,15 +56,29 @@ const SignUp: React.FC = () => {
     setIsSubmitting(true);
     setError(null);
 
-    const { success, error } = await signUp(data.email, data.password);
-    
-    if (success) {
-      navigate("/you", { replace: true });
-    } else if (error) {
-      setError(error.message);
+    try {
+      const { success, error } = await signUp(data.email, data.password);
+      
+      if (success) {
+        toast({
+          title: "Account created",
+          description: "Your account has been created successfully. Welcome to Attune!",
+        });
+        navigate("/you", { replace: true });
+      } else if (error) {
+        // If it's the database error we know about, give a more friendly message
+        if (error.message.includes("Database error saving new user")) {
+          setError("We had trouble setting up your profile, but your account was created. Please try signing in.");
+        } else {
+          setError(error.message);
+        }
+      }
+    } catch (unexpectedError) {
+      console.error("Unexpected error during signup:", unexpectedError);
+      setError("An unexpected error occurred. Please try again later.");
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
   };
 
   return (
