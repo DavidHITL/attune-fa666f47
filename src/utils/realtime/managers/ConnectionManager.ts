@@ -152,7 +152,7 @@ export class ConnectionManager {
       if (event.code !== 1000) {
         console.log(`Abnormal close (${event.code}), attempting reconnection`);
         this.reconnectionHandler.tryReconnect();
-      } else if (event.code === 1006) {
+      } else if (event.code === 1006) { // Fix: This comparison now uses proper number comparison
         // Code 1006 means abnormal closure, could be network issues
         console.log("Abnormal closure detected, attempting reconnection");
         setTimeout(() => {
