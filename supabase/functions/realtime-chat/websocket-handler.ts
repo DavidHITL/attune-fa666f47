@@ -31,10 +31,22 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
       // For now we'll just log its presence since we disabled JWT verification
     }
     
+    // Extract any requested WebSocket subprotocol
+    const protocolHeader = req.headers.get("sec-websocket-protocol");
+    const requestedProtocols = protocolHeader ? protocolHeader.split(",").map(p => p.trim()) : undefined;
+    
+    if (requestedProtocols && requestedProtocols.length > 0) {
+      console.log("Client requested WebSocket subprotocols:", requestedProtocols);
+    }
+    
     try {
-      // Upgrade the connection to WebSocket
-      const upgradeResult = Deno.upgradeWebSocket(req);
-      console.log("WebSocket upgrade successful");
+      // Upgrade the connection to WebSocket, passing along any requested protocols
+      const upgradeResult = Deno.upgradeWebSocket(req, {
+        protocol: requestedProtocols ? requestedProtocols[0] : undefined
+      });
+      
+      console.log("WebSocket upgrade successful" + 
+                 (upgradeResult.socket.protocol ? ` with protocol: ${upgradeResult.socket.protocol}` : ""));
       
       const { socket, response } = upgradeResult;
       const OPENAI_API_KEY = getOpenAIApiKey();
