@@ -55,7 +55,8 @@ export class ConnectionManager {
           this.websocket = new WebSocket(wsUrl);
           this.websocket.binaryType = "arraybuffer";
           
-          const timeoutId = setTimeout(() => {
+          // Use window.setTimeout to ensure correct type
+          const timeoutId = window.setTimeout(() => {
             if (!this.connectionState.isConnected()) {
               console.error("WebSocket connection timeout after", this.connectionTimeout, "ms");
               if (this.websocket) {
@@ -112,7 +113,7 @@ export class ConnectionManager {
       console.log("WebSocket connection established successfully");
       this.connectionState.setConnected(true);
       this.reconnectionHandler.resetAttempts();
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       
       if (this.openPromiseResolve) {
         this.openPromiseResolve();
@@ -124,7 +125,7 @@ export class ConnectionManager {
     this.websocket.onerror = (error) => {
       console.error("WebSocket connection error:", error);
       this.connectionState.setConnected(false);
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       
       if (this.openPromiseReject) {
         this.openPromiseReject(error);
@@ -140,7 +141,7 @@ export class ConnectionManager {
     this.websocket.onclose = (event) => {
       console.log("WebSocket connection closed:", event.code, event.reason);
       this.connectionState.setConnected(false);
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       
       if (this.openPromiseReject) {
         this.openPromiseReject(new Error(`Connection closed: ${event.code} ${event.reason}`));

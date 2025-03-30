@@ -43,7 +43,7 @@ export class ReconnectionHandler {
     this.isReconnecting = true;
     this.reconnectAttempts++;
     
-    // Fix: Use window.setTimeout to ensure number type compatibility
+    // Use window.setTimeout to ensure correct number type
     this.reconnectTimeout = window.setTimeout(async () => {
       console.log(`Executing reconnection attempt ${this.reconnectAttempts} of ${this.maxReconnectAttempts}`);
       
