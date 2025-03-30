@@ -48,6 +48,22 @@ export class WebSocketManager {
           }
         }
         
+        // Get auth token if available from Supabase
+        let authHeaders = {};
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          const { data } = await supabase.auth.getSession();
+          
+          if (data.session?.access_token) {
+            console.log("[Managers/WebSocketManager] Adding auth token to connection");
+            // Add token to URL as a query parameter
+            const separator = this.wsUrl.includes('?') ? '&' : '?';
+            this.wsUrl = `${this.wsUrl}${separator}token=${data.session.access_token}`;
+          }
+        } catch (error) {
+          console.warn("[Managers/WebSocketManager] Could not get auth token:", error);
+        }
+        
         // Create new connection
         this.websocket = new WebSocket(this.wsUrl);
         

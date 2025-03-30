@@ -21,6 +21,16 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
       });
     }
     
+    // Extract authentication token from URL if present
+    const url = new URL(req.url);
+    const token = url.searchParams.get('token');
+    
+    if (token) {
+      console.log("Authentication token provided in WebSocket connection");
+      // You can validate the token here if needed
+      // For now we'll just log its presence since we disabled JWT verification
+    }
+    
     try {
       // Upgrade the connection to WebSocket
       const upgradeResult = Deno.upgradeWebSocket(req);

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, RefObject } from "react";
 import { RealtimeChat } from "@/utils/RealtimeAudio";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UseVoiceChatConnectionProps {
   open: boolean;
@@ -25,12 +26,20 @@ export function useVoiceChatConnection({
   // Handle connection
   useEffect(() => {
     if (open && !hasAttemptedConnection.current) {
-      const initConnection = async () => {
+      const checkAuthAndConnect = async () => {
         hasAttemptedConnection.current = true;
         setConnectionStatus('connecting');
         setIsConnecting(true);
         
         try {
+          // Check for existing session
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (!session) {
+            console.warn("[useVoiceChatConnection] No active session found, but continuing with connection attempt");
+            // We continue anyway since we've disabled JWT verification
+          }
+          
           await connect();
           setConnectionStatus('connected');
           toast.success("Connected to OpenAI GPT-4o Realtime API");
@@ -56,7 +65,7 @@ export function useVoiceChatConnection({
         }
       };
       
-      initConnection();
+      checkAuthAndConnect();
     }
     
     // Cleanup on dialog close
