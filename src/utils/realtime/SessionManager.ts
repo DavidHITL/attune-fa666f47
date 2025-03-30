@@ -1,53 +1,42 @@
 
-import { WebSocketManager } from './WebSocketManager';
-import { SessionConfig } from './types';
+import { WebSocketManager } from './managers/WebSocketManager';
 
 /**
- * Manages session configuration and settings
+ * Manages realtime chat sessions
  */
 export class SessionManager {
-  private websocketManager: WebSocketManager;
-
-  constructor(websocketManager: WebSocketManager) {
-    this.websocketManager = websocketManager;
-  }
-
   /**
-   * Configure session settings
+   * Configures the session with optimal settings
    */
-  configureSession(): boolean {
-    if (!this.websocketManager || !this.websocketManager.isConnected) {
-      console.error("Cannot configure session: WebSocket not connected");
-      return false;
-    }
-    
+  configureSession(webSocketManager: WebSocketManager): boolean {
     try {
-      console.log("Configuring session for OpenAI GPT-4o...");
-      
-      const sessionConfig: SessionConfig = {
-        "event_id": "config_event",
-        "type": "session.update",
-        "session": {
-          "modalities": ["text", "audio"],
-          "instructions": "You are a helpful voice assistant that speaks naturally with users. Keep responses concise and conversational. You're using the GPT-4o model with advanced reasoning capabilities.",
-          "voice": "alloy",
-          "input_audio_format": "pcm16",
-          "output_audio_format": "pcm16",
-          "input_audio_transcription": {
-            "model": "whisper-1"
+      console.log("Configuring voice session with optimal settings");
+
+      // Configure session with audio settings for optimal experience
+      const sessionConfig = {
+        type: "session.update",
+        session: {
+          modalities: ["text", "audio"],
+          input_audio_format: "pcm16",
+          output_audio_format: "pcm16",
+          turn_detection: {
+            type: "server_vad", // Use server-side voice activity detection
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 1000
           },
-          "turn_detection": {
-            "type": "server_vad",
-            "threshold": 0.5,
-            "prefix_padding_ms": 300,
-            "silence_duration_ms": 1000
-          },
-          "temperature": 0.8,
-          "max_response_output_tokens": 150
+          temperature: 0.7,
+          max_response_output_tokens: "inf"
         }
       };
       
-      return this.websocketManager.configureSession(sessionConfig);
+      if (!webSocketManager || !webSocketManager.send) {
+        console.error("WebSocketManager not available or not properly initialized");
+        return false;
+      }
+      
+      // Send configuration to the server
+      return webSocketManager.send(sessionConfig);
     } catch (error) {
       console.error("Failed to configure session:", error);
       return false;

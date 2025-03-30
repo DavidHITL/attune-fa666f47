@@ -1,5 +1,5 @@
 
-import { WebSocketManager } from './WebSocketManager';
+import { WebSocketManager } from './managers/WebSocketManager';
 import { EventEmitter } from './EventEmitter';
 import { ChatError, ErrorType } from './types';
 
@@ -26,7 +26,7 @@ export class MessageHandler {
    * Set up WebSocket message handlers
    */
   setupMessageHandlers(): void {
-    this.websocketManager.setMessageHandler(async (event) => {
+    this.websocketManager.setMessageHandler((event) => {
       try {
         const data = JSON.parse(event.data);
         console.log("Received WebSocket message:", data.type);
@@ -92,8 +92,8 @@ export class MessageHandler {
       return false;
     }
     
-    if (!this.websocketManager.checkConnection()) {
-      const errorMsg = "WebSocket not connected";
+    if (!this.websocketManager) {
+      const errorMsg = "WebSocketManager not available";
       console.error(errorMsg);
       
       const chatError: ChatError = {
@@ -140,8 +140,8 @@ export class MessageHandler {
       return false;
     }
     
-    if (!this.websocketManager.checkConnection()) {
-      console.warn("Cannot send speech data: WebSocket not connected");
+    if (!this.websocketManager) {
+      console.warn("Cannot send speech data: WebSocketManager not available");
       return false;
     }
     

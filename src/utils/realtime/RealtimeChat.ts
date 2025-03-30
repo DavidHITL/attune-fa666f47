@@ -1,7 +1,7 @@
 
 import { TranscriptCallback, ChatError, ErrorType } from './types';
 import { EventEmitter } from './EventEmitter';
-import { ConnectionManager } from './ConnectionManager';
+import { ConnectionManager } from './managers/ConnectionManager';
 import { SessionManager } from './SessionManager';
 import { AudioHandler } from './AudioHandler';
 import { MessageHandler } from './MessageHandler';
@@ -29,13 +29,17 @@ export class RealtimeChat {
     // Create connection manager with reconnect function
     this.connectionManager = new ConnectionManager(
       projectId, 
+      this.eventEmitter,
       () => this.connect()
     );
     
-    const websocketManager = this.connectionManager.getWebSocketManager();
-    this.sessionManager = new SessionManager(websocketManager);
+    this.sessionManager = new SessionManager();
     this.audioHandler = new AudioHandler(this.eventEmitter);
-    this.messageHandler = new MessageHandler(websocketManager, this.eventEmitter, transcriptCallback);
+    this.messageHandler = new MessageHandler(
+      this.connectionManager.getWebSocketManager(),
+      this.eventEmitter, 
+      transcriptCallback
+    );
     
     // Set up event listeners
     this.setupEventListeners();
@@ -52,12 +56,16 @@ export class RealtimeChat {
     
     // Handle session creation
     this.eventEmitter.addEventListener('session.created', () => {
-      this.sessionManager.configureSession();
+      this.sessionManager.configureSession(this.connectionManager.getWebSocketManager());
     });
     
     // Update connection status
     this.eventEmitter.addEventListener('connected', () => {
       this.isConnected = true;
+    });
+    
+    this.eventEmitter.addEventListener('disconnected', () => {
+      this.isConnected = false;
     });
     
     // Handle connection errors
@@ -75,7 +83,7 @@ export class RealtimeChat {
       
       // Connect to WebSocket
       await this.connectionManager.connect();
-      this.isConnected = this.connectionManager.isConnected;
+      this.isConnected = this.connectionManager.isConnected();
       
       if (this.isConnected) {
         console.log("RealtimeChat: Connection successful");
@@ -108,7 +116,7 @@ export class RealtimeChat {
     
     // Check connection and attempt reconnect if needed
     if (!this.connectionManager.checkConnection()) {
-      this.connectionManager.handleReconnection();
+      this.connectionManager.tryReconnect();
       return;
     }
     

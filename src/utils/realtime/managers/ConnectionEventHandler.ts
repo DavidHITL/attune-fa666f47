@@ -2,6 +2,7 @@
 import { WebSocketManager } from './WebSocketManager';
 import { ConnectionState } from './ConnectionState';
 import { ReconnectionHandler } from '../ReconnectionHandler';
+import { EventEmitter } from '../EventEmitter';
 
 /**
  * Handles WebSocket connection events
@@ -10,15 +11,18 @@ export class ConnectionEventHandler {
   private webSocketManager: WebSocketManager;
   private connectionState: ConnectionState;
   private reconnectionHandler: ReconnectionHandler;
+  private eventEmitter: EventEmitter;
   
   constructor(
     webSocketManager: WebSocketManager,
     connectionState: ConnectionState,
-    reconnectionHandler: ReconnectionHandler
+    reconnectionHandler: ReconnectionHandler,
+    eventEmitter: EventEmitter
   ) {
     this.webSocketManager = webSocketManager;
     this.connectionState = connectionState;
     this.reconnectionHandler = reconnectionHandler;
+    this.eventEmitter = eventEmitter;
   }
 
   /**
@@ -32,6 +36,9 @@ export class ConnectionEventHandler {
       window.clearTimeout(timeoutId);
       
       this.webSocketManager.resolveOpenPromise();
+      
+      // Dispatch connected event
+      this.eventEmitter.dispatchEvent('connected', { status: "connected" });
     };
     
     websocket.onerror = (error) => {
@@ -40,6 +47,13 @@ export class ConnectionEventHandler {
       window.clearTimeout(timeoutId);
       
       this.webSocketManager.rejectOpenPromise(error);
+      
+      // Dispatch error event
+      this.eventEmitter.dispatchEvent('error', {
+        type: 'connection',
+        message: 'WebSocket connection error',
+        error
+      });
       
       // Gentler approach to reconnection - don't immediately discard on error
       // This will allow the onclose handler to attempt reconnection
@@ -54,6 +68,12 @@ export class ConnectionEventHandler {
       this.webSocketManager.rejectOpenPromise(
         new Error(`Connection closed: ${event.code} ${event.reason}`)
       );
+      
+      // Dispatch disconnected event
+      this.eventEmitter.dispatchEvent('disconnected', {
+        code: event.code,
+        reason: event.reason
+      });
       
       // Always attempt reconnection except for normal closure
       const normalCloseCode = 1000;
@@ -70,6 +90,20 @@ export class ConnectionEventHandler {
             this.reconnectionHandler.tryReconnect();
           }
         }, 2000); // Add a small delay before reconnection attempt
+      }
+    };
+    
+    websocket.onmessage = (event) => {
+      try {
+        // Forward the message to any listeners
+        this.eventEmitter.dispatchEvent('message', event.data);
+      } catch (error) {
+        console.error("Error processing WebSocket message:", error);
+        this.eventEmitter.dispatchEvent('error', {
+          type: 'message',
+          message: 'Error processing WebSocket message',
+          error
+        });
       }
     };
   }

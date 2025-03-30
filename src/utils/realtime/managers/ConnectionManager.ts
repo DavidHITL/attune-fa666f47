@@ -3,6 +3,7 @@ import { ConnectionState } from './ConnectionState';
 import { WebSocketManager } from './WebSocketManager';
 import { ConnectionEventHandler } from './ConnectionEventHandler';
 import { ReconnectionHandler } from '../ReconnectionHandler';
+import { EventEmitter } from '../EventEmitter';
 
 /**
  * Manages WebSocket connections and reconnection logic
@@ -13,16 +14,19 @@ export class ConnectionManager {
   private connectionEventHandler: ConnectionEventHandler;
   private reconnectionHandler: ReconnectionHandler;
   private projectId: string;
+  private eventEmitter: EventEmitter;
   
-  constructor(projectId: string, onReconnect: () => Promise<void>) {
+  constructor(projectId: string, eventEmitter: EventEmitter, onReconnect: () => Promise<void>) {
     this.projectId = projectId;
+    this.eventEmitter = eventEmitter;
     this.webSocketManager = new WebSocketManager();
     this.connectionState = new ConnectionState();
     this.reconnectionHandler = new ReconnectionHandler(onReconnect);
     this.connectionEventHandler = new ConnectionEventHandler(
       this.webSocketManager,
       this.connectionState,
-      this.reconnectionHandler
+      this.reconnectionHandler,
+      this.eventEmitter
     );
   }
 
@@ -46,6 +50,14 @@ export class ConnectionManager {
       console.error("Failed to connect:", error);
       this.connectionState.setConnected(false);
       this.reconnectionHandler.tryReconnect();
+      
+      // Dispatch error event
+      this.eventEmitter.dispatchEvent('error', {
+        type: 'connection',
+        message: 'Failed to connect to WebSocket',
+        error
+      });
+      
       throw error;
     }
   }
@@ -65,6 +77,13 @@ export class ConnectionManager {
    */
   getWebSocket(): WebSocket | null {
     return this.webSocketManager.getWebSocket();
+  }
+  
+  /**
+   * Get the WebSocket manager
+   */
+  getWebSocketManager(): WebSocketManager {
+    return this.webSocketManager;
   }
   
   /**
