@@ -30,10 +30,13 @@ const VoiceMessageList: React.FC<VoiceMessageListProps> = ({ messages, transcrip
         ))
       )}
       
-      {transcript && (
+      {transcript && transcript.trim() && (
         <div className="text-right mb-4">
-          <div className="inline-block px-4 py-2 rounded-lg bg-blue-500 text-white rounded-br-none">
+          <div className="inline-block px-4 py-2 rounded-lg bg-blue-100 text-blue-800 rounded-br-none">
             {transcript}
+            <div className="text-xs text-blue-500 mt-1">
+              Typing...
+            </div>
           </div>
         </div>
       )}

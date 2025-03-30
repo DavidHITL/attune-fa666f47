@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -26,58 +26,118 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // For demo purposes, use the Web Speech API
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+  // Speech recognition setup
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
+  // Initialize speech recognition
   useEffect(() => {
-    if (recognition) {
-      recognition.continuous = true;
-      recognition.interimResults = true;
+    console.log("[VoiceChat] Initializing speech recognition");
+    
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       
-      recognition.onresult = (event) => {
-        const current = event.resultIndex;
-        const result = event.results[current];
-        const transcript = result[0].transcript;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        const recognition = recognitionRef.current;
         
-        if (result.isFinal) {
-          setTranscript(prevTranscript => prevTranscript + " " + transcript);
-        } else {
-          // Update with interim result
-          setTranscript(prevTranscript => prevTranscript + " " + transcript);
-        }
-      };
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        
+        recognition.onresult = (event) => {
+          const current = event.resultIndex;
+          const result = event.results[current];
+          const transcript = result[0].transcript;
+          
+          console.log("[VoiceChat] Speech recognition result:", transcript);
+          
+          if (result.isFinal) {
+            setTranscript(prevTranscript => prevTranscript + " " + transcript);
+          } else {
+            // Update with interim result
+            setTranscript(prevTranscript => prevTranscript + " " + transcript);
+          }
+        };
 
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
-        setIsRecording(false);
-        toast.error("Error with speech recognition");
-      };
+        recognition.onerror = (event) => {
+          console.error("[VoiceChat] Speech recognition error", event.error);
+          setIsRecording(false);
+          toast.error("Error with speech recognition: " + event.error);
+        };
 
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
+        recognition.onend = () => {
+          console.log("[VoiceChat] Speech recognition ended");
+          setIsRecording(false);
+        };
+      } else {
+        console.warn("[VoiceChat] Speech recognition not supported in this browser");
+      }
     }
 
     return () => {
-      if (recognition) {
+      if (recognitionRef.current) {
+        console.log("[VoiceChat] Cleaning up speech recognition");
         try {
-          recognition.stop();
+          recognitionRef.current.stop();
         } catch (error) {
-          console.error("Error stopping recognition", error);
+          console.error("[VoiceChat] Error stopping recognition", error);
         }
       }
     };
-  }, []);
+  }, [open]);
+
+  // Load previous messages when opened
+  useEffect(() => {
+    if (open && user) {
+      console.log("[VoiceChat] Dialog opened, loading messages");
+      loadMessages();
+    }
+  }, [open, user]);
+
+  const loadMessages = async () => {
+    try {
+      if (!user) return;
+      
+      console.log("[VoiceChat] Loading messages for user:", user.id);
+      
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(50);
+      
+      if (error) {
+        console.error("[VoiceChat] Error loading messages:", error);
+        toast.error("Failed to load messages");
+        return;
+      }
+      
+      console.log("[VoiceChat] Loaded messages:", data?.length || 0);
+      
+      if (data && data.length > 0) {
+        const formattedMessages = data.map(msg => ({
+          role: msg.sender_type === 'user' ? 'user' : 'assistant' as 'user' | 'assistant',
+          text: msg.content || '',
+          timestamp: new Date(msg.created_at)
+        }));
+        
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error("[VoiceChat] Error in loadMessages:", error);
+      toast.error("Failed to load messages");
+    }
+  };
 
   const startRecording = () => {
-    if (recognition) {
+    if (recognitionRef.current) {
       try {
-        recognition.start();
+        console.log("[VoiceChat] Starting speech recognition");
+        recognitionRef.current.start();
         setIsRecording(true);
         toast.info("Listening...");
       } catch (error) {
-        console.error("Error starting speech recognition", error);
+        console.error("[VoiceChat] Error starting speech recognition", error);
         toast.error("Couldn't start speech recognition");
       }
     } else {
@@ -86,8 +146,9 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
   };
 
   const stopRecording = () => {
-    if (recognition) {
-      recognition.stop();
+    if (recognitionRef.current) {
+      console.log("[VoiceChat] Stopping speech recognition");
+      recognitionRef.current.stop();
       setIsRecording(false);
     }
   };
@@ -96,6 +157,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
   const saveMessageToDatabase = async (text: string, isUser: boolean) => {
     try {
       if (!user) return;
+      
+      console.log("[VoiceChat] Saving message to database:", isUser ? "user" : "assistant");
       
       const { data, error } = await supabase
         .from('messages')
@@ -107,21 +170,26 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
         .select();
       
       if (error) {
-        console.error("Error saving voice message to database:", error);
+        console.error("[VoiceChat] Error saving message to database:", error);
         throw error;
       }
       
+      console.log("[VoiceChat] Message saved successfully:", data?.[0]?.id);
       return data?.[0]?.id;
     } catch (error) {
-      console.error("Failed to save voice message:", error);
+      console.error("[VoiceChat] Failed to save message:", error);
       return null;
     }
   };
 
   const sendMessage = async () => {
-    if (!transcript.trim()) return;
+    if (!transcript.trim()) {
+      console.log("[VoiceChat] No transcript to send");
+      return;
+    }
 
     const currentTranscript = transcript.trim();
+    console.log("[VoiceChat] Sending message:", currentTranscript);
 
     // Add user message to chat
     setMessages(prev => [...prev, { 
@@ -143,6 +211,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
     setTimeout(async () => {
       const aiResponse = `I received your message: "${currentTranscript}". This is a simulated response since the realtime chat feature is currently being rebuilt.`;
       
+      console.log("[VoiceChat] Simulated AI response:", aiResponse);
+      
       // Add AI response to messages
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -161,6 +231,12 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
     stopRecording();
     setTranscript("");
     onOpenChange(false);
+  };
+
+  const handleAudioData = (audioData: Float32Array) => {
+    // This function would normally process audio data
+    // For now it's just a placeholder
+    console.log("[VoiceChat] Received audio data, length:", audioData.length);
   };
 
   return (
@@ -184,8 +260,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ open, onOpenChange }) => {
             setTranscript={setTranscript}
             onSend={sendMessage}
             isRecording={isRecording}
-            startRecording={recognition ? startRecording : undefined}
-            stopRecording={recognition ? stopRecording : undefined}
+            startRecording={startRecording}
+            stopRecording={stopRecording}
           />
         </div>
         
