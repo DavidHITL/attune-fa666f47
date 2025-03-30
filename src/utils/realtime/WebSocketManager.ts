@@ -11,7 +11,10 @@ export class WebSocketManager {
   private projectId: string;
   private connectionState: ConnectionState;
   private reconnectionHandler: ReconnectionHandler;
-  private connectionTimeout: number = 15000; // 15 second timeout
+  private connectionTimeout: number = 20000; // Increased from 15 to 20 second timeout
+  private openPromise: Promise<void> | null = null;
+  private openPromiseResolve: (() => void) | null = null;
+  private openPromiseReject: ((reason?: any) => void) | null = null;
   
   constructor(projectId: string) {
     this.projectId = projectId;
@@ -31,6 +34,12 @@ export class WebSocketManager {
    */
   async connect(): Promise<void> {
     try {
+      // Don't attempt multiple connections simultaneously
+      if (this.openPromise) {
+        console.log("Connection already in progress, returning existing promise");
+        return this.openPromise;
+      }
+      
       this.reconnectionHandler.clearTimeout();
       
       // Close any existing connection first
@@ -43,60 +52,114 @@ export class WebSocketManager {
         this.websocket = null;
       }
       
-      // Use direct URL with HTTPS protocol to ensure proper connection
-      const wsUrl = `wss://${this.projectId}.functions.supabase.co/realtime-chat`;
-      console.log("Connecting to WebSocket:", wsUrl);
-      
-      this.websocket = new WebSocket(wsUrl);
-      
-      return new Promise<void>((resolve, reject) => {
-        if (!this.websocket) {
-          reject(new Error("Failed to create WebSocket"));
-          return;
-        }
+      // Create a new promise for this connection attempt
+      this.openPromise = new Promise<void>((resolve, reject) => {
+        this.openPromiseResolve = resolve;
+        this.openPromiseReject = reject;
         
-        const timeoutId = setTimeout(() => {
-          if (!this.connectionState.isConnected()) {
-            console.error("WebSocket connection timeout");
-            if (this.websocket) {
-              try {
-                this.websocket.close();
-              } catch (err) {
-                console.warn("Error closing WebSocket after timeout:", err);
-              }
-            }
-            reject(new Error("Connection timeout"));
-            this.reconnectionHandler.tryReconnect();
-          }
-        }, this.connectionTimeout);
-        
-        this.websocket.onopen = () => {
-          console.log("WebSocket connection established");
-          this.connectionState.setConnected(true);
-          this.reconnectionHandler.resetAttempts();
-          clearTimeout(timeoutId);
-          resolve();
-        };
-        
-        this.websocket.onerror = (error) => {
-          console.error("WebSocket connection error:", error);
-          this.connectionState.setConnected(false);
-          clearTimeout(timeoutId);
-          reject(error);
-          this.reconnectionHandler.tryReconnect();
-        };
-        
-        this.websocket.onclose = (event) => {
-          console.log("WebSocket connection closed:", event.code, event.reason);
-          this.connectionState.setConnected(false);
-          clearTimeout(timeoutId);
+        try {
+          // Use direct URL with HTTPS protocol to ensure proper connection
+          const wsUrl = `wss://${this.projectId}.functions.supabase.co/realtime-chat`;
+          console.log("Connecting to WebSocket:", wsUrl);
           
-          // Don't reconnect if it was a normal closure
-          if (event.code !== 1000) {
+          this.websocket = new WebSocket(wsUrl);
+          
+          const timeoutId = setTimeout(() => {
+            if (!this.connectionState.isConnected()) {
+              console.error("WebSocket connection timeout after", this.connectionTimeout, "ms");
+              if (this.websocket) {
+                try {
+                  this.websocket.close();
+                } catch (err) {
+                  console.warn("Error closing WebSocket after timeout:", err);
+                }
+              }
+              
+              if (this.openPromiseReject) {
+                this.openPromiseReject(new Error("Connection timeout"));
+              }
+              
+              // Reset the promise
+              this.openPromise = null;
+              this.openPromiseResolve = null;
+              this.openPromiseReject = null;
+              
+              // Attempt reconnection
+              this.reconnectionHandler.tryReconnect();
+            }
+          }, this.connectionTimeout);
+          
+          this.websocket.onopen = () => {
+            console.log("WebSocket connection established successfully");
+            this.connectionState.setConnected(true);
+            this.reconnectionHandler.resetAttempts();
+            clearTimeout(timeoutId);
+            
+            if (this.openPromiseResolve) {
+              this.openPromiseResolve();
+            }
+            
+            // Reset the promise
+            this.openPromise = null;
+            this.openPromiseResolve = null;
+            this.openPromiseReject = null;
+          };
+          
+          this.websocket.onerror = (error) => {
+            console.error("WebSocket connection error:", error);
+            this.connectionState.setConnected(false);
+            clearTimeout(timeoutId);
+            
+            if (this.openPromiseReject) {
+              this.openPromiseReject(error);
+            }
+            
+            // Reset the promise
+            this.openPromise = null;
+            this.openPromiseResolve = null;
+            this.openPromiseReject = null;
+            
             this.reconnectionHandler.tryReconnect();
+          };
+          
+          this.websocket.onclose = (event) => {
+            console.log("WebSocket connection closed:", event.code, event.reason);
+            this.connectionState.setConnected(false);
+            clearTimeout(timeoutId);
+            
+            // If promise is still pending, reject it
+            if (this.openPromiseReject) {
+              this.openPromiseReject(new Error(`Connection closed: ${event.code} ${event.reason}`));
+              
+              // Reset the promise
+              this.openPromise = null;
+              this.openPromiseResolve = null;
+              this.openPromiseReject = null;
+            }
+            
+            // Don't reconnect if it was a normal closure
+            if (event.code !== 1000) {
+              this.reconnectionHandler.tryReconnect();
+            }
+          };
+        } catch (error) {
+          console.error("Error creating WebSocket:", error);
+          
+          if (this.openPromiseReject) {
+            this.openPromiseReject(error);
           }
-        };
+          
+          // Reset the promise
+          this.openPromise = null;
+          this.openPromiseResolve = null;
+          this.openPromiseReject = null;
+          
+          this.reconnectionHandler.tryReconnect();
+          reject(error);
+        }
       });
+      
+      return this.openPromise;
     } catch (error) {
       console.error("Failed to connect:", error);
       this.connectionState.setConnected(false);
@@ -168,6 +231,11 @@ export class WebSocketManager {
     }
     this.connectionState.setConnected(false);
     this.reconnectionHandler.resetAttempts();
+    
+    // Clear any pending promises
+    this.openPromise = null;
+    this.openPromiseResolve = null;
+    this.openPromiseReject = null;
   }
   
   /**
