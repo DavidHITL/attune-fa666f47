@@ -14,6 +14,41 @@ export const authService = {
         return { error, success: false };
       }
 
+      // User created successfully in auth.users
+      // Now manually create a profile if the trigger failed
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData && userData.user) {
+          // Check if profile exists
+          const { data: existingProfile } = await supabase
+            .from('users_profile')
+            .select('*')
+            .eq('user_id', userData.user.id)
+            .single();
+            
+          // Only create a profile if it doesn't exist
+          if (!existingProfile) {
+            // Generate a random partner code manually instead of using gen_random_bytes
+            const partnerCode = Array.from(Array(12), () => Math.floor(Math.random() * 36).toString(36)).join('');
+            
+            const { error: profileError } = await supabase
+              .from('users_profile')
+              .insert({
+                user_id: userData.user.id,
+                partner_code: partnerCode,
+                message_count: 0
+              });
+              
+            if (profileError) {
+              console.warn("Failed to create user profile, but auth account was created:", profileError.message);
+            }
+          }
+        }
+      } catch (profileErr) {
+        // Even if profile creation fails, the user's auth account is created
+        console.warn("Error creating user profile, but auth account was created:", profileErr);
+      }
+
       console.log("Account created successfully");
       return { error: null, success: true };
     } catch (err) {
