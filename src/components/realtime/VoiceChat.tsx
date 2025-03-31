@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Mic, MicOff, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { saveMessage } from "@/services/messages/messageStorage";
+import { useAuth } from "@/context/AuthContext";
 
 interface VoiceChatProps {
   systemPrompt?: string;
@@ -19,6 +21,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
 }) => {
   const [textInput, setTextInput] = useState("");
   const [microphonePermission, setMicrophonePermission] = useState<PermissionState | null>(null);
+  const { user } = useAuth();
   
   const {
     isConnected,
@@ -88,12 +91,25 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   };
 
   // Handle form submission for text input
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!textInput.trim()) return;
     
     if (isConnected) {
+      // Save the text message to the database
+      if (user) {
+        try {
+          await saveMessage(textInput, true, { 
+            messageType: 'text',
+            instructions: systemPrompt
+          });
+        } catch (error) {
+          console.error("Failed to save text message:", error);
+        }
+      }
+      
+      // Send message via WebRTC
       sendTextMessage(textInput);
       setTextInput("");
     } else {

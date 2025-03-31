@@ -7,6 +7,7 @@ export interface WebRTCMessageHandlerOptions {
   onAudioData?: (base64Audio: string) => void;
   onAudioComplete?: () => void;
   onMessageReceived?: (message: WebRTCMessage) => void;
+  onFinalTranscript?: (transcript: string) => void;
 }
 
 /**
@@ -60,6 +61,12 @@ export class WebRTCMessageHandler {
         // Transcript is complete
         if (this.options.onTranscriptComplete) {
           this.options.onTranscriptComplete();
+          
+          // Notify about final transcript if callback is provided
+          if (this.options.onFinalTranscript && this.currentTranscript.trim()) {
+            this.options.onFinalTranscript(this.currentTranscript);
+          }
+          
           // Reset current transcript
           this.currentTranscript = "";
         }

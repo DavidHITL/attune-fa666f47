@@ -1,5 +1,7 @@
+
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
+import { MessageMetadata } from "@/hooks/useWebRTCConnection/types";
 
 export interface ChatMessage {
   role: string;
@@ -15,17 +17,26 @@ export const convertMessagesToApiFormat = (messages: Message[]): ChatMessage[] =
 };
 
 // Function to create a message object
-export const createMessageObject = (text: string, isUser: boolean): Message => {
+export const createMessageObject = (
+  text: string,
+  isUser: boolean,
+  metadata: Partial<MessageMetadata> = { messageType: 'text' }
+): Message => {
   return {
     id: Math.random().toString(36).substring(2, 15), // Generate a random ID
     text: text,
     isUser: isUser,
-    timestamp: new Date()
+    timestamp: new Date(),
+    messageType: metadata.messageType || 'text'
   };
 };
 
 // Function to save a message to the database
-export const saveMessage = async (text: string, isUser: boolean): Promise<string | null> => {
+export const saveMessage = async (
+  text: string, 
+  isUser: boolean,
+  metadata: Partial<MessageMetadata> = { messageType: 'text' }
+): Promise<string | null> => {
   try {
     // Get current user from session
     const { data: { session } } = await supabase.auth.getSession();
@@ -43,6 +54,9 @@ export const saveMessage = async (text: string, isUser: boolean): Promise<string
           user_id: userId,
           content: text,
           sender_type: isUser ? 'user' : 'bot',
+          message_type: metadata.messageType || 'text',
+          instructions: metadata.instructions,
+          knowledge_entries: metadata.knowledgeEntries
         },
       ])
       .select('id') // Only select the ID
@@ -99,7 +113,8 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
       id: msg.id.toString(),
       text: msg.content || '', // Map content to text
       isUser: msg.sender_type === 'user', // Map sender_type to isUser
-      timestamp: new Date(msg.created_at)
+      timestamp: new Date(msg.created_at),
+      messageType: msg.message_type || 'text'
     }));
 
     return messages;
@@ -113,7 +128,8 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
 export const callChatApi = async (
   message: string, 
   conversationHistory: ChatMessage[] = [], 
-  sessionProgress: number = 0
+  sessionProgress: number = 0,
+  metadata: Partial<MessageMetadata> = {}
 ) => {
   try {
     console.log(`Calling Supabase Edge Function with ${conversationHistory.length} messages`);
@@ -122,7 +138,8 @@ export const callChatApi = async (
       body: { 
         message, 
         conversationHistory,
-        sessionProgress
+        sessionProgress,
+        metadata
       }
     });
 

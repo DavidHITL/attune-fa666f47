@@ -30,3 +30,10 @@ export interface WebRTCConnectionActions {
 }
 
 export type WebRTCConnectionResult = WebRTCConnectionState & WebRTCConnectionActions;
+
+// Extended message types for storage
+export interface MessageMetadata {
+  messageType: 'text' | 'voice';
+  instructions?: string;
+  knowledgeEntries?: Record<string, any>[];
+}

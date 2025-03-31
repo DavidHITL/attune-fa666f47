@@ -110,6 +110,9 @@ export type Database = {
           content: string | null
           created_at: string
           id: number
+          instructions: string | null
+          knowledge_entries: Json | null
+          message_type: string | null
           partnership_id: string | null
           sender_type: string | null
           user_id: string | null
@@ -118,6 +121,9 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: number
+          instructions?: string | null
+          knowledge_entries?: Json | null
+          message_type?: string | null
           partnership_id?: string | null
           sender_type?: string | null
           user_id?: string | null
@@ -126,6 +132,9 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: number
+          instructions?: string | null
+          knowledge_entries?: Json | null
+          message_type?: string | null
           partnership_id?: string | null
           sender_type?: string | null
           user_id?: string | null

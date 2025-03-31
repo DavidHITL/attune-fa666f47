@@ -1,8 +1,10 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
 import { WebRTCMessage } from "../useWebRTCConnection";
+import { saveMessage } from "@/services/messages/messageStorage";
+import { useAuth } from "@/context/AuthContext";
 
 export function useAudioProcessor(
   setIsAiSpeaking: (isAiSpeaking: boolean) => void,
@@ -17,9 +19,22 @@ export function useAudioProcessor(
   const [isProcessingAudio, setIsProcessingAudio] = useState(false);
   const [transcriptProgress, setTranscriptProgress] = useState(0);
   const lastAudioTimestampRef = useRef<number>(0);
+  const { user } = useAuth();
   
   // Initialize audio processor
   const audioProcessor = new AudioProcessor();
+
+  // Handle saving complete voice transcript
+  const handleTranscriptComplete = useCallback((transcript: string) => {
+    if (!transcript.trim() || !user) return;
+    
+    // Save the transcript as a voice message
+    saveMessage(transcript, true, { 
+      messageType: 'voice',
+    }).catch(error => {
+      console.error("[AudioProcessor] Failed to save voice transcript:", error);
+    });
+  }, [user]);
   
   // Initialize message handler with callbacks
   const messageHandler = new WebRTCMessageHandler({
@@ -59,6 +74,7 @@ export function useAudioProcessor(
         setTranscriptProgress(0);
       }, 1000);
     },
+    onFinalTranscript: handleTranscriptComplete,
     onMessageReceived: (message: WebRTCMessage) => {
       // Additional message handling can be added here
       if (message.type === 'response.created') {

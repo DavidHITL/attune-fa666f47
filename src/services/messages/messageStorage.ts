@@ -2,9 +2,14 @@
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
 import { testDatabaseAccess } from "../api/chatService";
+import { MessageMetadata } from "@/hooks/useWebRTCConnection/types";
 
 // Save message to database with explicit error handling for RLS policy issues
-export const saveMessage = async (text: string, isUser: boolean): Promise<string | null> => {
+export const saveMessage = async (
+  text: string, 
+  isUser: boolean, 
+  metadata: Partial<MessageMetadata> = { messageType: 'text' }
+): Promise<string | null> => {
   try {
     // Check if the user is logged in
     const { data: { session } } = await supabase.auth.getSession();
@@ -27,7 +32,10 @@ export const saveMessage = async (text: string, isUser: boolean): Promise<string
       .insert({
         content: text,
         user_id: session.user.id,
-        sender_type: isUser ? 'user' : 'bot'
+        sender_type: isUser ? 'user' : 'bot',
+        message_type: metadata.messageType || 'text',
+        instructions: metadata.instructions,
+        knowledge_entries: metadata.knowledgeEntries || null
       })
       .select('id')
       .single();
@@ -89,13 +97,42 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
       id: dbMessage.id.toString(),
       text: dbMessage.content || '',
       isUser: dbMessage.sender_type === 'user',
-      timestamp: new Date(dbMessage.created_at)
+      timestamp: new Date(dbMessage.created_at),
+      messageType: dbMessage.message_type || 'text'
     }));
     
     console.log(`Fetched ${formattedMessages.length} messages from database`);
     return formattedMessages;
   } catch (error) {
     console.error("Failed to fetch messages:", error);
+    return null;
+  }
+};
+
+// Fetch messages with additional metadata for context enrichment
+export const fetchMessagesWithMetadata = async (): Promise<any[] | null> => {
+  try {
+    // Check if the user is logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session || !session.user) {
+      console.error("No valid session found when fetching messages with metadata");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, content, sender_type, created_at, message_type, instructions, knowledge_entries')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error("Error fetching messages with metadata:", error);
+      return null;
+    }
+    
+    return data || null;
+  } catch (error) {
+    console.error("Failed to fetch messages with metadata:", error);
     return null;
   }
 };
