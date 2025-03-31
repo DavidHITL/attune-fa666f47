@@ -1,65 +1,91 @@
 
 import { Message } from "@/components/MessageBubble";
-import { generateLocalResponse } from "@/utils/localResponseGenerator";
-import { callChatApi } from "./api/chatService";
-import { createMessageObject, convertMessagesToApiFormat, ChatMessage } from "./chatApiService";
+import { createMessageObject } from "./chatApiService";
+import { withSecureOpenAI } from "./api/ephemeralKeyService";
 
-// Function to generate a response, either from Supabase or locally
+/**
+ * Generate a response to the user's message
+ * @param userMessage The message from the user
+ * @param conversation Previous messages in the conversation
+ * @param useLocalFallback Whether to use local fallback mode
+ * @param setUseLocalFallback Function to update local fallback mode state
+ * @param sessionProgress Current session progress (0-100)
+ * @returns Promise with the generated response
+ */
 export const generateResponse = async (
-  text: string,
-  messages: Message[],
+  userMessage: string,
+  conversation: Message[],
   useLocalFallback: boolean,
-  setUseLocalFallback: (value: boolean) => void,
+  setUseLocalFallback: React.Dispatch<React.SetStateAction<boolean>>,
   sessionProgress: number = 0
 ): Promise<Message> => {
   try {
-    // Validate input
-    if (!text || text.trim() === "") {
-      return createMessageObject(
-        "I didn't receive a message. Please try again.",
-        false
-      );
+    // For local fallback mode, generate a simple response
+    if (useLocalFallback) {
+      return generateLocalResponse(userMessage);
     }
+
+    // Convert conversation history to the format expected by the API
+    const messages = prepareConversationHistory(conversation);
     
-    if (!useLocalFallback) {
+    // Add the most recent user message
+    messages.push({ role: "user", content: userMessage });
+
+    console.log("Generating response with session progress:", sessionProgress);
+
+    // Using ephemeral key service to securely make the API call
+    const response = await withSecureOpenAI(async (openaiKey) => {
       try {
-        // Log message history being sent to AI
-        console.log(`Sending ${messages.length} messages to AI service`);
-        console.log(`Session progress: ${sessionProgress}%`);
-        
-        // Prepare conversation history for the API - include ALL previous messages for better context
-        const conversationHistory = convertMessagesToApiFormat(messages);
+        const response = await fetch("https://oseowhythgbqvllwonaz.supabase.co/functions/v1/generateChatResponse", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openaiKey}`
+          },
+          body: JSON.stringify({
+            messages,
+            sessionProgress
+          })
+        });
 
-        // Call the Supabase Edge Function with session progress
-        const reply = await callChatApi(text, conversationHistory, sessionProgress);
-
-        // Validate reply
-        if (!reply || typeof reply !== "string" || reply.trim() === "") {
-          throw new Error("Received an invalid response from the AI service");
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Error response from API:", errorData);
+          throw new Error(`API request failed: ${response.status}`);
         }
 
-        // Return AI response
-        return createMessageObject(reply, false);
+        const data = await response.json();
+        return data.response;
       } catch (error) {
-        console.error("Error with Supabase function, falling back to local processing:", error);
-        setUseLocalFallback(true);
-        
-        // Generate local response as fallback
-        const localReply = generateLocalResponse(text);
-        return createMessageObject(localReply, false);
+        console.error("Error calling OpenAI API:", error);
+        throw error;
       }
-    } else {
-      // Use local response generation
-      const localReply = generateLocalResponse(text);
-      return createMessageObject(localReply, false);
-    }
-  } catch (error) {
-    console.error("Error getting chat response:", error);
+    });
 
-    // Return fallback response in case of error
-    return createMessageObject(
-      "I'm sorry, I couldn't process your message right now. Please try again later.", 
-      false
-    );
+    return createMessageObject(response, false);
+  } catch (error) {
+    console.error("Error in generateResponse:", error);
+    setUseLocalFallback(true);
+    return generateLocalResponse(userMessage);
   }
+};
+
+/**
+ * Generate a local response without making API calls
+ */
+const generateLocalResponse = (userMessage: string): Message => {
+  return createMessageObject(
+    "I'm sorry, we're currently having trouble connecting to the AI service. Please try again later.",
+    false
+  );
+};
+
+/**
+ * Prepare conversation history for the API
+ */
+const prepareConversationHistory = (conversation: Message[]) => {
+  return conversation.map(msg => ({
+    role: msg.isUser ? "user" : "assistant",
+    content: msg.text
+  }));
 };

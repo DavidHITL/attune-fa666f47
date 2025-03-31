@@ -96,8 +96,6 @@ export function useSendMessage({
       // Add bot response to local state
       setMessages((prevMessages) => [...prevMessages, botResponse]);
       
-      // Text-to-speech functionality removed
-      
     } catch (error) {
       console.error("Error generating response:", error);
       

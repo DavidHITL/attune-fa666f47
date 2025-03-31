@@ -1,22 +1,30 @@
-
 /**
- * Calculates the session progress as a percentage (0-100%)
- * 
- * @param sessionStarted Whether the session has started
- * @param sessionEndTime The timestamp when the session will end
- * @returns Percentage of session completed (0-100)
+ * Calculate session progress as a percentage
+ * @param sessionStarted boolean indicating if session has started
+ * @param sessionEndTime end time in milliseconds since epoch
+ * @returns number between 0 and 100 representing session progress
  */
 export const calculateSessionProgress = (
   sessionStarted: boolean,
   sessionEndTime: number | null
 ): number => {
-  if (!sessionStarted || !sessionEndTime) return 0;
-  
+  if (!sessionStarted || !sessionEndTime) {
+    return 0;
+  }
+
   const now = Date.now();
-  const sessionDuration = 25 * 60 * 1000; // 25 minutes in ms
-  const sessionStartTime = sessionEndTime - sessionDuration;
-  const elapsed = now - sessionStartTime;
+  const SESSION_DURATION = 25 * 60 * 1000; // 25 minutes in milliseconds
+  const elapsedTime = sessionEndTime - now;
   
-  // Return percentage of session completed (0-100)
-  return Math.min(100, Math.max(0, (elapsed / sessionDuration) * 100));
+  // Calculate how much time has passed as percentage
+  // (SESSION_DURATION - elapsedTime) / SESSION_DURATION * 100
+  const progress = Math.max(
+    0, 
+    Math.min(
+      100, 
+      ((SESSION_DURATION - elapsedTime) / SESSION_DURATION) * 100
+    )
+  );
+  
+  return progress;
 };

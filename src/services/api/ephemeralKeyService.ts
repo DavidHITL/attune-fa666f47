@@ -2,12 +2,27 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
+// In-memory cache for the ephemeral key to avoid unnecessary requests
+let cachedEphemeralKey: { key: string; expiresAt: Date } | null = null;
+let cachedOpenAIKey: { key: string; expiresAt: Date } | null = null;
+
+// Minimum time before expiry to trigger a refresh (30 seconds)
+const REFRESH_THRESHOLD_MS = 30 * 1000;
+
 /**
  * Request an ephemeral API key from the server
  * @returns Promise with the ephemeral key and its expiration time
  */
 export const requestEphemeralKey = async () => {
   try {
+    // If we have a cached key that's still valid (with refresh threshold)
+    if (cachedEphemeralKey && new Date() < new Date(cachedEphemeralKey.expiresAt.getTime() - REFRESH_THRESHOLD_MS)) {
+      console.log("Using cached ephemeral key");
+      return cachedEphemeralKey;
+    }
+    
+    console.log("Requesting new ephemeral key");
+    
     // Check if user is authenticated first
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -29,10 +44,13 @@ export const requestEphemeralKey = async () => {
       throw new Error("Invalid response from server");
     }
 
-    return {
-      ephemeralKey: data.ephemeralKey,
+    // Store the ephemeral key in memory cache
+    cachedEphemeralKey = {
+      key: data.ephemeralKey,
       expiresAt: new Date(data.expiresAt)
     };
+
+    return cachedEphemeralKey;
   } catch (error) {
     console.error("Error in requestEphemeralKey:", error);
     toast({
@@ -51,6 +69,14 @@ export const requestEphemeralKey = async () => {
  */
 export const verifyEphemeralKey = async (ephemeralKey: string) => {
   try {
+    // If we have a cached OpenAI key that's still valid (with refresh threshold)
+    if (cachedOpenAIKey && new Date() < new Date(cachedOpenAIKey.expiresAt.getTime() - REFRESH_THRESHOLD_MS)) {
+      console.log("Using cached OpenAI key");
+      return cachedOpenAIKey;
+    }
+    
+    console.log("Verifying ephemeral key to get OpenAI key");
+    
     // Check if user is authenticated first
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -73,10 +99,13 @@ export const verifyEphemeralKey = async (ephemeralKey: string) => {
       throw new Error("Invalid response from server");
     }
 
-    return {
-      openaiKey: data.openaiKey,
+    // Store the OpenAI key in memory cache
+    cachedOpenAIKey = {
+      key: data.openaiKey,
       expiresAt: new Date(data.expiresAt)
     };
+
+    return cachedOpenAIKey;
   } catch (error) {
     console.error("Error in verifyEphemeralKey:", error);
     toast({
@@ -95,11 +124,11 @@ export const verifyEphemeralKey = async (ephemeralKey: string) => {
  */
 export const withSecureOpenAI = async <T>(apiCall: (apiKey: string) => Promise<T>): Promise<T> => {
   try {
-    // Step 1: Get ephemeral key
-    const { ephemeralKey } = await requestEphemeralKey();
+    // Step 1: Get ephemeral key (with automatic refresh if needed)
+    const { key: ephemeralKey } = await requestEphemeralKey();
     
     // Step 2: Verify ephemeral key and get actual OpenAI API key
-    const { openaiKey } = await verifyEphemeralKey(ephemeralKey);
+    const { key: openaiKey } = await verifyEphemeralKey(ephemeralKey);
     
     // Step 3: Use the actual OpenAI API key for the API call
     return await apiCall(openaiKey);
