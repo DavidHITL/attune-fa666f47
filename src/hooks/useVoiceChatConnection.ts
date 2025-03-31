@@ -23,50 +23,52 @@ export function useVoiceChatConnection({
   const retryCount = useRef(0);
   const maxRetries = 3;
 
+  // Function to attempt connection
+  const attemptDirectConnection = async () => {
+    hasAttemptedConnection.current = true;
+    setConnectionStatus('connecting');
+    setIsConnecting(true);
+    
+    try {
+      // Check for existing session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.warn("[useVoiceChatConnection] No active session found, continuing with connection attempt");
+      }
+      
+      console.log("[useVoiceChatConnection] Attempting direct OpenAI connection");
+      await connect();
+      setConnectionStatus('connected');
+      toast.success("Connected to OpenAI Realtime API");
+      retryCount.current = 0; // Reset retry count on successful connection
+    } catch (error) {
+      console.error("[useVoiceChatConnection] Connection failed:", error);
+      setConnectionStatus('failed');
+      
+      // Show error toast
+      toast.error(error instanceof Error ? `Connection failed: ${error.message}` : "Connection failed");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+  
+  // Function to retry connection
+  const retryConnection = () => {
+    if (retryCount.current < maxRetries) {
+      retryCount.current++;
+      hasAttemptedConnection.current = false;
+      toast.info(`Retrying connection... (Attempt ${retryCount.current}/${maxRetries})`);
+      console.log(`[useVoiceChatConnection] Retry attempt ${retryCount.current}/${maxRetries}`);
+    } else {
+      toast.error("Maximum retry attempts reached. Please try again later.");
+      console.error("[useVoiceChatConnection] Max retry attempts reached");
+    }
+  };
+
   // Handle connection
   useEffect(() => {
     if (open && !hasAttemptedConnection.current) {
-      const attemptDirectConnection = async () => {
-        hasAttemptedConnection.current = true;
-        setConnectionStatus('connecting');
-        setIsConnecting(true);
-        
-        try {
-          // Check for existing session
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (!session) {
-            console.warn("[useVoiceChatConnection] No active session found, continuing with connection attempt");
-          }
-          
-          console.log("[useVoiceChatConnection] Attempting direct OpenAI connection");
-          await connect();
-          setConnectionStatus('connected');
-          toast.success("Connected to OpenAI Realtime API");
-          retryCount.current = 0; // Reset retry count on successful connection
-        } catch (error) {
-          console.error("[useVoiceChatConnection] Connection failed:", error);
-          setConnectionStatus('failed');
-          
-          // Implement retry logic
-          if (retryCount.current < maxRetries) {
-            const retryDelay = Math.pow(2, retryCount.current) * 1000; // Exponential backoff
-            retryCount.current++;
-            toast.error(`Connection failed. Retrying in ${retryDelay/1000} seconds... (${retryCount.current}/${maxRetries})`);
-            
-            // Wait and retry
-            setTimeout(async () => {
-              hasAttemptedConnection.current = false; // Allow another attempt
-              console.log(`[useVoiceChatConnection] Retry attempt ${retryCount.current}/${maxRetries}`);
-            }, retryDelay);
-          } else {
-            toast.error("Could not connect after multiple attempts. Please try again later.");
-          }
-        } finally {
-          setIsConnecting(false);
-        }
-      };
-      
       attemptDirectConnection();
     }
     
@@ -80,7 +82,7 @@ export function useVoiceChatConnection({
         console.log("[useVoiceChatConnection] Dialog closed, connection clean up");
       }
     };
-  }, [open, connect, disconnect]);
+  }, [open, connect, disconnect, hasAttemptedConnection.current]);
   
   // Check connection status periodically
   useEffect(() => {
@@ -106,6 +108,7 @@ export function useVoiceChatConnection({
 
   return {
     connectionStatus,
-    isConnecting
+    isConnecting,
+    retryConnection
   };
 }

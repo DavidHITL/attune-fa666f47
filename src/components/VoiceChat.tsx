@@ -7,7 +7,7 @@ import VoiceConnectionStatus from "./voice/VoiceConnectionStatus";
 import { useVoiceChatConnection } from "@/hooks/useVoiceChatConnection";
 import { useAuth } from "@/context/AuthContext";
 import VoiceVisualization from "./voice/VoiceVisualization";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 import VoiceUIControls from "./voice/VoiceUIControls";
 
 export function VoiceChat({
@@ -19,7 +19,7 @@ export function VoiceChat({
 }) {
   const { user } = useAuth();
   const { chatRef, connect, disconnect } = useVoiceChat(user);
-  const { connectionStatus, isConnecting } = useVoiceChatConnection({
+  const { connectionStatus, isConnecting, retryConnection } = useVoiceChatConnection({
     open,
     connect,
     disconnect,
@@ -47,12 +47,25 @@ export function VoiceChat({
               Establishing direct connection to OpenAI...
             </div>
           )}
+          
+          {connectionStatus === 'failed' && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4 my-4 w-full max-w-md">
+              <div className="flex items-center gap-2 text-red-600 mb-2">
+                <AlertCircle className="h-5 w-5" />
+                <h4 className="font-medium">Connection Failed</h4>
+              </div>
+              <p className="text-red-600 text-sm">
+                We couldn't connect to the voice service. This could be due to network issues or missing API keys.
+              </p>
+            </div>
+          )}
         </div>
         
         <div className="w-full space-y-4">
           <VoiceUIControls 
             isConnecting={isConnecting} 
-            connectionStatus={connectionStatus} 
+            connectionStatus={connectionStatus}
+            onRetry={connectionStatus === 'failed' ? retryConnection : undefined}
           />
           
           <Button 

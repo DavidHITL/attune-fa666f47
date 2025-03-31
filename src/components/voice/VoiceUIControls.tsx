@@ -2,15 +2,18 @@
 import React from 'react';
 import { DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
 interface VoiceUIControlsProps {
   isConnecting: boolean;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'failed';
+  onRetry?: () => void;
 }
 
 const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
   isConnecting,
-  connectionStatus
+  connectionStatus,
+  onRetry
 }) => {
   // Check if the browser supports speech recognition
   const isSpeechRecognitionSupported = typeof window !== 'undefined' && 
@@ -21,7 +24,7 @@ const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
   const supportId = "voice-recognition-support";
   
   return (
-    <DialogFooter>
+    <DialogFooter className="flex-col space-y-3">
       <div className="flex gap-2 items-center justify-between w-full">
         <div className="text-xs text-gray-500">
           {!isSpeechRecognitionSupported && (
@@ -29,7 +32,7 @@ const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
               Your browser does not support speech recognition.
             </p>
           )}
-          <p id={statusId} className="text-gray-500">
+          <p id={statusId} className={`${connectionStatus === 'failed' ? 'text-red-500' : 'text-gray-500'}`}>
             {connectionStatus === 'connected' ? 'Connected to AI voice service' : 
              connectionStatus === 'connecting' ? 'Establishing connection...' :
              connectionStatus === 'failed' ? 'Connection failed' :
@@ -37,6 +40,18 @@ const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
           </p>
         </div>
       </div>
+      
+      {connectionStatus === 'failed' && onRetry && (
+        <Button 
+          onClick={onRetry}
+          variant="outline"
+          className="flex items-center gap-2 w-full"
+          type="button"
+        >
+          <RefreshCw className="h-4 w-4" />
+          <span>Retry Connection</span>
+        </Button>
+      )}
     </DialogFooter>
   );
 };

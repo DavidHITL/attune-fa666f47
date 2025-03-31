@@ -21,13 +21,12 @@ export class DirectConnectionManager {
       // Create a request ID for tracking
       const requestId = uuidv4().substring(0, 8);
       
-      // For development/testing purposes, use a hardcoded API key or fetch from an env variable
-      // NOTE: In production, you should NEVER expose API keys in the client-side code
-      // Instead, use a secure backend endpoint to generate tokens
+      // For development/testing purposes
+      // In production, use an edge function to generate tokens securely
       
       let apiKey = '';
       
-      // In browser environments, don't use process.env
+      // In browser environments, check for a configured API key
       if (typeof window !== 'undefined') {
         // Check if there's a configured API key in localStorage or elsewhere
         const storedKey = localStorage.getItem('OPENAI_API_KEY');
@@ -37,8 +36,6 @@ export class DirectConnectionManager {
       }
       
       if (!apiKey) {
-        // For development only - this should be replaced with a secure endpoint
-        // that generates tokens without exposing API keys to the client
         console.log("[DirectConnectionManager] No API key found, using demo endpoint");
         
         try {
@@ -55,7 +52,9 @@ export class DirectConnectionManager {
           });
           
           if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
+            const errorText = await response.text();
+            console.error("[DirectConnectionManager] API error:", response.status, errorText);
+            throw new Error(`API error: ${response.status} - ${errorText || 'No response'}`);
           }
           
           const data = await response.json();
@@ -65,6 +64,7 @@ export class DirectConnectionManager {
           // For demo purposes only
           if (!data.id) {
             console.warn("[DirectConnectionManager] Using fallback demo values");
+            throw new Error("Unable to get proper session from token endpoint");
           }
           
           return {
@@ -73,7 +73,7 @@ export class DirectConnectionManager {
           };
         } catch (error) {
           console.error("[DirectConnectionManager] Connection error:", error);
-          throw new Error(`Direct connection error: ${error instanceof Error ? error.message : String(error)}`);
+          throw error;
         }
       } else {
         console.log("[DirectConnectionManager] Using provided OpenAI API key");
@@ -88,14 +88,16 @@ export class DirectConnectionManager {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "gpt-4o-realtime-preview-2024-12-17", 
+              model: "gpt-4o-realtime-preview-2024-10-01", 
               voice: voice,
               instructions: instructions
             }),
           });
           
           if (!response.ok) {
-            throw new Error(`OpenAI API error: ${response.status}`);
+            const errorText = await response.text();
+            console.error("[DirectConnectionManager] OpenAI API error:", response.status, errorText);
+            throw new Error(`OpenAI API error: ${response.status} - ${errorText || 'No response'}`);
           }
           
           const data = await response.json();
@@ -108,12 +110,12 @@ export class DirectConnectionManager {
           };
         } catch (error) {
           console.error("[DirectConnectionManager] Connection error:", error);
-          throw new Error(`Direct connection error: ${error instanceof Error ? error.message : String(error)}`);
+          throw error;
         }
       }
     } catch (error) {
       console.error("[DirectConnectionManager] Connection error:", error);
-      throw new Error(`Connection error: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
