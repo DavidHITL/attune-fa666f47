@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { testRealtimeEndpoint, testRealtimeFunctionEndpoint, testWebSocketConnection, testCompleteChatFlow } from '@/utils/realtime/testEndpoint';
 import { toast } from 'sonner';
@@ -42,7 +43,7 @@ export function useEndpointTest() {
     }
   };
 
-  const testWsConnection = () => {
+  const testWsConnection = async () => {
     setIsTestingWs(true);
     setWsResult(null);
     setWsStatus(null);
@@ -53,7 +54,8 @@ export function useEndpointTest() {
         activeWsConnection.close();
       }
       
-      const result = testWebSocketConnection();
+      // Properly await the result of the WebSocket connection test
+      const result = await testWebSocketConnection();
       
       if (result.success) {
         setWsStatus('success');
@@ -77,7 +79,7 @@ export function useEndpointTest() {
     }
   };
 
-  const testFullChatFlow = () => {
+  const testFullChatFlow = async () => {
     setIsTestingFlow(true);
     setFlowResult(null);
     setFlowStatus(null);
@@ -88,7 +90,8 @@ export function useEndpointTest() {
         activeFlowConnection.close();
       }
       
-      const result = testCompleteChatFlow();
+      // Properly await the result of the chat flow test
+      const result = await testCompleteChatFlow();
       
       if (result.success) {
         setFlowStatus('success');

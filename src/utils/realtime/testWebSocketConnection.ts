@@ -2,7 +2,7 @@
 /**
  * Tests WebSocket connection to the realtime endpoint
  */
-export const testWebSocketConnection = async (): Promise<{success: boolean, message: string, close: () => void}> => {
+export const testWebSocketConnection = async (): Promise<{success: boolean; message: string; close: () => void}> => {
   console.log("[testWebSocketConnection] Starting WebSocket connection test");
   
   return new Promise((resolve) => {
