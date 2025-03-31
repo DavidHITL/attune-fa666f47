@@ -20,7 +20,7 @@ const WebSocketTester = () => {
       }
       socketRef.current = null;
       setConnectionStatus('idle');
-      console.log("WebSocket connection closed");
+      addMessage("Connection closed manually");
     }
   };
   
@@ -32,7 +32,6 @@ const WebSocketTester = () => {
   const connectToTestEndpoint = () => {
     setIsConnecting(true);
     setConnectionStatus('connecting');
-    setMessages([]);
     
     try {
       // Close any existing connection
@@ -42,12 +41,15 @@ const WebSocketTester = () => {
       const projectId = 'oseowhythgbqvllwonaz';
       const wsUrl = `wss://${projectId}.supabase.co/functions/v1/websocket-test`;
       
-      console.log("Connecting to WebSocket test endpoint:", wsUrl);
       addMessage(`Connecting to: ${wsUrl}`);
+      addMessage(`Browser WebSocket support: ${typeof WebSocket !== 'undefined' ? 'Available' : 'Not Available'}`);
       
-      // Create a new WebSocket connection
+      // Create a new WebSocket connection WITHOUT any protocols
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
+      
+      // Log the WebSocket readyState
+      addMessage(`Initial socket state: ${getReadyStateString(socket.readyState)}`);
       
       // Set up a connection timeout
       const timeoutId = setTimeout(() => {
@@ -62,39 +64,51 @@ const WebSocketTester = () => {
       
       socket.addEventListener('open', () => {
         clearTimeout(timeoutId);
-        console.log("WebSocket connection established");
-        addMessage("Connected! Socket open.");
+        addMessage(`Connected! Socket open. ReadyState: ${getReadyStateString(socket.readyState)}`);
         setConnectionStatus('connected');
         toast.success("WebSocket connected successfully");
         setIsConnecting(false);
         
         // Send a test message
-        socket.send("Hello from WebSocketTester!");
+        try {
+          socket.send("Hello from WebSocketTester!");
+          addMessage("Sent: Hello from WebSocketTester!");
+        } catch (sendError) {
+          addMessage(`Error sending test message: ${sendError}`);
+        }
       });
       
       socket.addEventListener('message', (event) => {
-        console.log("Received message:", event.data);
         addMessage(`Received: ${event.data}`);
       });
       
       socket.addEventListener('error', (event) => {
-        console.error("WebSocket error:", event);
-        addMessage(`Error: ${JSON.stringify(event)}`);
-        toast.error("WebSocket connection error");
+        addMessage(`WebSocket error occurred`);
         setConnectionStatus('failed');
         setIsConnecting(false);
       });
       
       socket.addEventListener('close', (event) => {
         clearTimeout(timeoutId);
-        console.log("WebSocket closed:", event.code, event.reason);
         addMessage(`Connection closed: ${event.code} ${event.reason || 'No reason'} (Clean: ${event.wasClean})`);
         setConnectionStatus(event.wasClean ? 'idle' : 'failed');
         setIsConnecting(false);
+        
+        // Add detailed explanation for common close codes
+        if (event.code === 1006) {
+          addMessage("Code 1006: Abnormal closure - Connection was closed abnormally, without a proper close frame being sent.");
+        } else if (event.code === 1001) {
+          addMessage("Code 1001: Going away - The server is going down or the browser is navigating away.");
+        } else if (event.code === 1002) {
+          addMessage("Code 1002: Protocol error - Endpoint is terminating the connection due to a protocol error.");
+        } else if (event.code === 1009) {
+          addMessage("Code 1009: Message too big - Data frame was too large.");
+        } else if (event.code === 1011) {
+          addMessage("Code 1011: Internal error - Server encountered an unexpected condition.");
+        }
       });
     } catch (error) {
-      console.error("Error creating WebSocket:", error);
-      addMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      addMessage(`Error creating WebSocket: ${error instanceof Error ? error.message : String(error)}`);
       setConnectionStatus('failed');
       setIsConnecting(false);
       toast.error("Failed to create WebSocket connection");
@@ -104,11 +118,26 @@ const WebSocketTester = () => {
   const sendTestMessage = () => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       const message = `Ping ${new Date().toISOString()}`;
-      socketRef.current.send(message);
-      addMessage(`Sent: ${message}`);
+      try {
+        socketRef.current.send(message);
+        addMessage(`Sent: ${message}`);
+      } catch (error) {
+        addMessage(`Error sending message: ${error instanceof Error ? error.message : String(error)}`);
+      }
     } else {
       toast.error("WebSocket is not connected");
       addMessage("Cannot send - WebSocket is not connected");
+    }
+  };
+  
+  // Helper to get readable WebSocket state
+  const getReadyStateString = (state: number): string => {
+    switch (state) {
+      case 0: return "CONNECTING (0)";
+      case 1: return "OPEN (1)";
+      case 2: return "CLOSING (2)";
+      case 3: return "CLOSED (3)";
+      default: return `UNKNOWN (${state})`;
     }
   };
   

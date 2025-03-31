@@ -41,13 +41,13 @@ serve(async (req) => {
   console.log("[WS-Test] Processing WebSocket upgrade request");
   
   try {
-    // Log the protocol information
+    // Instead of using the protocol header directly, extract it from headers
     const protocolHeader = req.headers.get("sec-websocket-protocol");
     const requestedProtocols = protocolHeader ? protocolHeader.split(",").map(p => p.trim()) : undefined;
     console.log("[WS-Test] Requested protocols:", requestedProtocols || "none");
     
-    // Attempt to upgrade the connection
-    console.log("[WS-Test] Attempting WebSocket upgrade");
+    // First attempt to upgrade with no protocol option
+    console.log("[WS-Test] Attempting simple WebSocket upgrade");
     const upgradeResult = Deno.upgradeWebSocket(req);
     console.log("[WS-Test] Upgrade successful");
     
@@ -91,12 +91,32 @@ serve(async (req) => {
       stack: error.stack
     }, null, 2));
     
-    return new Response(JSON.stringify({ 
-      error: "WebSocket upgrade failed", 
-      details: error instanceof Error ? error.message : String(error) 
-    }), { 
-      status: 500, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    });
+    // Try one more time with different options
+    try {
+      console.log("[WS-Test] Attempting fallback upgrade");
+      // Simple upgrade without any options
+      const fallbackResult = Deno.upgradeWebSocket(req, {
+        idleTimeout: 60000, // Longer timeout
+      });
+      console.log("[WS-Test] Fallback upgrade successful");
+      
+      // Set up basic event handlers
+      fallbackResult.socket.onmessage = (event) => {
+        fallbackResult.socket.send(`Echo: ${event.data}`);
+      };
+      
+      return fallbackResult.response;
+    } catch (fallbackError) {
+      console.error("[WS-Test] Fallback also failed:", fallbackError);
+      
+      return new Response(JSON.stringify({ 
+        error: "WebSocket upgrade failed", 
+        details: error instanceof Error ? error.message : String(error),
+        fallbackError: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+      }), { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
   }
 });
