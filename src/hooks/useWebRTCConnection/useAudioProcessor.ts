@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
-import { WebRTCMessage } from "../useWebRTCConnection";
+import { WebRTCMessage } from "./types";
 import { saveMessage } from "@/services/messages/messageStorage";
 import { useAuth } from "@/context/AuthContext";
 

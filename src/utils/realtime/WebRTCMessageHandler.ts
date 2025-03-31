@@ -1,5 +1,5 @@
 
-import { WebRTCMessage } from "@/hooks/useWebRTCConnection";
+import { WebRTCMessage, MessageMetadata } from "@/hooks/useWebRTCConnection/types";
 import { saveMessage } from "@/services/messages/messageStorage";
 
 export interface WebRTCMessageHandlerOptions {

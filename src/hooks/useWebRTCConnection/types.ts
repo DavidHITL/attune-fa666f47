@@ -23,6 +23,11 @@ export interface WebRTCMessage {
   role: WebRTCMessageRole;
   content: WebRTCMessageContent[];
   timestamp: number;
+  // Add properties used in WebRTCMessageHandler and useAudioProcessor
+  type?: string;
+  delta?: string;
+  event_id?: string;
+  response_id?: string;
 }
 
 export interface UseWebRTCConnectionOptions extends Partial<WebRTCOptions> {
@@ -48,4 +53,11 @@ export interface WebRTCConnectionResult extends WebRTCConnectionState {
   sendTextMessage: (text: string) => boolean;
   getActiveMediaStream: () => MediaStream | null;
   getActiveAudioTrack: () => MediaStreamTrack | null;
+}
+
+// Add MessageMetadata interface which is referenced in multiple files
+export interface MessageMetadata {
+  messageType: 'text' | 'voice';
+  instructions?: string;
+  knowledgeEntries?: string[];
 }
