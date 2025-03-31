@@ -5,20 +5,68 @@
 export class AudioProcessor {
   private audioQueue: Uint8Array[] = [];
   private isPlaying: boolean = false;
+  private audioContext: AudioContext | null = null;
   private audioElement: HTMLAudioElement | null = null;
+  private gainNode: GainNode | null = null;
+  private isAudioContextResumed: boolean = false;
 
   constructor() {
-    // Initialize audio element
-    const audio = new Audio();
-    audio.autoplay = false;
-    this.audioElement = audio;
+    try {
+      // Initialize Web Audio API context
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: 24000 // Match OpenAI's audio sample rate
+      });
+      
+      // Initialize audio element
+      const audio = new Audio();
+      audio.autoplay = false;
+      this.audioElement = audio;
+      
+      // Create gain node for volume control
+      if (this.audioContext) {
+        this.gainNode = this.audioContext.createGain();
+        this.gainNode.gain.value = 1.0; // Default volume
+        this.gainNode.connect(this.audioContext.destination);
+      }
+      
+      console.log("[AudioProcessor] Successfully initialized audio system");
+    } catch (error) {
+      console.error("[AudioProcessor] Error initializing audio system:", error);
+    }
+  }
+
+  /**
+   * Ensure AudioContext is resumed (needed due to autoplay policy)
+   */
+  private ensureAudioContextResumed(): Promise<void> {
+    if (!this.audioContext || this.isAudioContextResumed) {
+      return Promise.resolve();
+    }
+    
+    // Resume the audio context if it's suspended
+    if (this.audioContext.state === 'suspended') {
+      console.log("[AudioProcessor] Resuming audio context");
+      return this.audioContext.resume()
+        .then(() => {
+          this.isAudioContextResumed = true;
+          console.log("[AudioProcessor] AudioContext resumed successfully");
+        })
+        .catch(error => {
+          console.error("[AudioProcessor] Failed to resume AudioContext:", error);
+        });
+    }
+    
+    this.isAudioContextResumed = true;
+    return Promise.resolve();
   }
 
   /**
    * Add audio data to the playback queue
    */
-  addAudioData(base64Audio: string): void {
+  async addAudioData(base64Audio: string): Promise<void> {
     try {
+      await this.ensureAudioContextResumed();
+      
       // Convert base64 to binary
       const binaryString = atob(base64Audio);
       const bytes = new Uint8Array(binaryString.length);
@@ -28,6 +76,7 @@ export class AudioProcessor {
       
       // Add to audio queue
       this.audioQueue.push(bytes);
+      console.log("[AudioProcessor] Added audio chunk to queue, length:", this.audioQueue.length);
       
       // Start playing if not already playing
       if (!this.isPlaying) {
@@ -63,10 +112,22 @@ export class AudioProcessor {
         const handleEnded = () => {
           URL.revokeObjectURL(url);
           this.audioElement?.removeEventListener('ended', handleEnded);
+          // Continue with next chunk
           this.playNextAudioChunk();
         };
         
+        // Set up error handling
+        const handleError = (err: Event) => {
+          console.error("[AudioProcessor] Error playing audio:", err);
+          this.audioElement?.removeEventListener('error', handleError);
+          // Continue with next chunk even if this one fails
+          handleEnded();
+        };
+        
         this.audioElement.addEventListener('ended', handleEnded);
+        this.audioElement.addEventListener('error', handleError);
+        
+        // Start playback
         this.audioElement.src = url;
         this.audioElement.play().catch(err => {
           console.error("[AudioProcessor] Error playing audio:", err);
@@ -135,6 +196,17 @@ export class AudioProcessor {
   }
 
   /**
+   * Set the volume for audio playback
+   * @param value Volume level from 0 to 1
+   */
+  setVolume(value: number): void {
+    if (this.gainNode) {
+      const safeValue = Math.max(0, Math.min(1, value));
+      this.gainNode.gain.value = safeValue;
+    }
+  }
+
+  /**
    * Clean up resources
    */
   cleanup(): void {
@@ -143,7 +215,18 @@ export class AudioProcessor {
       this.audioElement.src = "";
       this.audioElement = null;
     }
+    if (this.audioContext) {
+      this.audioContext.close().catch(err => {
+        console.error("[AudioProcessor] Error closing AudioContext:", err);
+      });
+      this.audioContext = null;
+    }
+    if (this.gainNode) {
+      this.gainNode.disconnect();
+      this.gainNode = null;
+    }
     this.audioQueue = [];
     this.isPlaying = false;
+    this.isAudioContextResumed = false;
   }
 }

@@ -16,7 +16,9 @@ export interface WebRTCConnectionState {
   isConnecting: boolean;
   isMicrophoneActive: boolean;
   isAiSpeaking: boolean;
+  isProcessingAudio?: boolean;
   currentTranscript: string;
+  transcriptProgress?: number;
   messages: WebRTCMessage[];
 }
 

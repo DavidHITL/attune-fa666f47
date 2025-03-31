@@ -4,8 +4,7 @@ import { UseWebRTCConnectionOptions, WebRTCConnectionResult, WebRTCMessage } fro
 import { useConnectionState } from "./useConnectionState";
 import { useMessageHandler } from "./useMessageHandler";
 import { useConnectionActions } from "./useConnectionActions";
-import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
-import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
+import { useAudioProcessor } from "./useAudioProcessor";
 
 export * from "./types";
 
@@ -41,35 +40,24 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
   } = useConnectionState();
   
   // Initialize audio processor and message handler
+  const { 
+    audioProcessor,
+    messageHandler,
+    isProcessingAudio,
+    transcriptProgress
+  } = useAudioProcessor(setIsAiSpeaking, setCurrentTranscript);
+  
+  // Store references
   useEffect(() => {
-    audioProcessorRef.current = new AudioProcessor();
+    audioProcessorRef.current = audioProcessor;
+    messageHandlerRef.current = messageHandler;
     
-    // Initialize message handler
-    messageHandlerRef.current = new WebRTCMessageHandler({
-      onAudioData: (base64Audio) => {
-        if (audioProcessorRef.current) {
-          audioProcessorRef.current.addAudioData(base64Audio);
-          setIsAiSpeaking(true);
-        }
-      },
-      onAudioComplete: () => {
-        setIsAiSpeaking(false);
-      },
-      onTranscriptUpdate: (textDelta) => {
-        // Fix: Don't use a callback function here, just concatenate directly
-        setCurrentTranscript(currentTranscript + textDelta);
-      },
-      onTranscriptComplete: () => {
-        setTimeout(() => setCurrentTranscript(""), 1000);
-      }
-    });
-
     return () => {
       if (audioProcessorRef.current) {
         audioProcessorRef.current.cleanup();
       }
     };
-  }, [currentTranscript, setCurrentTranscript, setIsAiSpeaking]);
+  }, [audioProcessor, messageHandler]);
   
   // Set up message handler
   const { handleMessage } = useMessageHandler(messageHandlerRef, setMessages);
@@ -99,7 +87,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     setIsMicrophoneActive,
     setCurrentTranscript,
     setIsAiSpeaking,
-    addMessage // Pass our wrapper function instead
+    addMessage
   );
   
   // Auto-connect if enabled
@@ -119,7 +107,9 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     isConnecting,
     isMicrophoneActive,
     isAiSpeaking,
+    isProcessingAudio,
     currentTranscript,
+    transcriptProgress,
     messages,
     connect,
     disconnect,

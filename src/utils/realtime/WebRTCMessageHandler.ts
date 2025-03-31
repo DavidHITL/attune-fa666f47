@@ -6,6 +6,7 @@ export interface WebRTCMessageHandlerOptions {
   onTranscriptComplete?: () => void;
   onAudioData?: (base64Audio: string) => void;
   onAudioComplete?: () => void;
+  onMessageReceived?: (message: WebRTCMessage) => void;
 }
 
 /**
@@ -13,6 +14,7 @@ export interface WebRTCMessageHandlerOptions {
  */
 export class WebRTCMessageHandler {
   private options: WebRTCMessageHandlerOptions;
+  private currentTranscript: string = "";
   
   constructor(options: WebRTCMessageHandlerOptions = {}) {
     this.options = options;
@@ -24,6 +26,14 @@ export class WebRTCMessageHandler {
   handleMessage(event: MessageEvent): void {
     try {
       const message = JSON.parse(event.data) as WebRTCMessage;
+      
+      // Log for debugging
+      console.log(`[WebRTCMessageHandler] Received message: ${message.type}`, message);
+      
+      // Notify about all messages if callback is provided
+      if (this.options.onMessageReceived) {
+        this.options.onMessageReceived(message);
+      }
       
       // Handle different message types
       if (message.type === "response.audio.delta") {
@@ -41,13 +51,17 @@ export class WebRTCMessageHandler {
       else if (message.type === "response.audio_transcript.delta") {
         // Update transcript with new text
         if (this.options.onTranscriptUpdate && message.delta) {
-          this.options.onTranscriptUpdate(message.delta);
+          // Accumulate transcript text
+          this.currentTranscript += message.delta;
+          this.options.onTranscriptUpdate(this.currentTranscript);
         }
       } 
       else if (message.type === "response.audio_transcript.done") {
         // Transcript is complete
         if (this.options.onTranscriptComplete) {
           this.options.onTranscriptComplete();
+          // Reset current transcript
+          this.currentTranscript = "";
         }
       }
     } catch (error) {
