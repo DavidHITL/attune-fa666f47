@@ -23,7 +23,7 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
   try {
     console.log("[WebSocket Handler] Processing WebSocket request");
     
-    // Handle the WebSocket upgrade request
+    // Handle the WebSocket upgrade request - SIMPLIFIED WITHOUT PROTOCOLS
     const upgradeResult = await handleUpgrade(req);
     
     // If the result is a Response, it means there was an error during upgrade
@@ -54,6 +54,26 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
 
     socket.onclose = (event) => {
       console.log(`[WebSocket Handler] Socket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
+    };
+    
+    // Add a basic message handler for pings
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("[WebSocket Handler] Received message:", data.type || "unknown type");
+        
+        // Handle ping messages immediately with a pong
+        if (data.type === "ping") {
+          socket.send(JSON.stringify({
+            type: "pong",
+            timestamp: new Date().toISOString(),
+            echo: data.timestamp
+          }));
+          console.log("[WebSocket Handler] Responded with pong");
+        }
+      } catch (error) {
+        console.error("[WebSocket Handler] Error handling message:", error);
+      }
     };
     
     // CRITICAL FIX: Initialize connections asynchronously AFTER returning the response

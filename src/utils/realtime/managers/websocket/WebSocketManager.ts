@@ -14,7 +14,7 @@ import { IWebSocketManager } from '../interfaces/IWebSocketManager';
 export class WebSocketManager implements IWebSocketManager {
   private websocket: WebSocket | null = null;
   private wsUrl: string | null = null;
-  private protocols: string[] = ['json']; // Default to just 'json' for wider compatibility
+  private protocols: string[] = []; // Initialize with empty array (no protocols)
   private connectionAttempt = 0;
   private maxConnectionAttempts = 3;
   
@@ -26,6 +26,7 @@ export class WebSocketManager implements IWebSocketManager {
   private connectionHandler: WebSocketConnectionHandler;
   private timeoutManager: WebSocketTimeoutManager;
   private authHandler: WebSocketAuthHandler;
+  private messageHandler: ((event: MessageEvent) => void) | null = null;
 
   constructor() {
     this.heartbeatManager = new HeartbeatManager(this.reconnect.bind(this));
@@ -74,7 +75,6 @@ export class WebSocketManager implements IWebSocketManager {
       }
       
       console.log("[WebSocketManager] Connecting to:", this.wsUrl);
-      console.log("[WebSocketManager] Using protocols:", this.protocols);
       
       // Close existing connection if any
       if (this.websocket) {
@@ -97,17 +97,10 @@ export class WebSocketManager implements IWebSocketManager {
       // Create a connection promise
       const connectionPromise = this.promiseHandler.createConnectionPromise();
       
-      // Try connection with different protocol combinations if needed
+      // Create WebSocket connection without protocols
       try {
-        // First try with the specified protocols
-        if (this.protocols.length > 0) {
-          console.log("[WebSocketManager] Attempting connection with protocols:", this.protocols);
-          this.websocket = new WebSocket(finalUrl, this.protocols);
-        } else {
-          // Fall back to no protocols
-          console.log("[WebSocketManager] Attempting connection without protocols");
-          this.websocket = new WebSocket(finalUrl);
-        }
+        console.log("[WebSocketManager] Attempting connection without protocols");
+        this.websocket = new WebSocket(finalUrl);
         
         // Log connection readyState changes for debugging
         this.connectionLogger.startLogging(this.websocket);
@@ -115,7 +108,7 @@ export class WebSocketManager implements IWebSocketManager {
         // Set binary type for audio data
         this.websocket.binaryType = "arraybuffer";
         
-        // Set connection timeout (increase to 15 seconds for slower connections)
+        // Set connection timeout - 15 seconds timeout
         const timeoutId = this.timeoutManager.setupConnectionTimeout(this.websocket, 15000);
         
         // Configure handlers
@@ -127,23 +120,7 @@ export class WebSocketManager implements IWebSocketManager {
         return connectionPromise;
       } catch (wsError) {
         console.error("[WebSocketManager] Error creating WebSocket:", wsError);
-        
-        // If we failed with protocols, try without any protocols
-        if (this.protocols.length > 0 && !this.websocket) {
-          console.log("[WebSocketManager] Retrying connection without protocols");
-          this.protocols = [];
-          this.websocket = new WebSocket(finalUrl);
-          
-          // Set up the same handlers and timeout
-          this.connectionLogger.startLogging(this.websocket);
-          this.websocket.binaryType = "arraybuffer";
-          const timeoutId = this.timeoutManager.setupConnectionTimeout(this.websocket, 15000);
-          setupHandlers(this.websocket, timeoutId);
-          this.connectionHandler.setupEventHandlers(this.websocket, this.connectionLogger);
-          
-          return connectionPromise;
-        }
-        
+        this.promiseHandler.rejectOpenPromise(wsError);
         throw wsError;
       }
     } catch (error) {
@@ -265,13 +242,14 @@ export class WebSocketManager implements IWebSocketManager {
    */
   setMessageHandler(handler: (event: MessageEvent) => void): void {
     console.log("[WebSocketManager] Setting message handler");
+    this.messageHandler = handler;
     
     if (this.websocket) {
       this.websocket.onmessage = (event) => {
         try {
           // Process the message through the handler
-          if (handler) {
-            handler(event);
+          if (this.messageHandler) {
+            this.messageHandler(event);
           }
         } catch (error) {
           console.error("[WebSocketManager] Error in message handler:", error);

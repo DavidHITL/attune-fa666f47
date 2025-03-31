@@ -5,12 +5,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import ConnectionStatus from './ConnectionStatus';
+import EventLog from './EventLog';
 
 const WebSocketTester = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
   const [messages, setMessages] = useState<string[]>([]);
   const [closeCode, setCloseCode] = useState<number | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   
   // Cleanup function for the WebSocket connection
@@ -35,6 +38,7 @@ const WebSocketTester = () => {
     setIsConnecting(true);
     setConnectionStatus('connecting');
     setCloseCode(null);
+    setError(null);
     setMessages([]);
     
     try {
@@ -43,11 +47,13 @@ const WebSocketTester = () => {
       
       // Get the project ID
       const projectId = 'oseowhythgbqvllwonaz';
-      const wsUrl = `wss://${projectId}.supabase.co/functions/v1/websocket-test`;
+      
+      // Use the realtime-chat endpoint directly (same as the main app)
+      const wsUrl = `wss://${projectId}.supabase.co/functions/v1/realtime-chat`;
       
       addMessage(`Connecting to: ${wsUrl}`);
       
-      // Create a new WebSocket connection
+      // Create a new WebSocket connection - explicitly with no protocols
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
       
@@ -73,8 +79,8 @@ const WebSocketTester = () => {
         
         // Send a test message
         try {
-          socket.send("Hello from WebSocketTester!");
-          addMessage("Sent: Hello from WebSocketTester!");
+          socket.send(JSON.stringify({ type: "ping", timestamp: new Date().toISOString() }));
+          addMessage("Sent: Ping message");
         } catch (sendError) {
           addMessage(`Error sending test message: ${sendError}`);
         }
@@ -89,6 +95,7 @@ const WebSocketTester = () => {
         console.error("WebSocket error:", event);
         setConnectionStatus('failed');
         setIsConnecting(false);
+        setError(new Error("Connection failed"));
       });
       
       socket.addEventListener('close', (event) => {
@@ -102,13 +109,17 @@ const WebSocketTester = () => {
       addMessage(`Error creating WebSocket: ${error instanceof Error ? error.message : String(error)}`);
       setConnectionStatus('failed');
       setIsConnecting(false);
+      setError(error instanceof Error ? error : new Error(String(error)));
       toast.error("Failed to create WebSocket connection");
     }
   };
   
   const sendTestMessage = () => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      const message = `Ping ${new Date().toISOString()}`;
+      const message = JSON.stringify({
+        type: "ping", 
+        timestamp: new Date().toISOString()
+      });
       try {
         socketRef.current.send(message);
         addMessage(`Sent: ${message}`);
@@ -196,17 +207,22 @@ const WebSocketTester = () => {
       <CardHeader>
         <CardTitle>WebSocket Test</CardTitle>
         <CardDescription>
-          Tests a minimal WebSocket echo server to diagnose connection issues
+          Tests WebSocket connectivity to diagnose connection issues
         </CardDescription>
       </CardHeader>
       <CardContent>
         {/* Status indicator */}
         <div className="mb-4 flex items-center gap-2">
           <span className="font-medium">Status:</span>
-          {connectionStatus === 'idle' && <span className="text-gray-500">Not connected</span>}
-          {connectionStatus === 'connecting' && <span className="text-blue-500 flex items-center"><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Connecting...</span>}
-          {connectionStatus === 'connected' && <span className="text-green-500 flex items-center"><CheckCircle className="h-4 w-4 mr-1" /> Connected</span>}
-          {connectionStatus === 'failed' && <span className="text-red-500 flex items-center"><XCircle className="h-4 w-4 mr-1" /> Failed</span>}
+          {connectionStatus === 'connected' && (
+            <ConnectionStatus status="connected" />
+          )}
+          {connectionStatus === 'connecting' && (
+            <ConnectionStatus status="connecting" />
+          )}
+          {connectionStatus === 'disconnected' || connectionStatus === 'failed' || connectionStatus === 'idle' && (
+            <ConnectionStatus status="disconnected" error={error} />
+          )}
         </div>
         
         {renderCloseCodeExplanation()}
@@ -224,16 +240,8 @@ const WebSocketTester = () => {
           </div>
         )}
         
-        {/* Message log */}
-        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md h-60 overflow-auto">
-          {messages.length === 0 ? (
-            <div className="text-gray-400 italic">No messages yet</div>
-          ) : (
-            <pre className="text-xs whitespace-pre-wrap font-mono">
-              {messages.join('\n')}
-            </pre>
-          )}
-        </div>
+        {/* Event log */}
+        <EventLog logs={messages} />
       </CardContent>
       <CardFooter className="flex justify-between">
         <Button 

@@ -26,10 +26,9 @@ export class ConnectionInitializer {
       console.log("[ConnectionInitializer] Initializing connection to:", wsUrl);
       console.log("[ConnectionInitializer] Project ID:", projectId);
       
-      // Set the WebSocket URL and protocols - use a more limited set of protocols 
-      // since some might not be supported by the server
+      // Set the WebSocket URL and set protocols to empty array
       webSocketManager.setUrl(wsUrl);
-      webSocketManager.setProtocols(['json']); // Simplified protocols to improve compatibility
+      webSocketManager.setProtocols([]); // Don't use any protocols for maximum compatibility
       
       // Connect to the WebSocket server with increased timeout
       return await webSocketManager.connect((websocket: WebSocket, timeoutId: number) => 
@@ -65,23 +64,32 @@ export class ConnectionInitializer {
   ): void {
     console.log("[ConnectionInitializer] Setting up connection handlers");
     
-    // This is intentionally left as a placeholder as the actual implementation
-    // is in the ConnectionEventHandler class. But we'll add a message handler here
-    // to help with debugging.
+    // Send an immediate ping to help establish connection
+    try {
+      websocket.send(JSON.stringify({
+        type: "ping",
+        timestamp: new Date().toISOString()
+      }));
+      console.log("[ConnectionInitializer] Sent initial ping");
+    } catch (e) {
+      console.warn("[ConnectionInitializer] Failed to send initial ping:", e);
+    }
     
-    const originalMessageHandler = websocket.onmessage;
+    // Set up a temporary message handler for initial messages
     websocket.onmessage = (event) => {
       try {
-        // Log the first message received for debugging
-        console.log("[ConnectionInitializer] First message received:", typeof event.data === 'string' ? event.data.substring(0, 100) + '...' : 'Binary data');
+        console.log("[ConnectionInitializer] Initial message received:", 
+          typeof event.data === 'string' ? event.data.substring(0, 100) + '...' : 'Binary data');
         
-        // Forward to the original handler if it exists
-        if (originalMessageHandler) {
-          originalMessageHandler.call(websocket, event);
+        // Try to parse as JSON to see if it's a pong response
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "pong" || data.type === "connection.initialized") {
+            console.log("[ConnectionInitializer] Connection verified with server response");
+          }
+        } catch (e) {
+          // Not JSON or parsing error - continue
         }
-        
-        // Only handle the first message, then restore the original handler
-        websocket.onmessage = originalMessageHandler;
       } catch (error) {
         console.error("[ConnectionInitializer] Error handling initial message:", error);
       }

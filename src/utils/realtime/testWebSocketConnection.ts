@@ -7,33 +7,36 @@ export async function testWebSocketConnection(): Promise<{ success: boolean; mes
     try {
       console.log("[WebSocketTest] Starting connection test");
       
-      // Get the Supabase project ID from the URL
+      // Get the Supabase project ID 
       const projectId = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID || 'oseowhythgbqvllwonaz';
       const wsUrl = `wss://${projectId}.supabase.co/functions/v1/realtime-chat`;
       
       console.log(`[WebSocketTest] Connecting to ${wsUrl}`);
       
+      // Important: Create WebSocket with no protocols for maximum compatibility
       const socket = new WebSocket(wsUrl);
+      
       let timeoutId: number;
       
-      // Set connection timeout
+      // Set connection timeout - increased to 15 seconds for slower connections
       timeoutId = window.setTimeout(() => {
         console.log("[WebSocketTest] Connection timeout");
         socket.close();
         resolve({ 
           success: false, 
-          message: "Connection timed out after 10 seconds", 
+          message: "Connection timed out after 15 seconds", 
           close: () => {} 
         });
-      }, 10000);
+      }, 15000);
       
       socket.onopen = () => {
-        console.log("[WebSocketTest] Connection established");
+        console.log("[WebSocketTest] Connection established successfully");
         clearTimeout(timeoutId);
         
         // Send a test message
         try {
-          socket.send(JSON.stringify({ type: "test", message: "Connection test" }));
+          socket.send(JSON.stringify({ type: "ping", timestamp: new Date().toISOString() }));
+          console.log("[WebSocketTest] Sent ping message");
         } catch (err) {
           console.error("[WebSocketTest] Error sending test message:", err);
         }
