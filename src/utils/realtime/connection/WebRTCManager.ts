@@ -34,9 +34,13 @@ export class WebRTCManager {
    */
   async initializeConnection(ephemeralKey: string): Promise<void> {
     try {
-      // Create peer connection
+      // Create peer connection with improved ICE servers configuration
       this.pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
       });
       
       // Set up data channel for events
