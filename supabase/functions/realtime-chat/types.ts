@@ -27,6 +27,7 @@ export interface OpenAISocketOptions {
 
 export interface ConnectionHandlerOptions {
   socket: WebSocket;
+  apiKey: string;
   openAISocketRef: MutableRef<WebSocket | null>;
   reconnectTimeoutRef: MutableRef<number | undefined>;
   connectionAttemptsRef: MutableRef<number>;

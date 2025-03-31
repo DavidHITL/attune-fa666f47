@@ -119,7 +119,7 @@ export function handleReconnection(options: OpenAISocketOptions): void {
     
     reconnectTimeoutRef.current = setTimeout(() => {
       console.log("Attempting reconnection now...");
-      connectToOpenAI(options);
+      options.retryConnect();
     }, backoffTime);
     
     // Notify client of reconnection attempt

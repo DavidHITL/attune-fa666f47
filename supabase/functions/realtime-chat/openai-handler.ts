@@ -11,6 +11,7 @@ import { ConnectionHandlerOptions } from "./types.ts";
 export function setupOpenAIConnection(options: ConnectionHandlerOptions): void {
   const { 
     socket, 
+    apiKey,
     openAISocketRef,
     reconnectTimeoutRef,
     connectionAttemptsRef,
@@ -18,11 +19,6 @@ export function setupOpenAIConnection(options: ConnectionHandlerOptions): void {
   } = options;
 
   try {
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY environment variable is not set');
-    }
-    
     console.log('Setting up OpenAI connection with API key length:', apiKey.length);
     
     // Connect to OpenAI
