@@ -20,9 +20,9 @@ export function useConnectionManagement(
   setIsAiSpeaking: (isAiSpeaking: boolean) => void,
   toggleMicrophone: () => Promise<boolean>
 ) {
-  // Disconnect from OpenAI Realtime API
+  // Enhanced disconnect function with proper cleanup sequence
   const disconnect = useCallback(() => {
-    console.log("[useConnectionManagement] Disconnecting from OpenAI Realtime API");
+    console.log("[useConnectionManagement] Starting disconnection sequence");
     
     // Stop microphone if active
     if (recorderRef.current) {
@@ -54,7 +54,7 @@ export function useConnectionManagement(
     console.log("[useConnectionManagement] Disconnect complete");
   }, [setIsConnected, setIsConnecting, setCurrentTranscript, setIsAiSpeaking, setIsMicrophoneActive, audioProcessorRef, connectorRef, recorderRef]);
 
-  // Connect to OpenAI Realtime API
+  // Connect to OpenAI Realtime API with improved state handling
   const connect = useCallback(async () => {
     if (isConnected || isConnecting) {
       console.log("[useConnectionManagement] Already connected or connecting, aborting");
@@ -103,10 +103,28 @@ export function useConnectionManagement(
               }, 1000); // Add a small delay before enabling the microphone
             }
           }
-          else if (state === "failed" || state === "disconnected" || state === "closed") {
-            console.warn(`[useConnectionManagement] WebRTC connection ${state}`);
+          else if (state === "failed") {
+            console.error("[useConnectionManagement] WebRTC connection failed");
+            toast.error("Connection failed. Please try again.");
+            disconnect();
+            setIsConnecting(false);
+          }
+          else if (state === "disconnected") {
+            console.warn("[useConnectionManagement] WebRTC connection disconnected");
+            // Give a brief period for potential auto-recovery
+            const recoveryTimer = setTimeout(() => {
+              if (connectorRef.current?.getConnectionState() !== "connected") {
+                toast.error("Connection lost. Please reconnect.");
+                disconnect();
+              }
+            }, 5000); // 5 second grace period for auto-recovery
+            
+            return () => clearTimeout(recoveryTimer);
+          }
+          else if (state === "closed") {
+            console.warn("[useConnectionManagement] WebRTC connection closed");
             if (isConnected) {
-              toast.error(`WebRTC connection ${state}. Please reconnect.`);
+              toast.error("Connection closed. Please reconnect if needed.");
               disconnect();
             }
           }
@@ -115,9 +133,13 @@ export function useConnectionManagement(
           console.error("[useConnectionManagement] WebRTC error:", error);
           toast.error(`WebRTC error: ${error.message}`);
           
-          // Automatically disconnect on critical errors
-          disconnect();
-          setIsConnecting(false);
+          // Only disconnect on critical errors
+          if (error.message.includes("timeout") || 
+              error.message.includes("failed to set remote description") ||
+              error.message.includes("API Error")) {
+            disconnect();
+            setIsConnecting(false);
+          }
         }
       });
       

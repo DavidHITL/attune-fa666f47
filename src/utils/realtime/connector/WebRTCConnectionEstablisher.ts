@@ -94,14 +94,43 @@ export class WebRTCConnectionEstablisher {
       
       console.log("[WebRTCConnectionEstablisher] Received SDP answer from OpenAI");
       
+      // Create a promise that resolves or rejects based on the connection state
+      const connectionPromise = new Promise<void>((resolve, reject) => {
+        const connectionTimeout = setTimeout(() => {
+          reject(new Error("Remote description set but connection timed out"));
+        }, 10000); // 10 second timeout for connection after setting remote description
+        
+        const connectionStateHandler = () => {
+          if (pc.connectionState === "connected") {
+            clearTimeout(connectionTimeout);
+            pc.removeEventListener("connectionstatechange", connectionStateHandler);
+            resolve();
+          } else if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+            clearTimeout(connectionTimeout);
+            pc.removeEventListener("connectionstatechange", connectionStateHandler);
+            reject(new Error(`Connection failed with state: ${pc.connectionState}`));
+          }
+        };
+        
+        pc.addEventListener("connectionstatechange", connectionStateHandler);
+      });
+      
       try {
         // Set remote description from OpenAI response
+        console.log("[WebRTCConnectionEstablisher] Setting remote description");
         await pc.setRemoteDescription(result.answer);
-        
         console.log("[WebRTCConnectionEstablisher] Remote description set successfully");
-        console.log("[WebRTCConnectionEstablisher] WebRTC connection established successfully");
         
-        return { pc, dc };
+        try {
+          // Wait for the connection to be established
+          console.log("[WebRTCConnectionEstablisher] Waiting for connection to be established");
+          await connectionPromise;
+          console.log("[WebRTCConnectionEstablisher] WebRTC connection established successfully");
+          return { pc, dc };
+        } catch (connectionError) {
+          console.error("[WebRTCConnectionEstablisher] Connection error:", connectionError);
+          throw connectionError;
+        }
       } catch (sdpError) {
         console.error("[WebRTCConnectionEstablisher] Error setting remote description:", sdpError);
         throw new Error(`Failed to set remote description: ${sdpError instanceof Error ? sdpError.message : String(sdpError)}`);

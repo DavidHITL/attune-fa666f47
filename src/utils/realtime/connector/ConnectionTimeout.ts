@@ -33,4 +33,21 @@ export class ConnectionTimeout {
       this.timeoutId = null;
     }
   }
+  
+  /**
+   * Check if a timeout is currently active
+   */
+  isActive(): boolean {
+    return this.timeoutId !== null;
+  }
+  
+  /**
+   * Reset the timeout with a new duration
+   * @param onTimeout Callback to execute when timeout occurs
+   * @param timeoutMs Timeout in milliseconds
+   * @returns The new timeout ID
+   */
+  resetTimeout(onTimeout: () => void, timeoutMs: number = 15000): number {
+    return this.setTimeout(onTimeout, timeoutMs);
+  }
 }
