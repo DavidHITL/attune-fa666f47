@@ -14,14 +14,20 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
       console.log("[testWebSocketConnection] Connecting to:", wsUrl);
       console.log("[testWebSocketConnection] Browser WebSocket support:", typeof WebSocket !== 'undefined' ? 'Available' : 'Not Available');
       
+      // Track whether we've already resolved the promise to avoid multiple resolves
+      let hasResolved = false;
+      
       // Connection timeout handling
       const timeoutId = setTimeout(() => {
         console.error("[testWebSocketConnection] Connection timed out after 15 seconds");
-        resolve({
-          success: false,
-          message: "Connection timed out after 15 seconds. The server might not be responding or is unable to upgrade to WebSocket.",
-          close: () => {}
-        });
+        if (!hasResolved) {
+          hasResolved = true;
+          resolve({
+            success: false,
+            message: "Connection timed out after 15 seconds. The server might not be responding or is unable to upgrade to WebSocket.",
+            close: () => {}
+          });
+        }
       }, 15000);
       
       // Create WebSocket connection without protocols first (simpler approach)
@@ -40,14 +46,17 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
           console.error("[testWebSocketConnection] Failed to send ping message:", sendError);
         }
         
-        resolve({
-          success: true,
-          message: `WebSocket connection established successfully. Ready state: ${ws.readyState}`,
-          close: () => {
-            console.log("[testWebSocketConnection] Manually closing WebSocket connection");
-            ws.close();
-          }
-        });
+        if (!hasResolved) {
+          hasResolved = true;
+          resolve({
+            success: true,
+            message: `WebSocket connection established successfully. Ready state: ${ws.readyState}`,
+            close: () => {
+              console.log("[testWebSocketConnection] Manually closing WebSocket connection");
+              ws.close();
+            }
+          });
+        }
       };
       
       ws.onmessage = (event) => {
@@ -56,8 +65,9 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
           console.log("[testWebSocketConnection] Received message:", data);
           
           // If we get a response, that's already a good sign
-          if (!timeoutId._destroyed) {
+          if (!hasResolved) {
             clearTimeout(timeoutId);
+            hasResolved = true;
             resolve({
               success: true,
               message: `WebSocket connection success! Received message: ${JSON.stringify(data)}`,
@@ -81,8 +91,9 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
           : "WebSocket connection failed. Check browser console for details.";
         
         // Only resolve if not resolved yet
-        if (!timeoutId._destroyed) {
+        if (!hasResolved) {
           clearTimeout(timeoutId);
+          hasResolved = true;
           resolve({
             success: false,
             message: errorMessage + " This often means the Edge Function failed to upgrade the connection properly.",
@@ -102,8 +113,9 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
           `[testWebSocketConnection] Connection closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`
         );
         
-        if (!timeoutId._destroyed) {
+        if (!hasResolved) {
           clearTimeout(timeoutId);
+          hasResolved = true;
           
           if (!event.wasClean) {
             resolve({
