@@ -1,6 +1,7 @@
 
 import React from "react";
 import ChatConversation from "./ChatConversation";
+import RealtimeChat from "./realtime/RealtimeChat";
 
 interface ChatInterfaceProps {
   sessionStarted?: boolean;
@@ -18,6 +19,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         sessionStarted={sessionStarted}
         sessionEndTime={sessionEndTime}
       />
+      
+      {/* Only show RealtimeChat when session is started */}
+      {sessionStarted && (
+        <RealtimeChat
+          sessionStarted={sessionStarted}
+          sessionEndTime={sessionEndTime}
+        />
+      )}
     </div>
   );
 };

@@ -29,7 +29,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
           </div>
         </CardHeader>
         <CardContent className="p-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-3 mb-4">
               <TabsTrigger value="voice-chat">Chat</TabsTrigger>
               <TabsTrigger value="tests">Tests</TabsTrigger>
