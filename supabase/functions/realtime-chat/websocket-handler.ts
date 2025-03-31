@@ -1,5 +1,5 @@
 
-import { corsHeaders } from "./utils.ts";
+import { corsHeaders, createErrorResponse, logWithTimestamp, isWebSocketUpgrade } from "./utils.ts";
 import { handleUpgrade } from "./handlers/upgrade-handler.ts";
 import { initializeConnections } from "./handlers/connection-initializer.ts";
 import { WebSocketOptions, defaultOptions } from "./types.ts";
@@ -10,6 +10,7 @@ import { WebSocketOptions, defaultOptions } from "./types.ts";
 export async function handleWebSocketRequest(req: Request, options: WebSocketOptions = defaultOptions): Promise<Response> {
   // Allow CORS preflight for websockets
   if (req.method === "OPTIONS") {
+    logWithTimestamp("[WebSocket Handler] Handling OPTIONS request");
     return new Response(null, {
       headers: {
         ...corsHeaders,
@@ -21,19 +22,30 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
   }
   
   try {
-    console.log("[WebSocket Handler] Processing WebSocket request");
+    logWithTimestamp("[WebSocket Handler] Processing WebSocket request");
     
-    // Handle the WebSocket upgrade request - SIMPLIFIED WITHOUT PROTOCOLS
+    // Check if this is a WebSocket upgrade request
+    if (!isWebSocketUpgrade(req.headers)) {
+      logWithTimestamp("[WebSocket Handler] Not a WebSocket upgrade request, returning 400", "error");
+      return createErrorResponse("Expected WebSocket upgrade", 400);
+    }
+    
+    // Log request headers for debugging
+    logWithTimestamp(`[WebSocket Handler] Request headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
+    
+    // Handle the WebSocket upgrade request
     const upgradeResult = await handleUpgrade(req);
     
     // If the result is a Response, it means there was an error during upgrade
     if (upgradeResult instanceof Response) {
-      console.log("[WebSocket Handler] Upgrade failed, returning error response");
+      logWithTimestamp("[WebSocket Handler] Upgrade failed, returning error response", "error");
       return upgradeResult;
     }
     
     // We have a successful WebSocket connection
     const { socket, response } = upgradeResult;
+    
+    logWithTimestamp("[WebSocket Handler] WebSocket connection established successfully");
     
     // Send an immediate message to the client to confirm the connection
     try {
@@ -42,25 +54,25 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
         message: "WebSocket connection initialized",
         timestamp: new Date().toISOString()
       }));
-      console.log("[WebSocket Handler] Sent initial connection message to client");
+      logWithTimestamp("[WebSocket Handler] Sent initial connection message to client");
     } catch (e) {
-      console.error("[WebSocket Handler] Error sending initial message:", e);
+      logWithTimestamp("[WebSocket Handler] Error sending initial message: " + (e instanceof Error ? e.message : String(e)), "error");
     }
     
     // Set up initial error and close handlers for debugging
     socket.onerror = (event) => {
-      console.error("[WebSocket Handler] Socket error:", event);
+      logWithTimestamp("[WebSocket Handler] Socket error: " + JSON.stringify(event), "error");
     };
 
     socket.onclose = (event) => {
-      console.log(`[WebSocket Handler] Socket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
+      logWithTimestamp(`[WebSocket Handler] Socket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
     };
     
     // Add a basic message handler for pings
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("[WebSocket Handler] Received message:", data.type || "unknown type");
+        logWithTimestamp("[WebSocket Handler] Received message: " + data.type || "unknown type");
         
         // Handle ping messages immediately with a pong
         if (data.type === "ping") {
@@ -69,21 +81,20 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
             timestamp: new Date().toISOString(),
             echo: data.timestamp
           }));
-          console.log("[WebSocket Handler] Responded with pong");
+          logWithTimestamp("[WebSocket Handler] Responded with pong");
         }
       } catch (error) {
-        console.error("[WebSocket Handler] Error handling message:", error);
+        logWithTimestamp("[WebSocket Handler] Error handling message: " + (error instanceof Error ? error.message : String(error)), "error");
       }
     };
     
-    // CRITICAL FIX: Initialize connections asynchronously AFTER returning the response
-    // This prevents any delay in returning the 101 Switching Protocols response
+    // Initialize connections asynchronously AFTER returning the response
     setTimeout(() => {
       try {
         initializeConnections(socket);
-        console.log("[WebSocket Handler] Connection initialization completed");
+        logWithTimestamp("[WebSocket Handler] Connection initialization completed");
       } catch (error) {
-        console.error("[WebSocket Handler] Error during connection initialization:", error);
+        logWithTimestamp("[WebSocket Handler] Error during connection initialization: " + (error instanceof Error ? error.message : String(error)), "error");
         try {
           if (socket.readyState === socket.OPEN) {
             socket.send(JSON.stringify({ 
@@ -94,22 +105,16 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
             }));
           }
         } catch (e) {
-          console.error("[WebSocket Handler] Failed to send error message:", e);
+          logWithTimestamp("[WebSocket Handler] Failed to send error message: " + (e instanceof Error ? e.message : String(e)), "error");
         }
       }
     }, 0);
     
     // Return the response immediately for a successful WebSocket handshake
-    console.log("[WebSocket Handler] Returning WebSocket upgrade response");
+    logWithTimestamp("[WebSocket Handler] Returning WebSocket upgrade response");
     return response;
   } catch (error) {
-    console.error("[WebSocket Handler] Critical error:", error);
-    return new Response(JSON.stringify({
-      error: "WebSocket connection failed",
-      details: error instanceof Error ? error.message : String(error)
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
+    logWithTimestamp("[WebSocket Handler] Critical error: " + (error instanceof Error ? error.message : String(error)), "error");
+    return createErrorResponse("WebSocket connection failed: " + (error instanceof Error ? error.message : String(error)), 500);
   }
 }

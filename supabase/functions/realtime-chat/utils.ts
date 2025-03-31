@@ -4,7 +4,7 @@
  */
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, upgrade, connection',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, upgrade, connection, sec-websocket-protocol',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
@@ -12,6 +12,7 @@ export const corsHeaders = {
  * Generate formatted error response
  */
 export function createErrorResponse(message: string, status = 500): Response {
+  console.error(`[Error] ${message} (Status: ${status})`);
   return new Response(
     JSON.stringify({ error: message }),
     { 
@@ -26,7 +27,16 @@ export function createErrorResponse(message: string, status = 500): Response {
  */
 export function isWebSocketUpgrade(headers: Headers): boolean {
   const upgradeHeader = headers.get('upgrade');
-  return !!upgradeHeader && upgradeHeader.toLowerCase() === 'websocket';
+  const connection = headers.get('connection');
+  
+  const isWebSocketUpgrade = !!upgradeHeader && upgradeHeader.toLowerCase() === 'websocket';
+  const hasConnectionUpgrade = !!connection && 
+    connection.split(',').map(v => v.trim().toLowerCase()).includes('upgrade');
+  
+  console.log(`[WebSocket] Headers check - Upgrade: ${upgradeHeader}, Connection: ${connection}`);
+  console.log(`[WebSocket] Is WebSocket upgrade: ${isWebSocketUpgrade && hasConnectionUpgrade}`);
+  
+  return isWebSocketUpgrade && hasConnectionUpgrade;
 }
 
 /**

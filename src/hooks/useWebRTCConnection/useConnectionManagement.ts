@@ -93,10 +93,13 @@ export function useConnectionManagement(
       
       connectorRef.current = connector;
       
-      // Attempt to connect
+      // Attempt to connect with additional logging
       console.log("[useConnectionManagement] Calling connector.connect()");
+      console.time("WebRTC Connection Process");
+      
       const success = await connector.connect();
       
+      console.timeEnd("WebRTC Connection Process");
       console.log("[useConnectionManagement] Connection result:", success ? "Success" : "Failed");
       
       if (success) {
@@ -112,7 +115,7 @@ export function useConnectionManagement(
         setIsConnecting(false);
         return true;
       } else {
-        toast.error("Failed to connect to OpenAI Realtime API");
+        toast.error("Failed to connect to OpenAI Realtime API. Check console for details.");
         connectorRef.current = null;
         setIsConnecting(false);
         return false;

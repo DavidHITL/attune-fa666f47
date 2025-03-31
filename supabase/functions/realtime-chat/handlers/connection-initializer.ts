@@ -1,27 +1,30 @@
-import { corsHeaders } from "../utils.ts";
+
+import { corsHeaders, logWithTimestamp } from "../utils.ts";
 
 /**
  * Initialize WebSocket connection handling
  */
 export function initializeConnections(socket: WebSocket): void {
-  console.log("[Connection Initializer] Setting up WebSocket communication");
+  logWithTimestamp("[Connection Initializer] Setting up WebSocket communication");
   
   try {
     // Send heartbeat pings every 30 seconds to keep connection alive
     const pingInterval = setInterval(() => {
       if (socket.readyState === socket.OPEN) {
+        logWithTimestamp("[Connection Initializer] Sending heartbeat ping");
         socket.send(JSON.stringify({
           type: "ping",
           timestamp: new Date().toISOString()
         }));
       } else {
+        logWithTimestamp("[Connection Initializer] Socket no longer open, clearing ping interval", "warn");
         clearInterval(pingInterval);
       }
     }, 30000);
     
     // Handle socket closure
     socket.onclose = (event) => {
-      console.log(`[Connection Initializer] Socket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
+      logWithTimestamp(`[Connection Initializer] Socket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
       clearInterval(pingInterval);
     };
     
@@ -29,7 +32,7 @@ export function initializeConnections(socket: WebSocket): void {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log(`[Connection Initializer] Received message type: ${data.type || "unknown"}`);
+        logWithTimestamp(`[Connection Initializer] Received message type: ${data.type || "unknown"}`);
         
         // Handle ping messages
         if (data.type === "ping") {
@@ -38,14 +41,21 @@ export function initializeConnections(socket: WebSocket): void {
             timestamp: new Date().toISOString(),
             echo: data.timestamp
           }));
+          logWithTimestamp("[Connection Initializer] Responded with pong");
+        }
+        
+        // Log other message types for debugging
+        else {
+          logWithTimestamp(`[Connection Initializer] Processing message of type: ${data.type}`);
         }
       } catch (error) {
-        console.error("[Connection Initializer] Error handling message:", error);
+        logWithTimestamp("[Connection Initializer] Error handling message: " + (error instanceof Error ? error.message : String(error)), "error");
         
         if (socket.readyState === socket.OPEN) {
           socket.send(JSON.stringify({
             type: "error",
             error: "Failed to process message",
+            details: error instanceof Error ? error.message : String(error),
             timestamp: new Date().toISOString()
           }));
         }
@@ -59,9 +69,12 @@ export function initializeConnections(socket: WebSocket): void {
         message: "WebSocket connection fully initialized",
         timestamp: new Date().toISOString()
       }));
+      logWithTimestamp("[Connection Initializer] Sent connection ready notification");
+    } else {
+      logWithTimestamp("[Connection Initializer] Socket not open, could not send ready message", "warn");
     }
   } catch (error) {
-    console.error("[Connection Initializer] Error in connection setup:", error);
+    logWithTimestamp("[Connection Initializer] Error in connection setup: " + (error instanceof Error ? error.message : String(error)), "error");
     
     if (socket.readyState === socket.OPEN) {
       socket.send(JSON.stringify({

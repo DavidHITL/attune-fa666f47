@@ -94,22 +94,28 @@ export class WebRTCConnector {
           
           console.log("[WebRTCConnector] Setting remote description from answer");
           
-          // Set remote description from OpenAI response
-          await this.pc.setRemoteDescription(result.answer);
-          
-          console.log("[WebRTCConnector] Connection established successfully");
-          
-          // Configure the session after connection is established
-          setTimeout(() => {
-            if (this.dc && this.dc.readyState === "open") {
-              console.log("[WebRTCConnector] Configuring session");
-              configureSession(this.dc, this.options);
-            } else {
-              console.warn(`[WebRTCConnector] Data channel not ready for session config, state: ${this.dc?.readyState}`);
-            }
-          }, 1000);
-          
-          return true;
+          try {
+            // Set remote description from OpenAI response
+            await this.pc.setRemoteDescription(result.answer);
+            
+            console.log("[WebRTCConnector] Remote description set successfully");
+            console.log("[WebRTCConnector] Connection established successfully");
+            
+            // Configure the session after connection is established
+            setTimeout(() => {
+              if (this.dc && this.dc.readyState === "open") {
+                console.log("[WebRTCConnector] Configuring session");
+                configureSession(this.dc, this.options);
+              } else {
+                console.warn(`[WebRTCConnector] Data channel not ready for session config, state: ${this.dc?.readyState}`);
+              }
+            }, 1000);
+            
+            return true;
+          } catch (sdpError) {
+            console.error("[WebRTCConnector] Error setting remote description:", sdpError);
+            throw new Error(`Failed to set remote description: ${sdpError instanceof Error ? sdpError.message : String(sdpError)}`);
+          }
         } catch (error) {
           console.error("[WebRTCConnector] Error connecting to OpenAI:", error);
           this.handleError(error);
@@ -192,6 +198,8 @@ export class WebRTCConnector {
    */
   private handleError(error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    console.error("[WebRTCConnector] Error:", errorMessage);
     
     if (this.options.onError) {
       this.options.onError(new Error(errorMessage));

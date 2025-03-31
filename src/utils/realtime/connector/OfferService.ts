@@ -34,6 +34,14 @@ export async function sendOffer(
     console.log(`[WebRTC] Using model: ${model}`);
     console.log(`[WebRTC] Requesting from endpoint: ${requestUrl}`);
     
+    console.log("[WebRTC] About to send SDP offer to OpenAI");
+    
+    // Log the first and last 100 chars of the SDP for debugging
+    const sdpPreview = localDescription.sdp.length > 200 
+      ? `${localDescription.sdp.substring(0, 100)}...${localDescription.sdp.substring(localDescription.sdp.length - 100)}`
+      : localDescription.sdp;
+    console.log(`[WebRTC] SDP offer preview: ${sdpPreview}`);
+    
     const sdpResponse = await fetch(requestUrl, {
       method: "POST",
       body: localDescription.sdp,
@@ -43,11 +51,22 @@ export async function sendOffer(
       }
     });
 
+    // Log response status for debugging
+    console.log(`[WebRTC] SDP response status: ${sdpResponse.status}`);
+
     // Check for HTTP errors
     if (!sdpResponse.ok) {
       const errorText = await sdpResponse.text();
       console.error("[WebRTC] API Error Status:", sdpResponse.status);
       console.error("[WebRTC] API Error Response:", errorText);
+      
+      try {
+        // Try to parse the error as JSON for more detail
+        const errorJson = JSON.parse(errorText);
+        console.error("[WebRTC] API Error Details:", errorJson);
+      } catch (e) {
+        // Not JSON, continue with the text error
+      }
       
       if (sdpResponse.status === 401) {
         return {
@@ -73,6 +92,12 @@ export async function sendOffer(
         error: "Empty SDP answer received from API"
       };
     }
+    
+    // Log preview of the SDP answer
+    const answerPreview = sdpAnswer.length > 200 
+      ? `${sdpAnswer.substring(0, 100)}...${sdpAnswer.substring(sdpAnswer.length - 100)}`
+      : sdpAnswer;
+    console.log(`[WebRTC] SDP answer preview: ${answerPreview}`);
     
     // Create and return the remote description
     const answer: RTCSessionDescriptionInit = {
