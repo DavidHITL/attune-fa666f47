@@ -183,6 +183,49 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}) {
     }
   };
 
+  // Toggle microphone on/off
+  const toggleMicrophone = useCallback(async () => {
+    if (!isConnected || !connectorRef.current) {
+      toast.error("Please connect to OpenAI first");
+      return false;
+    }
+    
+    if (isMicrophoneActive && recorderRef.current) {
+      // Stop recording
+      recorderRef.current.stop();
+      recorderRef.current = null;
+      setIsMicrophoneActive(false);
+      return true;
+    } else {
+      // Start recording
+      try {
+        const recorder = new AudioRecorder({
+          onAudioData: (audioData) => {
+            // Send audio data if connection is active
+            if (connectorRef.current) {
+              connectorRef.current.sendAudioData(audioData);
+            }
+          }
+        });
+        
+        const success = await recorder.start();
+        
+        if (success) {
+          recorderRef.current = recorder;
+          setIsMicrophoneActive(true);
+          return true;
+        } else {
+          toast.error("Failed to start microphone");
+          return false;
+        }
+      } catch (error) {
+        console.error("[useWebRTCConnection] Microphone error:", error);
+        toast.error(`Microphone error: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+      }
+    }
+  }, [isConnected, isMicrophoneActive]);
+
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
     if (isConnected || isConnecting) return false;
@@ -263,49 +306,6 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}) {
     }
     isPlayingRef.current = false;
   }, []);
-
-  // Toggle microphone on/off
-  const toggleMicrophone = useCallback(async () => {
-    if (!isConnected || !connectorRef.current) {
-      toast.error("Please connect to OpenAI first");
-      return false;
-    }
-    
-    if (isMicrophoneActive && recorderRef.current) {
-      // Stop recording
-      recorderRef.current.stop();
-      recorderRef.current = null;
-      setIsMicrophoneActive(false);
-      return true;
-    } else {
-      // Start recording
-      try {
-        const recorder = new AudioRecorder({
-          onAudioData: (audioData) => {
-            // Send audio data if connection is active
-            if (connectorRef.current) {
-              connectorRef.current.sendAudioData(audioData);
-            }
-          }
-        });
-        
-        const success = await recorder.start();
-        
-        if (success) {
-          recorderRef.current = recorder;
-          setIsMicrophoneActive(true);
-          return true;
-        } else {
-          toast.error("Failed to start microphone");
-          return false;
-        }
-      } catch (error) {
-        console.error("[useWebRTCConnection] Microphone error:", error);
-        toast.error(`Microphone error: ${error instanceof Error ? error.message : String(error)}`);
-        return false;
-      }
-    }
-  }, [isConnected, isMicrophoneActive]);
 
   // Send text message to OpenAI
   const sendTextMessage = useCallback((text: string) => {
