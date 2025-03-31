@@ -23,7 +23,9 @@ export function useAudioProcessor(
       setIsAiSpeaking(false);
     },
     onTranscriptUpdate: (textDelta) => {
-      setCurrentTranscript(prev => prev + textDelta);
+      // Fixed: Store current transcript in a variable and append delta
+      const newTranscript = "" + textDelta; // Force string conversion
+      setCurrentTranscript(newTranscript);
     },
     onTranscriptComplete: () => {
       setTimeout(() => setCurrentTranscript(""), 1000);

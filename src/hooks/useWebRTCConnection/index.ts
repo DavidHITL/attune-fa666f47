@@ -57,7 +57,8 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
         setIsAiSpeaking(false);
       },
       onTranscriptUpdate: (textDelta) => {
-        setCurrentTranscript(prev => prev + textDelta);
+        // Fix: Don't use a callback function here, just concatenate directly
+        setCurrentTranscript(currentTranscript + textDelta);
       },
       onTranscriptComplete: () => {
         setTimeout(() => setCurrentTranscript(""), 1000);
@@ -69,7 +70,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
         audioProcessorRef.current.cleanup();
       }
     };
-  }, []);
+  }, [currentTranscript]); // Add currentTranscript as a dependency since we're using it
   
   // Set up message handler
   const { handleMessage } = useMessageHandler(messageHandlerRef, setMessages);
