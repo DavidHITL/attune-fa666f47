@@ -1,10 +1,8 @@
-
 import { WebRTCOptions } from "../WebRTCTypes";
 import { setupPeerConnectionListeners } from "../WebRTCConnectionListeners";
 import { setupDataChannelListeners } from "../WebRTCDataChannelHandler";
 import { createPeerConnection } from "./PeerConnectionFactory";
 import { sendOffer } from "./OfferService";
-import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
 import { ConnectionBase } from "./ConnectionBase";
 import { AudioSender } from "./AudioSender";
 import { TextMessageSender } from "./TextMessageSender";
@@ -33,9 +31,17 @@ export class WebRTCConnectionManager extends ConnectionBase {
   }
 
   /**
-   * Initialize and connect to OpenAI's Realtime API using WebRTC
+   * Get the options used to initialize this manager
    */
-  async connect(): Promise<boolean> {
+  getOptions(): WebRTCOptions {
+    return this.options;
+  }
+
+  /**
+   * Initialize and connect to OpenAI's Realtime API using WebRTC
+   * @param apiKey Ephemeral API key for authenticating with OpenAI
+   */
+  async connect(apiKey: string): Promise<boolean> {
     console.log("[WebRTCConnectionManager] Starting connection process");
     
     this.clearConnectionTimeout();
@@ -77,60 +83,51 @@ export class WebRTCConnectionManager extends ConnectionBase {
     
     console.log("[WebRTCConnectionManager] Local description set");
     
-    // Send offer to OpenAI using secure API client
     try {
-      return await withSecureOpenAI(async (apiKey) => {
-        try {
-          if (!this.pc || !this.pc.localDescription) {
-            console.error("[WebRTCConnectionManager] No valid local description available");
-            throw new Error("No valid local description available");
-          }
-          
-          console.log("[WebRTCConnectionManager] Sending offer to OpenAI");
-          
-          // Set a timeout for the connection
-          this.connectionTimeout = setTimeout(() => {
-            console.error("[WebRTCConnectionManager] Connection timeout after 15 seconds");
-            if (this.options.onError) {
-              this.options.onError(new Error("Connection timeout after 15 seconds"));
-            }
-            this.disconnect();
-          }, 15000) as unknown as number;
-          
-          // Send the offer to OpenAI and get answer
-          const result = await sendOffer(
-            this.pc.localDescription, 
-            apiKey, 
-            this.options.model || "gpt-4o-realtime-preview-2024-12-17"
-          );
-          
-          if (!result.success) {
-            console.error(`[WebRTCConnectionManager] Failed to get valid answer: ${result.error}`);
-            throw new Error(result.error || "Failed to send offer");
-          }
-          
-          console.log("[WebRTCConnectionManager] Setting remote description from answer");
-          
-          try {
-            // Set remote description from OpenAI response
-            await this.pc.setRemoteDescription(result.answer);
-            
-            console.log("[WebRTCConnectionManager] Remote description set successfully");
-            console.log("[WebRTCConnectionManager] Connection established successfully");
-            
-            return true;
-          } catch (sdpError) {
-            console.error("[WebRTCConnectionManager] Error setting remote description:", sdpError);
-            throw new Error(`Failed to set remote description: ${sdpError instanceof Error ? sdpError.message : String(sdpError)}`);
-          }
-        } catch (error) {
-          console.error("[WebRTCConnectionManager] Error connecting to OpenAI:", error);
-          this.handleError(error);
-          return false;
+      if (!this.pc || !this.pc.localDescription) {
+        console.error("[WebRTCConnectionManager] No valid local description available");
+        throw new Error("No valid local description available");
+      }
+      
+      console.log("[WebRTCConnectionManager] Sending offer to OpenAI");
+      
+      // Set a timeout for the connection
+      this.connectionTimeout = setTimeout(() => {
+        console.error("[WebRTCConnectionManager] Connection timeout after 15 seconds");
+        if (this.options.onError) {
+          this.options.onError(new Error("Connection timeout after 15 seconds"));
         }
-      });
+        this.disconnect();
+      }, 15000) as unknown as number;
+      
+      // Send the offer to OpenAI and get answer
+      const result = await sendOffer(
+        this.pc.localDescription, 
+        apiKey, 
+        this.options.model || "gpt-4o-realtime-preview-2024-12-17"
+      );
+      
+      if (!result.success) {
+        console.error(`[WebRTCConnectionManager] Failed to get valid answer: ${result.error}`);
+        throw new Error(result.error || "Failed to send offer");
+      }
+      
+      console.log("[WebRTCConnectionManager] Setting remote description from answer");
+      
+      try {
+        // Set remote description from OpenAI response
+        await this.pc.setRemoteDescription(result.answer);
+        
+        console.log("[WebRTCConnectionManager] Remote description set successfully");
+        console.log("[WebRTCConnectionManager] Connection established successfully");
+        
+        return true;
+      } catch (sdpError) {
+        console.error("[WebRTCConnectionManager] Error setting remote description:", sdpError);
+        throw new Error(`Failed to set remote description: ${sdpError instanceof Error ? sdpError.message : String(sdpError)}`);
+      }
     } catch (error) {
-      console.error("[WebRTCConnectionManager] Error in withSecureOpenAI:", error);
+      console.error("[WebRTCConnectionManager] Error connecting to OpenAI:", error);
       this.handleError(error);
       return false;
     }

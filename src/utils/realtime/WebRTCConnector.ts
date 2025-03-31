@@ -1,6 +1,7 @@
 
 import { WebRTCOptions } from "./WebRTCTypes";
 import { WebRTCConnectionManager } from "./connector/WebRTCConnectionManager";
+import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
 
 export class WebRTCConnector {
   private connectionManager: WebRTCConnectionManager;
@@ -37,7 +38,23 @@ export class WebRTCConnector {
    */
   async connect(): Promise<boolean> {
     try {
-      return await this.connectionManager.connect();
+      // Use withSecureOpenAI to get an ephemeral token and establish connection
+      return await withSecureOpenAI(
+        async (apiKey) => {
+          try {
+            console.log("[WebRTCConnector] Got ephemeral key, connecting to OpenAI Realtime API");
+            return await this.connectionManager.connect(apiKey);
+          } catch (error) {
+            console.error("[WebRTCConnector] Error connecting with ephemeral key:", error);
+            throw error;
+          }
+        },
+        {
+          model: this.connectionManager.getOptions().model,
+          voice: this.connectionManager.getOptions().voice,
+          instructions: this.connectionManager.getOptions().instructions
+        }
+      );
     } catch (error) {
       console.error("[WebRTCConnector] Error in connect:", error);
       this.connectionManager.handleError(error);
