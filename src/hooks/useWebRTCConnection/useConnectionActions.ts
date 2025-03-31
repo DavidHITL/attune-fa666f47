@@ -71,7 +71,7 @@ export function useConnectionActions(
       setIsConnecting(false);
       return false;
     }
-  }, [handleMessage, isConnected, isConnecting, options]);
+  }, [handleMessage, isConnected, isConnecting, options, disconnect, toggleMicrophone]);
 
   // Disconnect from OpenAI Realtime API
   const disconnect = useCallback(() => {
@@ -115,6 +115,20 @@ export function useConnectionActions(
     } else {
       // Start recording
       try {
+        // Check if browser supports getUserMedia
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          toast.error("Your browser doesn't support microphone access");
+          return false;
+        }
+        
+        // First request permission to avoid surprising the user
+        const permissionResult = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        
+        if (permissionResult.state === 'denied') {
+          toast.error("Microphone access is blocked. Please allow access in your browser settings.");
+          return false;
+        }
+        
         const recorder = new AudioRecorder({
           onAudioData: (audioData) => {
             // Send audio data if connection is active
@@ -129,6 +143,7 @@ export function useConnectionActions(
         if (success) {
           recorderRef.current = recorder;
           setIsMicrophoneActive(true);
+          toast.success("Microphone activated");
           return true;
         } else {
           toast.error("Failed to start microphone");
@@ -140,7 +155,7 @@ export function useConnectionActions(
         return false;
       }
     }
-  }, [isConnected, isMicrophoneActive, connectorRef, recorderRef]);
+  }, [isConnected, isMicrophoneActive, connectorRef]);
 
   // Send text message to OpenAI
   const sendTextMessage = useCallback((text: string) => {

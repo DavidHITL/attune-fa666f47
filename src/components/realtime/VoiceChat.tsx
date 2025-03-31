@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   onClose
 }) => {
   const [textInput, setTextInput] = useState("");
+  const [microphonePermission, setMicrophonePermission] = useState<PermissionState | null>(null);
   
   const {
     isConnected,
@@ -34,6 +34,54 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     autoConnect: false,
     enableMicrophone: false
   });
+
+  // Check microphone permissions
+  useEffect(() => {
+    const checkMicrophonePermission = async () => {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        setMicrophonePermission(permissionStatus.state);
+        
+        // Listen for permission changes
+        permissionStatus.addEventListener('change', () => {
+          setMicrophonePermission(permissionStatus.state);
+        });
+        
+        return () => {
+          permissionStatus.removeEventListener('change', () => {});
+        };
+      } catch (error) {
+        console.error("Error checking microphone permission:", error);
+        // If we can't check permissions, assume we need to ask
+        setMicrophonePermission(null);
+      }
+    };
+    
+    checkMicrophonePermission();
+  }, []);
+
+  // Handle microphone button click with permission checking
+  const handleMicrophoneToggle = async () => {
+    // If already active, just toggle off
+    if (isMicrophoneActive) {
+      toggleMicrophone();
+      return;
+    }
+    
+    // If permission is denied, show helpful message
+    if (microphonePermission === 'denied') {
+      toast.error("Microphone access is blocked. Please update your browser settings.");
+      return;
+    }
+    
+    // Otherwise try to activate
+    const success = await toggleMicrophone();
+    
+    if (!success && microphonePermission !== 'denied') {
+      // If failed but not explicitly denied, might be a technical issue
+      toast.error("Could not access microphone. Please check your device settings.");
+    }
+  };
 
   // Handle form submission for text input
   const handleSubmit = (e: React.FormEvent) => {
@@ -56,6 +104,39 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     };
   }, [disconnect]);
 
+  // Render microphone button based on permission state
+  const renderMicrophoneButton = () => {
+    if (!isConnected) return null;
+    
+    let buttonVariant: "default" | "destructive" | "outline" = "outline";
+    let buttonTitle = "Enable microphone";
+    let buttonIcon = <Mic size={16} />;
+    let isDisabled = false;
+    
+    if (isMicrophoneActive) {
+      buttonVariant = "destructive";
+      buttonTitle = "Disable microphone";
+      buttonIcon = <MicOff size={16} />;
+    } else if (microphonePermission === 'denied') {
+      buttonTitle = "Microphone blocked by browser";
+      isDisabled = true;
+    }
+    
+    return (
+      <Button
+        size="sm"
+        variant={buttonVariant}
+        onClick={handleMicrophoneToggle}
+        disabled={isDisabled}
+        className="flex items-center gap-1"
+        title={buttonTitle}
+      >
+        {buttonIcon}
+        {isMicrophoneActive ? "Mute" : "Speak"}
+      </Button>
+    );
+  };
+
   return (
     <div className="flex flex-col space-y-4 w-full max-w-xl mx-auto p-4 bg-white rounded-lg shadow-md">
       {/* Connection Status & Controls */}
@@ -75,16 +156,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
         <div className="flex space-x-2">
           {isConnected ? (
             <>
-              <Button
-                size="sm"
-                variant={isMicrophoneActive ? "destructive" : "outline"}
-                onClick={() => toggleMicrophone()}
-                disabled={!isConnected}
-                className="flex items-center gap-1"
-              >
-                {isMicrophoneActive ? <MicOff size={16} /> : <Mic size={16} />}
-                {isMicrophoneActive ? "Mute" : "Speak"}
-              </Button>
+              {renderMicrophoneButton()}
               
               <Button
                 size="sm"
@@ -127,6 +199,14 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
           <div className="text-gray-700 min-h-24 max-h-48 overflow-y-auto">
             {currentTranscript || (isConnected && !isAiSpeaking && "Say something or type a message below...")}
           </div>
+        </div>
+      )}
+      
+      {/* Microphone Status Indicator (when active) */}
+      {isMicrophoneActive && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-2 flex items-center justify-center">
+          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-2"></div>
+          <span className="text-sm text-red-700">Microphone active - speak now</span>
         </div>
       )}
       

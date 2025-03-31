@@ -2,7 +2,6 @@
 import { useEffect } from "react";
 import { UseWebRTCConnectionOptions, WebRTCConnectionResult } from "./types";
 import { useConnectionState } from "./useConnectionState";
-import { useAudioProcessor } from "./useAudioProcessor";
 import { useMessageHandler } from "./useMessageHandler";
 import { useConnectionActions } from "./useConnectionActions";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
@@ -95,7 +94,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     setIsMicrophoneActive,
     setCurrentTranscript,
     setIsAiSpeaking,
-    (newMessages) => setMessages(prev => [...prev, newMessages])
+    setMessages
   );
   
   // Auto-connect if enabled

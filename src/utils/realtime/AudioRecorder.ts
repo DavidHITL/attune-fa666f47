@@ -33,7 +33,7 @@ export class AudioRecorder {
     try {
       console.log("[AudioRecorder] Starting audio recording");
       
-      // Request access to the microphone
+      // Request access to the microphone with explicit constraints
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: this.options.sampleRate,
