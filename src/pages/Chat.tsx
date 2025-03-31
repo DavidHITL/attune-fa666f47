@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 import NavBar from "@/components/NavBar";
 import ChatInterface from "@/components/ChatInterface";
 import SessionStartModal from "@/components/chat/SessionStartModal";

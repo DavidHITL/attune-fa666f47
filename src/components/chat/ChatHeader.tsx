@@ -1,10 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { useAuth } from "@/context/AuthContext";
-import { formatDistanceToNow } from "date-fns";
-import { CircleEllipsis } from "lucide-react";
+import SessionTimer from "./SessionTimer";
 
 interface ChatHeaderProps {
   sessionStarted?: boolean;
@@ -19,70 +16,33 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onSessionComplete,
   onRequestEndSession
 }) => {
-  const { user } = useAuth();
-  const userEmail = user?.email || "Guest";
-  const shortenedEmail = userEmail.length > 20 
-    ? `${userEmail.substring(0, 20)}...` 
-    : userEmail;
-
   return (
     <header className="bg-white border-b border-gray-200">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-3">
-          <div className="flex items-center space-x-2">
-            <h1 className="text-lg font-medium hidden md:block">
+          <div className="flex-1">
+            <h1 className="text-lg font-medium">
               Chat with AI
             </h1>
-            {sessionStarted && (
-              <span className="text-sm text-gray-500 hidden sm:inline-block">
-                Session started {" "}
-                {formatDistanceToNow(new Date(), { addSuffix: true })}
-              </span>
-            )}
-            {sessionEndTime && onSessionComplete && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-red-600">
-                  Session ending in{" "}
-                  {formatDistanceToNow(sessionEndTime)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={onSessionComplete}
-                >
-                  End Now
-                </Button>
-              </div>
+          </div>
+          
+          <div className="flex-1 text-center">
+            {sessionStarted && sessionEndTime && onSessionComplete && (
+              <SessionTimer 
+                sessionStarted={sessionStarted}
+                sessionEndTime={sessionEndTime.getTime()}
+                onSessionComplete={onSessionComplete}
+              />
             )}
           </div>
 
-          <div className="flex items-center">
-            <div className="flex items-center">
-              <span className="text-sm text-gray-600 mr-2 hidden sm:block">
-                {shortenedEmail}
-              </span>
-              
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full"
-                    onClick={() => {}}
-                  >
-                    <CircleEllipsis className="h-5 w-5" />
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
-            </div>
-            
+          <div className="flex-1 flex justify-end">
             {sessionStarted && onRequestEndSession && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onRequestEndSession}
-                className="ml-2 hidden sm:inline-flex"
+                className="ml-2"
               >
                 End Session
               </Button>
