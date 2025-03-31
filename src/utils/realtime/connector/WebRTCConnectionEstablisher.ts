@@ -5,6 +5,9 @@ import { setupDataChannelListeners } from "../WebRTCDataChannelHandler";
 import { WebRTCOptions } from "../WebRTCTypes";
 import { sendOffer } from "./OfferService";
 import { ConnectionTimeout } from "./ConnectionTimeout";
+import { SdpOfferAnalyzer } from "./SdpOfferAnalyzer";
+import { AudioTrackManager } from "./AudioTrackManager";
+import { ConnectionPromiseHandler } from "./ConnectionPromiseHandler";
 
 /**
  * Handles establishing WebRTC connections with OpenAI
@@ -64,51 +67,7 @@ export class WebRTCConnectionEstablisher {
       setupDataChannelListeners(dc, options, onDataChannelOpen);
       
       // Step 4: Add the audio track to the peer connection
-      // This is a critical step for voice-enabled applications
-      if (audioTrack) {
-        console.log("[WebRTCConnectionEstablisher] Adding provided audio track to peer connection:", 
-          audioTrack.label || "Unnamed track", 
-          "- Enabled:", audioTrack.enabled, 
-          "- ID:", audioTrack.id);
-        
-        // Create a new MediaStream with the audio track
-        const mediaStream = new MediaStream([audioTrack]);
-        
-        // Add the track to the peer connection, associating it with the stream
-        const sender = pc.addTrack(audioTrack, mediaStream);
-        console.log("[WebRTCConnectionEstablisher] Audio track added successfully with sender ID:", sender.track?.id || "unknown");
-      } else {
-        // If no audio track provided, try to get one from microphone
-        try {
-          console.log("[WebRTCConnectionEstablisher] No audio track provided, requesting microphone access");
-          const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 24000 // OpenAI recommends this sample rate
-            } 
-          });
-          
-          const audioTracks = mediaStream.getAudioTracks();
-          if (audioTracks.length > 0) {
-            const micTrack = audioTracks[0];
-            console.log("[WebRTCConnectionEstablisher] Adding microphone track to peer connection:", 
-              micTrack.label || "Unnamed microphone", 
-              "- Enabled:", micTrack.enabled, 
-              "- ID:", micTrack.id);
-            
-            // Add the first audio track from the microphone to the peer connection
-            const sender = pc.addTrack(micTrack, mediaStream);
-            console.log("[WebRTCConnectionEstablisher] Microphone track added successfully with sender ID:", sender.track?.id || "unknown");
-          } else {
-            console.warn("[WebRTCConnectionEstablisher] No audio tracks found in media stream");
-          }
-        } catch (micError) {
-          console.warn("[WebRTCConnectionEstablisher] Could not access microphone, continuing without audio track:", micError);
-          // Continue without microphone - we'll use data channel for text and can add tracks later if needed
-        }
-      }
+      await AudioTrackManager.addAudioTrack(pc, audioTrack);
       
       // Step 5: Create an offer and set local description
       console.log("[WebRTCConnectionEstablisher] Creating offer");
@@ -116,34 +75,12 @@ export class WebRTCConnectionEstablisher {
       
       // Log SDP offer details - including checking for audio media section
       if (offer.sdp) {
-        console.log("[WebRTCConnectionEstablisher] SDP offer created with length:", offer.sdp.length);
-        
-        // Check for audio media section in the SDP
-        const hasAudioSection = offer.sdp.includes("m=audio");
-        console.log("[WebRTCConnectionEstablisher] SDP contains audio media section:", hasAudioSection);
-        
-        if (hasAudioSection) {
-          // Extract and log the audio media section for debugging
-          const audioSectionMatch = offer.sdp.match(/m=audio.*(?:\r\n|\r|\n)(?:.*(?:\r\n|\r|\n))*/);
-          if (audioSectionMatch) {
-            console.log("[WebRTCConnectionEstablisher] Audio section details:", audioSectionMatch[0]);
-          }
-        } else {
-          console.warn("[WebRTCConnectionEstablisher] WARNING: No audio media section found in SDP offer!");
-        }
-        
-        // Log the first and last few lines of the SDP for debugging
-        const sdpLines = offer.sdp.split("\n");
-        const firstLines = sdpLines.slice(0, 5).join("\n");
-        const lastLines = sdpLines.slice(-5).join("\n");
-        console.log("[WebRTCConnectionEstablisher] SDP offer preview (first 5 lines):\n", firstLines);
-        console.log("[WebRTCConnectionEstablisher] SDP offer preview (last 5 lines):\n", lastLines);
+        SdpOfferAnalyzer.analyzeSdpOffer(offer.sdp);
       } else {
         console.warn("[WebRTCConnectionEstablisher] SDP offer is empty!");
       }
       
       // Step 6: Set the local description on the peer connection
-      // This applies the offer as the local description
       await pc.setLocalDescription(offer);
       
       console.log("[WebRTCConnectionEstablisher] Local description set:", 
@@ -175,27 +112,6 @@ export class WebRTCConnectionEstablisher {
       
       console.log("[WebRTCConnectionEstablisher] Received SDP answer from OpenAI");
       
-      // Create a promise that resolves or rejects based on the connection state
-      const connectionPromise = new Promise<void>((resolve, reject) => {
-        const connectionTimeout = setTimeout(() => {
-          reject(new Error("Remote description set but connection timed out"));
-        }, 10000); // 10 second timeout for connection after setting remote description
-        
-        const connectionStateHandler = () => {
-          if (pc.connectionState === "connected") {
-            clearTimeout(connectionTimeout);
-            pc.removeEventListener("connectionstatechange", connectionStateHandler);
-            resolve();
-          } else if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-            clearTimeout(connectionTimeout);
-            pc.removeEventListener("connectionstatechange", connectionStateHandler);
-            reject(new Error(`Connection failed with state: ${pc.connectionState}`));
-          }
-        };
-        
-        pc.addEventListener("connectionstatechange", connectionStateHandler);
-      });
-      
       try {
         // Step 8: Set remote description from OpenAI response
         console.log("[WebRTCConnectionEstablisher] Setting remote description");
@@ -205,7 +121,7 @@ export class WebRTCConnectionEstablisher {
         try {
           // Step 9: Wait for the connection to be established
           console.log("[WebRTCConnectionEstablisher] Waiting for connection to be established");
-          await connectionPromise;
+          await ConnectionPromiseHandler.createConnectionPromise(pc);
           console.log("[WebRTCConnectionEstablisher] WebRTC connection established successfully");
           return { pc, dc };
         } catch (connectionError) {
