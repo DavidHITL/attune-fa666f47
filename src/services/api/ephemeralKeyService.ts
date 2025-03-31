@@ -8,6 +8,20 @@ export async function getEphemeralKey(): Promise<string> {
   try {
     console.log("[ephemeralKeyService] Requesting ephemeral key from Supabase");
     
+    // Verify we have an authenticated session before making the request
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error("[ephemeralKeyService] Session error:", sessionError);
+      throw new Error(`Authentication error: ${sessionError.message}`);
+    }
+    
+    if (!sessionData?.session) {
+      console.error("[ephemeralKeyService] No active session found");
+      throw new Error("No active authentication session found");
+    }
+    
+    // Now make the request with the authenticated session
     const { data, error } = await supabase.functions.invoke('generate-ephemeral-key');
     
     if (error) {

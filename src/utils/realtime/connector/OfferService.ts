@@ -41,6 +41,12 @@ export async function sendOffer(
     console.log(`[WebRTC] SDP offer preview: ${sdpPreview}`);
     
     console.time("[WebRTC] SDP API Request Time");
+    
+    // Make sure the API key is valid
+    if (!apiKey || apiKey.trim() === '') {
+      throw new Error("Invalid or empty API key");
+    }
+    
     const sdpResponse = await fetch(requestUrl, {
       method: "POST",
       body: localDescription.sdp,

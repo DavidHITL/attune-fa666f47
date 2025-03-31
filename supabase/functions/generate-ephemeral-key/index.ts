@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.23.0"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,28 +15,45 @@ serve(async (req: Request) => {
   }
   
   try {
+    // Create Supabase client to verify authentication
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
     // Verify the user is authenticated
-    const authHeader = req.headers.get('Authorization')
+    const authHeader = req.headers.get('Authorization');
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader) {
+      console.error('Missing Authorization header');
       return new Response(
-        JSON.stringify({ error: 'Missing or invalid authorization header' }),
+        JSON.stringify({ error: 'Missing Authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
+    }
+    
+    // Get the user from the auth header
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    
+    if (authError || !user) {
+      console.error('Authentication failed:', authError || 'No user found');
+      return new Response(
+        JSON.stringify({ error: 'Authentication failed', details: authError?.message }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
     // Get the OpenAI API key from environment variable
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
-      console.error('OPENAI_API_KEY environment variable not set')
+      console.error('OPENAI_API_KEY environment variable not set');
       return new Response(
         JSON.stringify({ error: 'OpenAI API key not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
     
-    console.log('Generating ephemeral key for OpenAI API')
+    console.log('Generating ephemeral key for OpenAI API');
     
     // Create a client secret for use with WebRTC
     const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
@@ -50,8 +68,8 @@ serve(async (req: Request) => {
     })
     
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`OpenAI API error (${response.status}):`, errorText)
+      const errorText = await response.text();
+      console.error(`OpenAI API error (${response.status}):`, errorText);
       
       return new Response(
         JSON.stringify({ 
@@ -62,20 +80,20 @@ serve(async (req: Request) => {
           status: response.status, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      )
+      );
     }
     
-    const data = await response.json()
+    const data = await response.json();
     
-    console.log('Successfully generated ephemeral key')
+    console.log('Successfully generated ephemeral key');
     
     // Return the ephemeral key
     return new Response(
       JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   } catch (error) {
-    console.error('Error generating ephemeral key:', error)
+    console.error('Error generating ephemeral key:', error);
     
     return new Response(
       JSON.stringify({ 
@@ -86,6 +104,6 @@ serve(async (req: Request) => {
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    )
+    );
   }
 })

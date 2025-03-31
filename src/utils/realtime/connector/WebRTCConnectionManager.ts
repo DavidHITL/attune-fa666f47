@@ -15,6 +15,9 @@ export class WebRTCConnectionManager {
   private options: WebRTCOptions;
   private connectionState: RTCPeerConnectionState = "new";
   private connectionTimeout: number | null = null;
+  private sessionConfigured: boolean = false;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 3;
   
   constructor(options: WebRTCOptions) {
     this.options = options;
@@ -47,13 +50,20 @@ export class WebRTCConnectionManager {
       if (state === "connected" && this.connectionTimeout) {
         clearTimeout(this.connectionTimeout);
         this.connectionTimeout = null;
+        
+        // Configure the session after connection is established
+        this.configureSessionWhenReady();
       }
     });
     
     // Create data channel for sending/receiving events
     console.log("[WebRTCConnectionManager] Creating data channel");
     this.dc = this.pc.createDataChannel("oai-events");
-    setupDataChannelListeners(this.dc, this.options);
+    setupDataChannelListeners(this.dc, this.options, () => {
+      // This will be called when the data channel opens
+      console.log("[WebRTCConnectionManager] Data channel is open and ready");
+      this.configureSessionWhenReady();
+    });
     
     // Create an offer and set local description
     console.log("[WebRTCConnectionManager] Creating offer");
@@ -103,16 +113,6 @@ export class WebRTCConnectionManager {
             console.log("[WebRTCConnectionManager] Remote description set successfully");
             console.log("[WebRTCConnectionManager] Connection established successfully");
             
-            // Configure the session after connection is established
-            setTimeout(() => {
-              if (this.dc && this.dc.readyState === "open") {
-                console.log("[WebRTCConnectionManager] Configuring session");
-                configureSession(this.dc, this.options);
-              } else {
-                console.warn(`[WebRTCConnectionManager] Data channel not ready for session config, state: ${this.dc?.readyState}`);
-              }
-            }, 1000);
-            
             return true;
           } catch (sdpError) {
             console.error("[WebRTCConnectionManager] Error setting remote description:", sdpError);
@@ -132,11 +132,36 @@ export class WebRTCConnectionManager {
   }
 
   /**
+   * Configure the session but only when both the peer connection is connected
+   * and the data channel is open
+   */
+  private configureSessionWhenReady() {
+    // Don't configure more than once
+    if (this.sessionConfigured) {
+      return;
+    }
+
+    // Check if connection and data channel are ready
+    if (this.pc?.connectionState === 'connected' && this.dc?.readyState === 'open') {
+      console.log("[WebRTCConnectionManager] Both connection and data channel ready, configuring session");
+      this.sessionConfigured = true;
+      configureSession(this.dc, this.options);
+    } else {
+      console.log(`[WebRTCConnectionManager] Not yet ready to configure session. Connection: ${this.pc?.connectionState}, DataChannel: ${this.dc?.readyState}`);
+    }
+  }
+
+  /**
    * Send a text message to OpenAI
    */
   sendTextMessage(text: string): boolean {
     if (!this.dc) {
       console.error("[WebRTCConnectionManager] Data channel not available for sending text");
+      return false;
+    }
+    
+    if (this.dc.readyState !== "open") {
+      console.error(`[WebRTCConnectionManager] Data channel not open, current state: ${this.dc.readyState}`);
       return false;
     }
     
@@ -155,6 +180,11 @@ export class WebRTCConnectionManager {
   sendAudioData(audioData: Float32Array): boolean {
     if (!this.dc) {
       console.error("[WebRTCConnectionManager] Data channel not available for sending audio");
+      return false;
+    }
+    
+    if (this.dc.readyState !== "open") {
+      console.error(`[WebRTCConnectionManager] Data channel not open for audio, current state: ${this.dc.readyState}`);
       return false;
     }
     
@@ -185,6 +215,9 @@ export class WebRTCConnectionManager {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
     }
+    
+    // Reset session configuration flag
+    this.sessionConfigured = false;
     
     // Close the data channel if it exists
     if (this.dc) {

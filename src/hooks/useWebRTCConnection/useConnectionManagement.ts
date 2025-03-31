@@ -74,6 +74,13 @@ export function useConnectionManagement(
         })
       );
       
+      // Make sure we don't have any previous connector instance
+      if (connectorRef.current) {
+        console.log("[useConnectionManagement] Cleaning up previous connector instance");
+        connectorRef.current.disconnect();
+        connectorRef.current = null;
+      }
+      
       const connector = new WebRTCConnector({
         ...options,
         onMessage: handleMessage,
@@ -83,14 +90,17 @@ export function useConnectionManagement(
           if (state === "connected") {
             console.log("[useConnectionManagement] WebRTC connection established successfully");
             setIsConnected(true);
+            setIsConnecting(false);
             toast.success("Connected to OpenAI Realtime API");
             
             // Start microphone if enabled
             if (options.enableMicrophone) {
               console.log("[useConnectionManagement] Auto-enabling microphone");
-              toggleMicrophone().catch(err => {
-                console.error("[useConnectionManagement] Error enabling microphone:", err);
-              });
+              setTimeout(() => {
+                toggleMicrophone().catch(err => {
+                  console.error("[useConnectionManagement] Error enabling microphone:", err);
+                });
+              }, 1000); // Add a small delay before enabling the microphone
             }
           }
           else if (state === "failed" || state === "disconnected" || state === "closed") {

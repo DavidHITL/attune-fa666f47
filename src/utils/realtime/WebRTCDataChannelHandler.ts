@@ -6,14 +6,20 @@ import { WebRTCOptions } from "./WebRTCTypes";
  */
 export function setupDataChannelListeners(
   dc: RTCDataChannel,
-  options: WebRTCOptions
+  options: WebRTCOptions,
+  onOpen?: () => void
 ): void {
   dc.onopen = () => {
-    console.log("[WebRTC] Data channel opened");
+    console.log("[WebRTC] Data channel opened, state:", dc.readyState);
+    
+    // Call the onOpen callback if provided
+    if (onOpen) {
+      onOpen();
+    }
   };
   
   dc.onclose = () => {
-    console.log("[WebRTC] Data channel closed");
+    console.log("[WebRTC] Data channel closed, state:", dc.readyState);
   };
   
   dc.onerror = (event) => {
