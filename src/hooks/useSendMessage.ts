@@ -2,10 +2,8 @@
 import { useState, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { generateResponse } from "@/services/responseGenerator";
-import { speakMessage } from "@/components/ChatSpeech";
 import { createMessageObject } from "@/services/chatApiService";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 
 interface UseSendMessageProps {
   messages: Message[];
@@ -98,8 +96,7 @@ export function useSendMessage({
       // Add bot response to local state
       setMessages((prevMessages) => [...prevMessages, botResponse]);
       
-      // Speak the bot's response if speech is enabled
-      speakMessage(botResponse.text, isSpeechEnabled);
+      // Text-to-speech functionality removed
       
     } catch (error) {
       console.error("Error generating response:", error);
@@ -124,7 +121,7 @@ export function useSendMessage({
     saveMessageToDatabase, 
     setMessages, 
     isSpeechEnabled,
-    sessionProgress // Add sessionProgress to dependencies
+    sessionProgress
   ]);
 
   return {

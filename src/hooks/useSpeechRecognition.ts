@@ -1,176 +1,134 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 
-interface UseSpeechRecognitionOptions {
-  lang?: string;
-  onAudioData?: (audioData: Float32Array) => void;
+interface SpeechRecognitionHook {
+  isListening: boolean;
+  transcript: string;
+  toggleListening: () => void;
+  isSupported: boolean;
+  error: string | null;
 }
 
-export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) {
-  const { lang = 'en-US', onAudioData } = options;
-  
+// Define types for the speech recognition API
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  item(index: number): SpeechRecognitionResult;
+  length: number;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  item(index: number): SpeechRecognitionAlternative;
+  length: number;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+// Declare SpeechRecognition global type
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognition;
+    webkitSpeechRecognition?: new () => SpeechRecognition;
+  }
+}
+
+interface SpeechRecognition extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: any) => void;
+  onend: () => void;
+}
+
+export const useSpeechRecognition = (): SpeechRecognitionHook => {
   const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
-  
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
 
   // Initialize speech recognition
   useEffect(() => {
-    if (typeof window !== 'undefined' && 
-        ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      
-      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognitionAPI();
-      
-      const recognition = recognitionRef.current;
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = lang;
-      
-      recognition.onresult = (event) => {
-        const current = event.resultIndex;
-        const result = event.results[current];
-        const transcriptValue = result[0].transcript;
-        
-        if (result.isFinal) {
-          setTranscript(prev => {
-            // Only update if there's new content
-            if (transcriptValue && transcriptValue !== prev) {
-              return transcriptValue;
-            }
-            return prev;
-          });
-        }
-      };
-      
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setIsListening(false);
-      };
-      
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-      
-      setIsSupported(true);
-    } else {
-      console.warn('Speech recognition not supported in this browser');
+    // Check if browser supports SpeechRecognition API
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognitionAPI) {
       setIsSupported(false);
+      return;
     }
     
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
+    setIsSupported(true);
+    
+    // Initialize recognition
+    const recognitionInstance = new SpeechRecognitionAPI();
+    recognitionInstance.continuous = true;
+    recognitionInstance.interimResults = true;
+    recognitionInstance.lang = 'en-US'; // Default to English
+    
+    // Set up event handlers
+    recognitionInstance.onresult = (event: SpeechRecognitionEvent) => {
+      // Get the latest result
+      const result = event.results[event.results.length - 1];
+      if (result) {
+        const newTranscript = result[0].transcript;
+        setTranscript(newTranscript);
       }
-      
-      // Clean up audio processing
-      cleanupAudioProcessing();
     };
-  }, [lang]);
+    
+    recognitionInstance.onerror = (event) => {
+      setError(`Speech recognition error: ${event.error}`);
+      setIsListening(false);
+    };
+    
+    recognitionInstance.onend = () => {
+      setIsListening(false);
+    };
+    
+    setRecognition(recognitionInstance);
+    
+    // Cleanup on unmount
+    return () => {
+      if (recognitionInstance && isListening) {
+        recognitionInstance.stop();
+      }
+    };
+  }, []);
 
-  // Clean up audio processing resources
-  const cleanupAudioProcessing = () => {
-    if (sourceRef.current) {
-      sourceRef.current.disconnect();
-      sourceRef.current = null;
-    }
-    
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-    
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-  };
-  
-  // Set up audio processing if onAudioData is provided
-  const setupAudioProcessing = async () => {
-    if (!onAudioData) return;
-    
-    try {
-      // Get microphone access
-      streamRef.current = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 24000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      
-      // Create audio context
-      audioContextRef.current = new AudioContext({
-        sampleRate: 24000,
-      });
-      
-      // Create source node
-      sourceRef.current = audioContextRef.current.createMediaStreamSource(streamRef.current);
-      
-      // Create processor
-      processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-      
-      // Set up audio processing
-      processorRef.current.onaudioprocess = (e) => {
-        if (onAudioData) {
-          const inputData = e.inputBuffer.getChannelData(0);
-          onAudioData(new Float32Array(inputData));
-        }
-      };
-      
-      // Connect nodes
-      sourceRef.current.connect(processorRef.current);
-      processorRef.current.connect(audioContextRef.current.destination);
-    } catch (error) {
-      console.error('Error setting up audio processing:', error);
-    }
-  };
-  
-  const toggleListening = useCallback(async () => {
-    if (!recognitionRef.current) return;
+  // Toggle listening
+  const toggleListening = useCallback(() => {
+    if (!recognition) return;
     
     if (isListening) {
-      // Stop listening
-      recognitionRef.current.stop();
-      cleanupAudioProcessing();
+      recognition.stop();
       setIsListening(false);
     } else {
-      // Start listening
+      // Clear previous transcript when starting new listening session
+      setTranscript("");
+      setError(null);
+      
       try {
-        // Clear previous transcript when starting new listening session
-        setTranscript('');
-        
-        // Set up audio processing if needed
-        if (onAudioData) {
-          await setupAudioProcessing();
-        }
-        
-        // Start recognition
-        recognitionRef.current.start();
+        recognition.start();
         setIsListening(true);
-      } catch (error) {
-        console.error('Error starting speech recognition:', error);
+      } catch (err) {
+        setError(`Failed to start speech recognition: ${err}`);
       }
     }
-  }, [isListening, onAudioData]);
-  
+  }, [isListening, recognition]);
+
   return {
     isListening,
     transcript,
-    isSupported,
     toggleListening,
+    isSupported,
+    error
   };
-}
+};
