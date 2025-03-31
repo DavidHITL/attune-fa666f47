@@ -10,6 +10,7 @@ export class WebRTCManager {
   private audioElement: HTMLAudioElement | null = null;
   private audioContext: AudioContext | null = null;
   private eventEmitter: EventEmitter;
+  private localStream: MediaStream | null = null;
   
   constructor(eventEmitter: EventEmitter) {
     this.eventEmitter = eventEmitter;
@@ -34,22 +35,61 @@ export class WebRTCManager {
   async initializeConnection(ephemeralKey: string): Promise<void> {
     try {
       // Create peer connection
-      this.pc = new RTCPeerConnection();
+      this.pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
       
       // Set up data channel for events
       this.setupDataChannel();
       
-      // Set up audio tracks
+      // IMPORTANT: First get user media and add tracks BEFORE creating the offer
+      try {
+        console.log("[WebRTCManager] Requesting user media for audio");
+        this.localStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        
+        // Add all audio tracks to the peer connection
+        this.localStream.getAudioTracks().forEach(track => {
+          if (this.pc) {
+            console.log("[WebRTCManager] Adding audio track to peer connection:", track.id, track.kind);
+            this.pc.addTrack(track, this.localStream!);
+          }
+        });
+      } catch (err) {
+        console.error("[WebRTCManager] Failed to get user media:", err);
+        // Continue anyway - we'll still create an offer but it won't have audio tracks
+        // This will allow debugging other aspects of the connection
+      }
+      
+      // Set up handlers for received audio
       this.setupAudioTracks();
       
+      // Wait a brief moment to ensure tracks are properly added
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Create and set local description
-      const offer = await this.pc.createOffer();
+      console.log("[WebRTCManager] Creating offer");
+      const offer = await this.pc.createOffer({
+        offerToReceiveAudio: true, // Explicitly request to receive audio
+        voiceActivityDetection: true
+      });
+      
+      console.log("[WebRTCManager] Setting local description");
       await this.pc.setLocalDescription(offer);
       
       // Connect to OpenAI's Realtime API
       console.log("[WebRTCManager] Creating connection with OpenAI");
       const baseUrl = "https://api.openai.com/v1/realtime";
       const model = "gpt-4o-realtime-preview-2024-12-17";
+      
+      // Log the SDP for debugging
+      console.log("[WebRTCManager] SDP being sent:", offer.sdp);
+      
       const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
         method: "POST",
         body: offer.sdp,
@@ -125,20 +165,6 @@ export class WebRTCManager {
         this.audioElement.srcObject = event.streams[0];
       }
     };
-    
-    // Add local audio track if possible
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(stream => {
-        stream.getAudioTracks().forEach(track => {
-          if (this.pc) {
-            this.pc.addTrack(track, stream);
-            console.log("[WebRTCManager] Added local audio track");
-          }
-        });
-      })
-      .catch(err => {
-        console.error("[WebRTCManager] Error accessing microphone:", err);
-      });
   }
 
   /**
@@ -163,6 +189,14 @@ export class WebRTCManager {
    * Close WebRTC connection
    */
   close(): void {
+    // Close local media streams
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => {
+        track.stop();
+      });
+      this.localStream = null;
+    }
+    
     // Close data channel
     if (this.dc) {
       try {
