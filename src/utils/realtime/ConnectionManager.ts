@@ -1,9 +1,7 @@
 
-// This is a stub implementation to resolve dependencies
-// All actual realtime functionality has been removed
-
 /**
  * Simple ConnectionManager stub to prevent build errors
+ * All actual realtime functionality has been removed
  */
 export const ConnectionManager = {
   connect: async () => {

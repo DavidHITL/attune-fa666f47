@@ -1,167 +1,65 @@
 
 import { useState } from 'react';
-import { testRealtimeEndpoint, testRealtimeFunctionEndpoint, testWebSocketConnection, testCompleteChatFlow } from '@/utils/realtime/testEndpoint';
 import { toast } from 'sonner';
 
+/**
+ * Stub implementation of useEndpointTest hook.
+ * Real-time functionality has been removed.
+ */
 export function useEndpointTest() {
   const [isTestingHttp, setIsTestingHttp] = useState(false);
-  const [isTestingWs, setIsTestingWs] = useState(false);
-  const [isTestingFlow, setIsTestingFlow] = useState(false);
   const [httpResult, setHttpResult] = useState<string | null>(null);
-  const [wsResult, setWsResult] = useState<string | null>(null);
-  const [flowResult, setFlowResult] = useState<string | null>(null);
   const [httpStatus, setHttpStatus] = useState<'success' | 'error' | null>(null);
-  const [wsStatus, setWsStatus] = useState<'success' | 'error' | null>(null);
-  const [flowStatus, setFlowStatus] = useState<'success' | 'error' | null>(null);
-  const [activeWsConnection, setActiveWsConnection] = useState<{close: () => void} | null>(null);
-  const [activeFlowConnection, setActiveFlowConnection] = useState<{close: () => void} | null>(null);
-
+  
   const testHttpEndpoint = async () => {
     setIsTestingHttp(true);
     setHttpResult(null);
     setHttpStatus(null);
     
     try {
-      const result = await testRealtimeFunctionEndpoint();
-      
-      if (result.success) {
-        setHttpStatus('success');
-        toast.success("HTTP endpoint is accessible");
-      } else {
+      // This is a stub implementation
+      setTimeout(() => {
         setHttpStatus('error');
-        toast.error("HTTP endpoint test failed");
-      }
-      
-      setHttpResult(result.message);
+        setHttpResult('Real-time voice functionality has been removed');
+        toast.error('Real-time voice functionality has been removed');
+      }, 500);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       setHttpStatus('error');
-      toast.error(`Error testing endpoint: ${errorMsg}`);
+      toast.error(`Error: ${errorMsg}`);
       setHttpResult(`Test failed: ${errorMsg}`);
     } finally {
       setIsTestingHttp(false);
     }
   };
 
-  const testWsConnection = async () => {
-    setIsTestingWs(true);
-    setWsResult(null);
-    setWsStatus(null);
-    
-    try {
-      // Close any existing connection
-      if (activeWsConnection) {
-        activeWsConnection.close();
-      }
-      
-      // Properly await the result of the WebSocket connection test
-      const result = await testWebSocketConnection();
-      
-      if (result.success) {
-        setWsStatus('success');
-        toast("WebSocket connection attempt started", {
-          description: "Check console for connection status"
-        });
-        setActiveWsConnection(result);
-      } else {
-        setWsStatus('error');
-        toast.error("WebSocket connection test failed");
-      }
-      
-      setWsResult(result.message);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      setWsStatus('error');
-      toast.error(`Error testing WebSocket: ${errorMsg}`);
-      setWsResult(`Test failed: ${errorMsg}`);
-    } finally {
-      setIsTestingWs(false);
-    }
-  };
-
-  const testFullChatFlow = async () => {
-    setIsTestingFlow(true);
-    setFlowResult(null);
-    setFlowStatus(null);
-    
-    try {
-      // Close any existing connections
-      if (activeFlowConnection) {
-        activeFlowConnection.close();
-      }
-      
-      // Properly await the result of the chat flow test
-      const result = await testCompleteChatFlow();
-      
-      if (result.success) {
-        setFlowStatus('success');
-        toast("Full chat flow test started", {
-          description: "Check console for detailed progress"
-        });
-        setActiveFlowConnection(result);
-      } else {
-        setFlowStatus('error');
-        toast.error("Chat flow test failed");
-      }
-      
-      setFlowResult(result.message);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      setFlowStatus('error');
-      toast.error(`Error testing chat flow: ${errorMsg}`);
-      setFlowResult(`Test failed: ${errorMsg}`);
-    } finally {
-      setIsTestingFlow(false);
-    }
-  };
-
-  const closeWsConnection = () => {
-    if (activeWsConnection) {
-      activeWsConnection.close();
-      setActiveWsConnection(null);
-      setWsStatus(null);
-      toast("WebSocket disconnected");
-      setWsResult("WebSocket connection closed");
-    }
-  };
-
-  const closeFlowConnection = () => {
-    if (activeFlowConnection) {
-      activeFlowConnection.close();
-      setActiveFlowConnection(null);
-      setFlowStatus(null);
-      toast("Chat flow test disconnected");
-      setFlowResult("Chat flow test closed");
-    }
-  };
-
   return {
     // Test functions
     testHttpEndpoint,
-    testWsConnection,
-    testFullChatFlow,
-    closeWsConnection,
-    closeFlowConnection,
+    testWsConnection: () => toast.info('Real-time voice functionality has been removed'),
+    testFullChatFlow: () => toast.info('Real-time voice functionality has been removed'),
+    closeWsConnection: () => {},
+    closeFlowConnection: () => {},
     
     // Status indicators
     httpStatus,
-    wsStatus,
-    flowStatus,
+    wsStatus: null,
+    flowStatus: null,
     
     // Messages
     httpMessage: httpResult,
-    wsMessage: wsResult,
-    flowMessage: flowResult,
+    wsMessage: 'Real-time voice functionality has been removed',
+    flowMessage: 'Real-time voice functionality has been removed',
     
     // Loading states
     isLoading: {
       http: isTestingHttp,
-      ws: isTestingWs,
-      flow: isTestingFlow
+      ws: false,
+      flow: false
     },
     
     // Connection states
-    hasActiveWsConnection: !!activeWsConnection,
-    hasActiveFlowConnection: !!activeFlowConnection
+    hasActiveWsConnection: false,
+    hasActiveFlowConnection: false
   };
 }
