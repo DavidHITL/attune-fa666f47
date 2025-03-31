@@ -1,12 +1,5 @@
 
-import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
 import { WebRTCOptions } from "./WebRTCTypes";
-import { setupPeerConnectionListeners } from "./WebRTCConnectionListeners";
-import { setupDataChannelListeners } from "./WebRTCDataChannelHandler";
-import { configureSession } from "./WebRTCSessionConfig";
-import { createPeerConnection } from "./connector/PeerConnectionFactory";
-import { sendOffer } from "./connector/OfferService";
-import { sendTextMessage, sendAudioData } from "./connector/MessageSender";
 import { WebRTCConnectionManager } from "./connector/WebRTCConnectionManager";
 
 export class WebRTCConnector {

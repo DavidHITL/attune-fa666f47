@@ -2,25 +2,34 @@
 import { WebRTCOptions } from "../WebRTCTypes";
 import { setupPeerConnectionListeners } from "../WebRTCConnectionListeners";
 import { setupDataChannelListeners } from "../WebRTCDataChannelHandler";
-import { configureSession } from "../WebRTCSessionConfig";
 import { createPeerConnection } from "./PeerConnectionFactory";
 import { sendOffer } from "./OfferService";
-import { sendTextMessage, sendAudioData } from "./MessageSender";
 import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
-import { encodeAudioData } from "../WebRTCAudioEncoder";
+import { ConnectionBase } from "./ConnectionBase";
+import { AudioSender } from "./AudioSender";
+import { TextMessageSender } from "./TextMessageSender";
+import { SessionManager } from "./SessionManager";
 
-export class WebRTCConnectionManager {
+export class WebRTCConnectionManager extends ConnectionBase {
   private pc: RTCPeerConnection | null = null;
   private dc: RTCDataChannel | null = null;
-  private options: WebRTCOptions;
-  private connectionState: RTCPeerConnectionState = "new";
-  private connectionTimeout: number | null = null;
-  private sessionConfigured: boolean = false;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 3;
+  private sessionManager: SessionManager | null = null;
   
   constructor(options: WebRTCOptions) {
-    this.options = options;
+    super(options);
+    console.log("[WebRTCConnectionManager] Initialized with options:", 
+      JSON.stringify({
+        model: options.model,
+        voice: options.voice,
+        hasInstructions: !!options.instructions,
+        hasCallbacks: {
+          onMessage: !!options.onMessage,
+          onConnectionStateChange: !!options.onConnectionStateChange,
+          onError: !!options.onError,
+          onTrack: !!options.onTrack
+        }
+      })
+    );
   }
 
   /**
@@ -29,10 +38,7 @@ export class WebRTCConnectionManager {
   async connect(): Promise<boolean> {
     console.log("[WebRTCConnectionManager] Starting connection process");
     
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
-    }
+    this.clearConnectionTimeout();
     
     // Create peer connection and set up listeners
     this.pc = createPeerConnection();
@@ -48,10 +54,9 @@ export class WebRTCConnectionManager {
       
       // Clear timeout if connection is successful
       if (state === "connected" && this.connectionTimeout) {
-        clearTimeout(this.connectionTimeout);
-        this.connectionTimeout = null;
+        this.clearConnectionTimeout();
         
-        // Configure the session after connection is established
+        // Configure the session after connection is established if data channel is ready
         this.configureSessionWhenReady();
       }
     });
@@ -136,19 +141,15 @@ export class WebRTCConnectionManager {
    * and the data channel is open
    */
   private configureSessionWhenReady() {
-    // Don't configure more than once
-    if (this.sessionConfigured) {
+    if (!this.pc || !this.dc) {
       return;
     }
-
-    // Check if connection and data channel are ready
-    if (this.pc?.connectionState === 'connected' && this.dc?.readyState === 'open') {
-      console.log("[WebRTCConnectionManager] Both connection and data channel ready, configuring session");
-      this.sessionConfigured = true;
-      configureSession(this.dc, this.options);
-    } else {
-      console.log(`[WebRTCConnectionManager] Not yet ready to configure session. Connection: ${this.pc?.connectionState}, DataChannel: ${this.dc?.readyState}`);
+    
+    if (!this.sessionManager) {
+      this.sessionManager = new SessionManager(this.pc, this.dc, this.options);
     }
+    
+    this.sessionManager.configureSessionIfReady();
   }
 
   /**
@@ -160,13 +161,8 @@ export class WebRTCConnectionManager {
       return false;
     }
     
-    if (this.dc.readyState !== "open") {
-      console.error(`[WebRTCConnectionManager] Data channel not open, current state: ${this.dc.readyState}`);
-      return false;
-    }
-    
     try {
-      return sendTextMessage(this.dc, text);
+      return TextMessageSender.sendTextMessage(this.dc, text);
     } catch (error) {
       console.error("[WebRTCConnectionManager] Error sending message:", error);
       this.handleError(error);
@@ -183,13 +179,8 @@ export class WebRTCConnectionManager {
       return false;
     }
     
-    if (this.dc.readyState !== "open") {
-      console.error(`[WebRTCConnectionManager] Data channel not open for audio, current state: ${this.dc.readyState}`);
-      return false;
-    }
-    
     try {
-      return sendAudioData(this.dc, audioData, encodeAudioData);
+      return AudioSender.sendAudioData(this.dc, audioData);
     } catch (error) {
       console.error("[WebRTCConnectionManager] Error sending audio data:", error);
       this.handleError(error);
@@ -198,26 +189,18 @@ export class WebRTCConnectionManager {
   }
 
   /**
-   * Get the current connection state
-   */
-  getConnectionState(): RTCPeerConnectionState {
-    return this.connectionState;
-  }
-
-  /**
    * Disconnect from the OpenAI Realtime API
    */
   disconnect(): void {
     console.log("[WebRTCConnectionManager] Disconnecting");
     
-    // Clear any pending timeout
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
-    }
+    this.clearConnectionTimeout();
     
-    // Reset session configuration flag
-    this.sessionConfigured = false;
+    // Reset session configuration
+    if (this.sessionManager) {
+      this.sessionManager.resetSessionConfigured();
+      this.sessionManager = null;
+    }
     
     // Close the data channel if it exists
     if (this.dc) {
@@ -232,18 +215,5 @@ export class WebRTCConnectionManager {
     }
     
     this.connectionState = "closed";
-  }
-
-  /**
-   * Handle errors from the WebRTC connection
-   */
-  handleError(error: unknown): void {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    
-    console.error("[WebRTCConnectionManager] Error:", errorMessage);
-    
-    if (this.options.onError) {
-      this.options.onError(new Error(errorMessage));
-    }
   }
 }
