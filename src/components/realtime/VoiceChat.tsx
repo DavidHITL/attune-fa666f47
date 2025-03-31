@@ -67,17 +67,17 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   }, []);
 
   // Handle microphone button click with permission checking
-  const handleMicrophoneToggle = async () => {
+  const handleMicrophoneToggle = async (): Promise<boolean> => {
     // If already active, just toggle off
     if (isMicrophoneActive) {
-      toggleMicrophone();
-      return;
+      const success = await toggleMicrophone();
+      return success;
     }
     
     // If permission is denied, show helpful message
     if (microphonePermission === 'denied') {
       toast.error("Microphone access is blocked. Please update your browser settings.");
-      return;
+      return false;
     }
     
     // Otherwise try to activate
@@ -87,6 +87,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
       // If failed but not explicitly denied, might be a technical issue
       toast.error("Could not access microphone. Please check your device settings.");
     }
+    
+    return success;
   };
 
   // Handle form submission for text input
