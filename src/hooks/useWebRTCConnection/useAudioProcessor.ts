@@ -22,7 +22,11 @@ export function useAudioProcessor(
   const { user } = useAuth();
   
   // Initialize audio processor
-  const audioProcessor = new AudioProcessor();
+  const audioProcessorRef = useRef<AudioProcessor | null>(null);
+  if (!audioProcessorRef.current) {
+    audioProcessorRef.current = new AudioProcessor();
+  }
+  const audioProcessor = audioProcessorRef.current;
 
   // Handle saving complete voice transcript
   const handleTranscriptComplete = useCallback((transcript: string) => {
@@ -49,6 +53,7 @@ export function useAudioProcessor(
     },
     onAudioComplete: () => {
       // Finalize audio when complete signal is received
+      console.log("[useAudioProcessor] Audio complete signal received, finalizing audio");
       audioProcessor.completeAudioMessage().catch(error => {
         console.error("[AudioProcessor] Error finalizing audio message:", error);
       });
@@ -90,10 +95,36 @@ export function useAudioProcessor(
     }
   });
 
+  // Resume audio context on first user interaction
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      // Resume audio context if it exists
+      if (audioProcessor) {
+        audioProcessor.addAudioData("").catch(error => {
+          console.error("[AudioProcessor] Error resuming audio context:", error);
+        });
+      }
+      
+      // Remove event listeners after first interaction
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+    
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+    
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, [audioProcessor]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      audioProcessor.cleanup();
+      if (audioProcessorRef.current) {
+        audioProcessorRef.current.cleanup();
+      }
     };
   }, []);
 

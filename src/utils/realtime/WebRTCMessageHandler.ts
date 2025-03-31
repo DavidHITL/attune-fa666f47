@@ -47,6 +47,7 @@ export class WebRTCMessageHandler {
       } 
       else if (message.type === "response.audio.done") {
         // AI has finished speaking
+        console.log("[WebRTCMessageHandler] Received response.audio.done event");
         if (this.options.onAudioComplete) {
           this.options.onAudioComplete();
         }
@@ -78,6 +79,7 @@ export class WebRTCMessageHandler {
       }
       else if (message.type === "response.done") {
         // Response is complete - this is another signal that audio is done
+        console.log("[WebRTCMessageHandler] Received response.done event");
         if (this.options.onAudioComplete) {
           this.options.onAudioComplete();
         }

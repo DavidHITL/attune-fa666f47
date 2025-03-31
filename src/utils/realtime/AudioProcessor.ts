@@ -20,7 +20,9 @@ export class AudioProcessor {
       
       // Initialize audio element
       const audio = new Audio();
-      audio.autoplay = false;
+      audio.autoplay = true;
+      audio.muted = false; // Explicitly ensure it's not muted
+      audio.volume = 1.0;  // Ensure full volume
       this.audioElement = audio;
       
       // Create gain node for volume control
@@ -29,6 +31,10 @@ export class AudioProcessor {
         this.gainNode.gain.value = 1.0; // Default volume
         this.gainNode.connect(this.audioContext.destination);
       }
+      
+      // Append to DOM temporarily to help with autoplay policies
+      document.body.appendChild(audio);
+      audio.style.display = 'none';
       
       console.log("[AudioProcessor] Successfully initialized audio system");
     } catch (error) {
@@ -46,7 +52,7 @@ export class AudioProcessor {
     
     // Resume the audio context if it's suspended
     if (this.audioContext.state === 'suspended') {
-      console.log("[AudioProcessor] Resuming audio context");
+      console.log("[AudioProcessor] Attempting to resume audio context");
       return this.audioContext.resume()
         .then(() => {
           this.isAudioContextResumed = true;
@@ -112,6 +118,7 @@ export class AudioProcessor {
       
       // Start playing if not already playing
       if (!this.isPlaying) {
+        await this.ensureAudioContextResumed(); // Make sure context is resumed before playback
         this.playNextAudioChunk();
       }
     } catch (error) {
@@ -156,10 +163,14 @@ export class AudioProcessor {
       const url = URL.createObjectURL(blob);
       
       if (this.audioElement) {
+        // Ensure audio is not muted before playback
+        this.audioElement.muted = false;
+        
         // Set up event listener for when playback ends
         const handleEnded = () => {
           URL.revokeObjectURL(url);
           this.audioElement?.removeEventListener('ended', handleEnded);
+          this.audioElement?.removeEventListener('error', handleError);
           // Continue with next chunk
           this.playNextAudioChunk();
         };
@@ -168,6 +179,7 @@ export class AudioProcessor {
         const handleError = (err: Event) => {
           console.error("[AudioProcessor] Error playing audio:", err);
           this.audioElement?.removeEventListener('error', handleError);
+          this.audioElement?.removeEventListener('ended', handleEnded);
           // Continue with next chunk even if this one fails
           handleEnded();
         };
@@ -177,10 +189,23 @@ export class AudioProcessor {
         
         // Start playback
         this.audioElement.src = url;
-        this.audioElement.play().catch(err => {
-          console.error("[AudioProcessor] Error playing audio:", err);
-          handleEnded(); // Continue with next chunk even if this one fails
-        });
+        
+        console.log("[AudioProcessor] Starting playback of audio chunk");
+        this.audioElement.play()
+          .then(() => {
+            console.log("[AudioProcessor] Audio playback started successfully");
+          })
+          .catch(err => {
+            console.error("[AudioProcessor] Error playing audio:", err);
+            if (err.name === 'NotAllowedError') {
+              console.warn("[AudioProcessor] Autoplay prevented by browser policy. User interaction required.");
+              // You might want to show a UI element to notify the user to interact with the page
+            }
+            handleEnded(); // Continue with next chunk even if this one fails
+          });
+      } else {
+        console.error("[AudioProcessor] Audio element not available");
+        this.playNextAudioChunk(); // Try next chunk
       }
     } catch (error) {
       console.error("[AudioProcessor] Error playing audio chunk:", error);
@@ -252,6 +277,10 @@ export class AudioProcessor {
       const safeValue = Math.max(0, Math.min(1, value));
       this.gainNode.gain.value = safeValue;
     }
+    
+    if (this.audioElement) {
+      this.audioElement.volume = Math.max(0, Math.min(1, value));
+    }
   }
 
   /**
@@ -261,6 +290,12 @@ export class AudioProcessor {
     if (this.audioElement) {
       this.audioElement.pause();
       this.audioElement.src = "";
+      
+      // Remove from DOM if it was added
+      if (this.audioElement.parentNode) {
+        this.audioElement.parentNode.removeChild(this.audioElement);
+      }
+      
       this.audioElement = null;
     }
     if (this.audioContext) {
