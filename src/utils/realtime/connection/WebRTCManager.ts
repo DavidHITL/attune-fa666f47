@@ -75,8 +75,8 @@ export class WebRTCManager {
       // Create and set local description
       console.log("[WebRTCManager] Creating offer");
       const offer = await this.pc.createOffer({
-        offerToReceiveAudio: true, // Explicitly request to receive audio
-        voiceActivityDetection: true
+        offerToReceiveAudio: true // Explicitly request to receive audio
+        // Removed the invalid voiceActivityDetection property
       });
       
       console.log("[WebRTCManager] Setting local description");
