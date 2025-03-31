@@ -17,7 +17,7 @@ export function useVoiceChatConnection({
   disconnect,
   connectionRef
 }: UseVoiceChatConnectionProps) {
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'failed'>('disconnected');
   const [isConnecting, setIsConnecting] = useState(false);
   const hasAttemptedConnection = useRef(false);
   const retryCount = useRef(0);
@@ -39,23 +39,26 @@ export function useVoiceChatConnection({
             console.warn("[useVoiceChatConnection] No active session found, continuing with connection attempt");
           }
           
+          console.log("[useVoiceChatConnection] Attempting direct OpenAI connection");
           await connect();
           setConnectionStatus('connected');
           toast.success("Connected to OpenAI Realtime API");
           retryCount.current = 0; // Reset retry count on successful connection
         } catch (error) {
           console.error("[useVoiceChatConnection] Connection failed:", error);
-          setConnectionStatus('disconnected');
+          setConnectionStatus('failed');
           
           // Implement retry logic
           if (retryCount.current < maxRetries) {
+            const retryDelay = Math.pow(2, retryCount.current) * 1000; // Exponential backoff
             retryCount.current++;
-            toast.error(`Connection attempt ${retryCount.current} failed. Retrying...`);
+            toast.error(`Connection failed. Retrying in ${retryDelay/1000} seconds... (${retryCount.current}/${maxRetries})`);
             
             // Wait and retry
             setTimeout(async () => {
               hasAttemptedConnection.current = false; // Allow another attempt
-            }, 2000);
+              console.log(`[useVoiceChatConnection] Retry attempt ${retryCount.current}/${maxRetries}`);
+            }, retryDelay);
           } else {
             toast.error("Could not connect after multiple attempts. Please try again later.");
           }
@@ -73,6 +76,8 @@ export function useVoiceChatConnection({
         disconnect();
         setConnectionStatus('disconnected');
         hasAttemptedConnection.current = false;
+        retryCount.current = 0; // Reset retry count when closing
+        console.log("[useVoiceChatConnection] Dialog closed, connection clean up");
       }
     };
   }, [open, connect, disconnect]);
@@ -83,16 +88,15 @@ export function useVoiceChatConnection({
     
     const checkInterval = setInterval(() => {
       if (connectionStatus === 'connected' && connectionRef.current) {
-        if (!connectionRef.current.isConnectedToOpenAI()) {
+        const isConnected = connectionRef.current.isConnectedToOpenAI();
+        console.log("[useVoiceChatConnection] Connection check:", isConnected);
+        
+        if (!isConnected) {
           setConnectionStatus('disconnected');
           toast.error("Connection to voice service was lost");
           
           // Try to reconnect
-          try {
-            hasAttemptedConnection.current = false;
-          } catch (error) {
-            console.error("[useVoiceChatConnection] Reconnection failed:", error);
-          }
+          hasAttemptedConnection.current = false;
         }
       }
     }, 5000);

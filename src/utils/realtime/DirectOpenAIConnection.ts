@@ -20,11 +20,14 @@ export class DirectOpenAIConnection {
   private isConnected: boolean = false;
   private eventEmitter = new EventEmitter();
   private connectionManager = new DirectConnectionManager();
+  private testMode: boolean = false;
   
   /**
    * Initialize the connection
+   * @param options Configuration options
    */
-  constructor() {
+  constructor(options: { testMode?: boolean } = {}) {
+    this.testMode = options.testMode || false;
     this.audioEl = document.createElement('audio');
     this.audioEl.autoplay = true;
     
@@ -53,6 +56,21 @@ export class DirectOpenAIConnection {
       });
       
       console.log("[DirectOpenAI] Initiating connection");
+      
+      if (this.testMode) {
+        console.log("[DirectOpenAI] Test mode enabled, simulating successful connection");
+        
+        // Simulate successful connection after a short delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        this.isConnected = true;
+        this.eventEmitter.emit({
+          type: 'connection',
+          state: 'connected'
+        });
+        
+        return;
+      }
       
       // Get ephemeral token directly using the DirectConnectionManager
       const { clientSecret } = await this.connectionManager.connect(instructions, voice);
@@ -319,6 +337,9 @@ export class DirectOpenAIConnection {
    * Check if connected to OpenAI
    */
   isConnectedToOpenAI(): boolean {
+    if (this.testMode) {
+      return this.isConnected;
+    }
     return (
       this.isConnected && 
       this.pc !== null && 

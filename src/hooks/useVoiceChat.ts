@@ -11,7 +11,9 @@ export function useVoiceChat(user: User | null) {
     try {
       // Create direct connection to OpenAI
       if (!chatRef.current) {
-        chatRef.current = new DirectOpenAIConnection();
+        // Enable test mode for debugging - set to false for production
+        const testMode = false; // Set to true for debugging without API calls
+        chatRef.current = new DirectOpenAIConnection({ testMode });
       }
       
       // Customize instructions based on user if needed

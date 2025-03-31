@@ -21,35 +21,51 @@ export class DirectConnectionManager {
       // Create a request ID for tracking
       const requestId = uuidv4().substring(0, 8);
       
-      // Get credentials from OpenAI
-      const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+      // For development/testing purposes, use a hardcoded API key or fetch from an env variable
+      // NOTE: In production, you should NEVER expose API keys in the client-side code
+      // Instead, use a secure backend endpoint to generate tokens
+      
+      let apiKey = '';
+      
+      // In browser environments, don't use process.env
+      if (typeof window !== 'undefined') {
+        // Check if there's a configured API key in localStorage or elsewhere
+        const storedKey = localStorage.getItem('OPENAI_API_KEY');
+        if (storedKey) {
+          apiKey = storedKey;
+        }
+      }
       
       if (!apiKey) {
-        // For development environments, we can use a secure endpoint to generate tokens
-        // In production, the OpenAI API key would be stored securely in environment variables
-        console.log("[DirectConnectionManager] Using built-in development token endpoint");
+        // For development only - this should be replaced with a secure endpoint
+        // that generates tokens without exposing API keys to the client
+        console.log("[DirectConnectionManager] No API key found, using demo endpoint");
         
         try {
-          const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
+          // In a real application, this would be a call to your backend
+          const response = await fetch("/api/generate-realtime-token", {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${apiKey}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "gpt-4o-realtime-preview-2024-12-17", 
               voice: voice,
               instructions: instructions
             }),
           });
           
           if (!response.ok) {
-            throw new Error(`OpenAI API error: ${response.status}`);
+            throw new Error(`API error: ${response.status}`);
           }
           
           const data = await response.json();
-          this.sessionId = data.id;
-          this.clientSecret = data.client_secret;
+          this.sessionId = data.id || "demo-session-id";
+          this.clientSecret = data.client_secret || "demo-client-secret";
+          
+          // For demo purposes only
+          if (!data.id) {
+            console.warn("[DirectConnectionManager] Using fallback demo values");
+          }
           
           return {
             sessionId: this.sessionId,
@@ -63,6 +79,8 @@ export class DirectConnectionManager {
         console.log("[DirectConnectionManager] Using provided OpenAI API key");
         
         try {
+          // In a real implementation, this call should NOT be made directly from the client
+          // This is shown for development purposes only
           const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
             method: "POST",
             headers: {
