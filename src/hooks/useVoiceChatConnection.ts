@@ -1,6 +1,6 @@
 
-import { useState, useEffect, useRef, RefObject } from "react";
-import { RealtimeChat } from "@/utils/RealtimeAudio";
+import { useState, useEffect, useRef } from "react";
+import { DirectOpenAIConnection } from "@/utils/realtime/DirectOpenAIConnection";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,14 +8,14 @@ interface UseVoiceChatConnectionProps {
   open: boolean;
   connect: () => Promise<void>;
   disconnect: () => void;
-  chatRef: RefObject<RealtimeChat | null>;
+  connectionRef: React.RefObject<DirectOpenAIConnection | null>;
 }
 
 export function useVoiceChatConnection({
   open,
   connect,
   disconnect,
-  chatRef
+  connectionRef
 }: UseVoiceChatConnectionProps) {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   const [isConnecting, setIsConnecting] = useState(false);
@@ -42,7 +42,7 @@ export function useVoiceChatConnection({
           
           await connect();
           setConnectionStatus('connected');
-          toast.success("Connected to OpenAI GPT-4o Realtime API");
+          toast.success("Connected to OpenAI Realtime API");
           retryCount.current = 0; // Reset retry count on successful connection
         } catch (error) {
           console.error("[useVoiceChatConnection] Connection failed:", error);
@@ -83,8 +83,8 @@ export function useVoiceChatConnection({
     if (!open) return;
     
     const checkInterval = setInterval(() => {
-      if (connectionStatus === 'connected' && chatRef.current) {
-        if (!chatRef.current.isConnected) {
+      if (connectionStatus === 'connected' && connectionRef.current) {
+        if (!connectionRef.current.isConnectedToOpenAI()) {
           setConnectionStatus('disconnected');
           toast.error("Connection to voice service was lost");
           
@@ -99,7 +99,7 @@ export function useVoiceChatConnection({
     }, 5000);
     
     return () => clearInterval(checkInterval);
-  }, [connectionStatus, open, chatRef]);
+  }, [connectionStatus, open, connectionRef]);
 
   return {
     connectionStatus,

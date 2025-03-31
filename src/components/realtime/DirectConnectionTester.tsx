@@ -122,7 +122,7 @@ const DirectConnectionTester: React.FC = () => {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Direct OpenAI Connection Test</CardTitle>
+        <CardTitle>OpenAI Realtime API Connection</CardTitle>
         <CardDescription>
           Test direct WebRTC connection to OpenAI Realtime API
         </CardDescription>
@@ -130,7 +130,7 @@ const DirectConnectionTester: React.FC = () => {
       
       <CardContent className="space-y-4">
         {/* Connection status */}
-        <ConnectionStatus status={connectionStatus} error={error} type="direct-openai" />
+        <ConnectionStatus status={connectionStatus} error={error} />
         
         {/* Error message if any */}
         {error && (

@@ -24,7 +24,7 @@ export function VoiceChat({
     open,
     connect,
     disconnect,
-    chatRef
+    connectionRef: chatRef
   });
 
   return (

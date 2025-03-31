@@ -1,74 +1,165 @@
 
-import { useRef, useEffect } from 'react';
-import { RealtimeChat } from '@/utils/RealtimeAudio';
+import { useState, useEffect, useRef } from 'react';
+import { DirectOpenAIConnection } from '@/utils/realtime/DirectOpenAIConnection';
+import { RealtimeEvent } from '@/utils/realtime/DirectOpenAIConnection';
+import { useAudioRecording } from './useAudioRecording';
 import { toast } from 'sonner';
-import { useAuth } from '@/context/AuthContext';
 
 export function useVoiceChat(user: any) {
-  const chatRef = useRef<RealtimeChat | null>(null);
-  const transcriptRef = useRef<string>('');
-
-  const updateTranscript = (text: string) => {
-    transcriptRef.current = text;
-  };
-
-  // Clean up on unmount
+  const [transcript, setTranscript] = useState("");
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const chatRef = useRef<DirectOpenAIConnection | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  
+  // Initialize chat connection
   useEffect(() => {
+    chatRef.current = new DirectOpenAIConnection();
+    
     return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+      
       if (chatRef.current) {
         chatRef.current.disconnect();
-        chatRef.current = null;
       }
     };
   }, []);
-
-  // Connect to the voice chat service
+  
+  // Audio recording handler
+  const { isRecording, startRecording, stopRecording } = useAudioRecording({
+    onAudioData: (audioData) => {
+      if (chatRef.current && chatRef.current.isConnectedToOpenAI()) {
+        chatRef.current.sendAudioData(audioData);
+      }
+    }
+  });
+  
+  // Connect to OpenAI
   const connect = async () => {
     try {
-      if (chatRef.current && chatRef.current.isConnected) {
-        console.log("Voice chat is already connected");
-        return;
-      }
-
-      // Create a new instance if one doesn't exist
       if (!chatRef.current) {
-        console.log("Creating new RealtimeChat instance");
-        chatRef.current = new RealtimeChat(updateTranscript);
-
-        // Set up error handling
-        chatRef.current.addEventListener('error', (error: any) => {
-          console.error("Voice chat error:", error);
-          
-          if (error.type === 'connection_error') {
-            toast.error("Could not connect to voice chat service");
-          } else if (error.type === 'audio_error') {
-            toast.error("Audio issue: Please check your microphone permissions");
-          }
-        });
+        chatRef.current = new DirectOpenAIConnection();
       }
-
-      console.log("Connecting to voice chat service...");
-      await chatRef.current.connect();
-      console.log("Successfully connected to voice chat service");
-
+      
+      // Configure event listener for transcript updates
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+      
+      unsubscribeRef.current = chatRef.current.addEventListener((event: RealtimeEvent) => {
+        if (event.type === 'transcript') {
+          setTranscript(event.text);
+        } else if (event.type === 'audio') {
+          setIsSpeaking(true);
+          
+          // Clear timeout from any previous audio event
+          const timeoutId = setTimeout(() => {
+            setIsSpeaking(false);
+          }, 1000);
+          
+          return () => clearTimeout(timeoutId);
+        }
+      });
+      
+      // Connect to OpenAI
+      const customInstructions = 
+        "You are a friendly, helpful, and concise voice assistant. " +
+        "Keep your responses brief but informative. " + 
+        "Be conversational but direct. Avoid unnecessarily long explanations.";
+        
+      await chatRef.current.connect(customInstructions, "alloy");
+      
+      // Add initial system message
+      setMessages([
+        {
+          id: "system-welcome",
+          role: "assistant",
+          text: "Hi! How can I help you today?",
+          timestamp: new Date()
+        }
+      ]);
+      
     } catch (error) {
-      console.error("Failed to start voice chat:", error);
-      toast.error("Could not start voice chat. Please try again later.");
+      console.error("[useVoiceChat] Connection error:", error);
+      toast.error("Failed to connect to voice service");
       throw error;
     }
   };
-
-  // Disconnect from the voice chat service
+  
+  // Disconnect from OpenAI
   const disconnect = () => {
     if (chatRef.current) {
-      console.log("Disconnecting from voice chat service");
       chatRef.current.disconnect();
     }
+    
+    if (isRecording) {
+      stopRecording();
+    }
+    
+    setTranscript("");
   };
-
+  
+  // Send message
+  const sendMessage = (text: string) => {
+    if (!chatRef.current || !chatRef.current.isConnectedToOpenAI()) {
+      toast.error("Not connected to voice service");
+      return;
+    }
+    
+    // Add user message
+    setMessages(prev => [
+      ...prev,
+      {
+        id: `user-${Date.now()}`,
+        role: "user",
+        text,
+        timestamp: new Date()
+      }
+    ]);
+    
+    // Send to OpenAI
+    chatRef.current.sendTextMessage(text);
+    
+    // Clear transcript
+    setTranscript("");
+  };
+  
+  // Add assistant message when transcript is finalized
+  useEffect(() => {
+    if (!isSpeaking && transcript && chatRef.current?.isConnectedToOpenAI()) {
+      // Check if the transcript is different from the last assistant message
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.role !== "assistant" || lastMessage?.text !== transcript) {
+        // Add assistant message
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            text: transcript,
+            timestamp: new Date()
+          }
+        ]);
+        
+        // Clear transcript for the next exchange
+        setTranscript("");
+      }
+    }
+  }, [isSpeaking, transcript, messages]);
+  
   return {
+    transcript,
+    setTranscript,
+    messages,
+    isRecording,
+    isSpeaking,
+    startRecording,
+    stopRecording,
+    sendMessage,
     chatRef,
-    transcript: transcriptRef.current,
     connect,
     disconnect
   };
