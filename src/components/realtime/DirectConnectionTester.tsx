@@ -1,21 +1,20 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, XCircle, Mic, MicOff, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDirectOpenAIConnection } from '@/hooks/useDirectOpenAIConnection';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { XCircle } from 'lucide-react';
+import { useAudioRecording } from '@/hooks/useAudioRecording';
+import ConnectionStatus from './ConnectionStatus';
+import EventLog from './EventLog';
 
 const DirectConnectionTester: React.FC = () => {
   const [message, setMessage] = useState<string>('');
-  const [isRecording, setIsRecording] = useState<boolean>(false);
   const [logs, setLogs] = useState<string[]>([]);
-  
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
   
   const {
     connectionStatus,
@@ -27,6 +26,10 @@ const DirectConnectionTester: React.FC = () => {
     sendMessage,
     processAudioInput
   } = useDirectOpenAIConnection();
+
+  const { isRecording, startRecording, stopRecording } = useAudioRecording({
+    onAudioData: processAudioInput
+  });
   
   // Add log message
   const addLog = (message: string) => {
@@ -55,80 +58,14 @@ const DirectConnectionTester: React.FC = () => {
     }
   };
   
-  // Start microphone recording
-  const startRecording = async () => {
-    try {
-      // Request microphone access
-      mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 24000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      
-      // Create audio context
-      audioContextRef.current = new AudioContext({
-        sampleRate: 24000,
-      });
-      
-      // Create source and processor
-      const source = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
-      processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-      
-      // Handle audio data
-      processorRef.current.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        processAudioInput(new Float32Array(inputData));
-      };
-      
-      // Connect nodes
-      source.connect(processorRef.current);
-      processorRef.current.connect(audioContextRef.current.destination);
-      
-      setIsRecording(true);
-      addLog("Microphone recording started");
-      toast.success("Microphone active");
-      
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      addLog(`Microphone error: ${error instanceof Error ? error.message : String(error)}`);
-      toast.error("Could not access microphone");
-    }
-  };
-  
-  // Stop microphone recording
-  const stopRecording = () => {
-    // Disconnect processor
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-    
-    // Stop all tracks
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-    
-    // Close audio context
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    
-    setIsRecording(false);
-    addLog("Microphone recording stopped");
-  };
-  
   // Toggle recording
   const toggleRecording = () => {
     if (isRecording) {
       stopRecording();
+      addLog("Microphone recording stopped");
     } else {
       startRecording();
+      addLog("Microphone recording started");
     }
   };
   
@@ -176,7 +113,9 @@ const DirectConnectionTester: React.FC = () => {
   useEffect(() => {
     return () => {
       disconnect();
-      stopRecording();
+      if (isRecording) {
+        stopRecording();
+      }
     };
   }, []);
   
@@ -191,13 +130,7 @@ const DirectConnectionTester: React.FC = () => {
       
       <CardContent className="space-y-4">
         {/* Connection status */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="font-medium">Status:</span>
-          {connectionStatus === 'disconnected' && <span className="text-gray-500">Not connected</span>}
-          {connectionStatus === 'connecting' && <span className="text-blue-500 flex items-center"><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Connecting...</span>}
-          {connectionStatus === 'connected' && <span className="text-green-500 flex items-center"><CheckCircle className="h-4 w-4 mr-1" /> Connected</span>}
-          {connectionStatus === 'failed' && <span className="text-red-500 flex items-center"><XCircle className="h-4 w-4 mr-1" /> Failed</span>}
-        </div>
+        <ConnectionStatus status={connectionStatus} error={error} />
         
         {/* Error message if any */}
         {error && (
@@ -235,12 +168,22 @@ const DirectConnectionTester: React.FC = () => {
               >
                 {isRecording ? (
                   <>
-                    <MicOff className="h-4 w-4" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mic-off h-4 w-4">
+                      <line x1="2" x2="22" y1="2" y2="22"></line>
+                      <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"></path>
+                      <path d="M5 10v2a7 7 0 0 0 12 5"></path>
+                      <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"></path>
+                      <path d="M9 9v3a3 3 0 0 0 5.12 2.12"></path>
+                    </svg>
                     Stop Recording
                   </>
                 ) : (
                   <>
-                    <Mic className="h-4 w-4" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mic h-4 w-4">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                      <line x1="12" x2="12" y1="19" y2="22"></line>
+                    </svg>
                     Start Recording
                   </>
                 )}
@@ -260,18 +203,7 @@ const DirectConnectionTester: React.FC = () => {
         )}
         
         {/* Message log */}
-        <div className="mt-4">
-          <h3 className="text-sm font-medium mb-2">Event Log</h3>
-          <div className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md h-48 overflow-auto">
-            {logs.length === 0 ? (
-              <div className="text-gray-400 italic">No events yet</div>
-            ) : (
-              <pre className="text-xs whitespace-pre-wrap font-mono">
-                {logs.join('\n')}
-              </pre>
-            )}
-          </div>
-        </div>
+        <EventLog logs={logs} />
       </CardContent>
       
       <CardFooter className="flex justify-between">
@@ -282,7 +214,9 @@ const DirectConnectionTester: React.FC = () => {
         >
           {connectionStatus === 'connecting' ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-loader-2 mr-2 h-4 w-4 animate-spin">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+              </svg>
               Connecting...
             </>
           ) : connectionStatus === 'connected' ? (
