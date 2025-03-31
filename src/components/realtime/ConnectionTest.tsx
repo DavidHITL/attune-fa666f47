@@ -45,10 +45,18 @@ const ConnectionTest = () => {
         setMessage('WebSocket connection established successfully!');
         toast.success('WebSocket connection successful');
         
+        // Try to ping the server
+        try {
+          socket.send(JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() }));
+        } catch (e) {
+          console.error("Error sending ping:", e);
+          setMessage(prev => `${prev}\nFailed to send ping: ${e}`);
+        }
+        
         // Close the socket after successful test
         setTimeout(() => {
           socket.close();
-        }, 1000);
+        }, 2000);
         
         setIsConnecting(false);
       });
@@ -74,10 +82,13 @@ const ConnectionTest = () => {
       });
       
       socket.addEventListener('close', (event) => {
+        clearTimeout(timeoutId);
         console.log("WebSocket closed:", event.code, event.reason);
         if (connectionResult !== 'success') {
           setConnectionResult('failure');
           setMessage(prev => `${prev}\nConnection closed: ${event.code} ${event.reason || 'No reason provided'}`);
+        } else {
+          setMessage(prev => `${prev}\nConnection closed normally: ${event.code}`);
         }
         setIsConnecting(false);
       });
@@ -120,7 +131,7 @@ const ConnectionTest = () => {
         )}
         {message && (
           <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
-            <pre className="text-sm whitespace-pre-wrap">{message}</pre>
+            <pre className="text-sm whitespace-pre-wrap overflow-auto max-h-60">{message}</pre>
           </div>
         )}
       </CardContent>

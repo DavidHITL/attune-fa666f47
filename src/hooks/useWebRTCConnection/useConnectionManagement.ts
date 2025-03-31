@@ -3,12 +3,13 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
+import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 
 export function useConnectionManagement(
   isConnected: boolean,
   isConnecting: boolean,
   connectorRef: React.MutableRefObject<WebRTCConnector | null>,
-  audioProcessorRef: React.MutableRefObject<any>,
+  audioProcessorRef: React.MutableRefObject<AudioProcessor | null>,
   recorderRef: React.MutableRefObject<any>,
   handleMessage: (event: MessageEvent) => void,
   options: UseWebRTCConnectionOptions,
@@ -52,11 +53,14 @@ export function useConnectionManagement(
     try {
       setIsConnecting(true);
       
+      console.log("[useConnectionManagement] Starting connection process");
+      
       // Create a new WebRTC connector
       const connector = new WebRTCConnector({
         ...options,
         onMessage: handleMessage,
         onConnectionStateChange: (state) => {
+          console.log("[useConnectionManagement] Connection state changed:", state);
           setIsConnected(state === "connected");
           if (state === "failed" || state === "disconnected") {
             toast.error("WebRTC connection lost. Please reconnect.");
@@ -64,6 +68,7 @@ export function useConnectionManagement(
           }
         },
         onError: (error) => {
+          console.error("[useConnectionManagement] WebRTC error:", error);
           toast.error(`WebRTC error: ${error.message}`);
         }
       });
@@ -71,7 +76,10 @@ export function useConnectionManagement(
       connectorRef.current = connector;
       
       // Attempt to connect
+      console.log("[useConnectionManagement] Calling connector.connect()");
       const success = await connector.connect();
+      
+      console.log("[useConnectionManagement] Connection result:", success ? "Success" : "Failed");
       
       if (success) {
         setIsConnected(true);
@@ -89,7 +97,7 @@ export function useConnectionManagement(
       setIsConnecting(false);
       return success;
     } catch (error) {
-      console.error("[useWebRTCConnection] Connection error:", error);
+      console.error("[useConnectionManagement] Connection error:", error);
       toast.error(`Connection error: ${error instanceof Error ? error.message : String(error)}`);
       setIsConnecting(false);
       return false;

@@ -57,8 +57,12 @@ export class WebRTCConnector {
             throw new Error("No valid local description available");
           }
           
+          console.log("[WebRTC] Sending offer to OpenAI");
+          
           // Send the offer to OpenAI and get answer
           const result = await sendOffer(this.pc.localDescription, apiKey, this.options.model || "");
+          
+          console.log("[WebRTC] Received answer:", result.success ? "Success" : "Failed");
           
           if (!result.success) {
             throw new Error(result.error || "Failed to send offer");

@@ -41,6 +41,7 @@ export const requestEphemeralKey = async () => {
     }
 
     if (!data || !data.ephemeralKey) {
+      console.error("Invalid response from server:", data);
       throw new Error("Invalid response from server");
     }
 
@@ -50,6 +51,7 @@ export const requestEphemeralKey = async () => {
       expiresAt: new Date(data.expiresAt)
     };
 
+    console.log("Successfully obtained ephemeral key, expires at:", cachedEphemeralKey.expiresAt);
     return cachedEphemeralKey;
   } catch (error) {
     console.error("Error in requestEphemeralKey:", error);
@@ -96,6 +98,7 @@ export const verifyEphemeralKey = async (ephemeralKey: string) => {
     }
 
     if (!data || !data.openaiKey) {
+      console.error("Invalid response from server:", data);
       throw new Error("Invalid response from server");
     }
 
@@ -105,6 +108,7 @@ export const verifyEphemeralKey = async (ephemeralKey: string) => {
       expiresAt: new Date(data.expiresAt)
     };
 
+    console.log("Successfully verified ephemeral key and obtained OpenAI key");
     return cachedOpenAIKey;
   } catch (error) {
     console.error("Error in verifyEphemeralKey:", error);
@@ -129,6 +133,8 @@ export const withSecureOpenAI = async <T>(apiCall: (apiKey: string) => Promise<T
     
     // Step 2: Verify ephemeral key and get actual OpenAI API key
     const { key: openaiKey } = await verifyEphemeralKey(ephemeralKey);
+    
+    console.log("Calling OpenAI API with secure key");
     
     // Step 3: Use the actual OpenAI API key for the API call
     return await apiCall(openaiKey);

@@ -25,8 +25,12 @@ export async function sendOffer(
     
     // Connect to OpenAI's Realtime API with the WebRTC offer
     const baseUrl = "https://api.openai.com/v1/realtime";
+    const modelParam = encodeURIComponent(model);
     
-    const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+    console.log(`[WebRTC] Using model: ${model}`);
+    console.log(`[WebRTC] Requesting from endpoint: ${baseUrl}?model=${modelParam}`);
+    
+    const sdpResponse = await fetch(`${baseUrl}?model=${modelParam}`, {
       method: "POST",
       body: localDescription.sdp,
       headers: {
@@ -37,7 +41,8 @@ export async function sendOffer(
 
     if (!sdpResponse.ok) {
       const errorText = await sdpResponse.text();
-      console.error("[WebRTC] API Error:", errorText);
+      console.error("[WebRTC] API Error Status:", sdpResponse.status);
+      console.error("[WebRTC] API Error Response:", errorText);
       return {
         success: false,
         error: `API Error: ${sdpResponse.status} - ${errorText}`
@@ -46,6 +51,7 @@ export async function sendOffer(
 
     // Get the SDP answer from OpenAI
     const sdpAnswer = await sdpResponse.text();
+    console.log("[WebRTC] Received SDP answer");
     
     // Create and return the remote description
     const answer: RTCSessionDescriptionInit = {
