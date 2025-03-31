@@ -35,15 +35,16 @@ export class WebRTCConnector {
 
   /**
    * Initialize and connect to OpenAI's Realtime API using WebRTC
+   * @param audioTrack Optional MediaStreamTrack to add to the peer connection
    */
-  async connect(): Promise<boolean> {
+  async connect(audioTrack?: MediaStreamTrack): Promise<boolean> {
     try {
       // Use withSecureOpenAI to get an ephemeral token and establish connection
       return await withSecureOpenAI(
         async (apiKey) => {
           try {
             console.log("[WebRTCConnector] Got ephemeral key, connecting to OpenAI Realtime API");
-            return await this.connectionManager.connect(apiKey);
+            return await this.connectionManager.connect(apiKey, audioTrack);
           } catch (error) {
             console.error("[WebRTCConnector] Error connecting with ephemeral key:", error);
             throw error;

@@ -18,7 +18,8 @@ export function useConnectionManagement(
   setIsMicrophoneActive: (isMicrophoneActive: boolean) => void,
   setCurrentTranscript: (currentTranscript: string) => void,
   setIsAiSpeaking: (isAiSpeaking: boolean) => void,
-  toggleMicrophone: () => Promise<boolean>
+  toggleMicrophone: () => Promise<boolean>,
+  getActiveAudioTrack: () => MediaStreamTrack | null
 ) {
   // Enhanced disconnect function with proper cleanup sequence
   const disconnect = useCallback(() => {
@@ -79,6 +80,14 @@ export function useConnectionManagement(
         console.log("[useConnectionManagement] Cleaning up previous connector instance");
         connectorRef.current.disconnect();
         connectorRef.current = null;
+      }
+      
+      // Get any existing audio track from the microphone if available
+      const audioTrack = getActiveAudioTrack();
+      if (audioTrack) {
+        console.log("[useConnectionManagement] Using existing audio track for connection:", audioTrack.label);
+      } else {
+        console.log("[useConnectionManagement] No existing audio track available, WebRTC will request microphone access");
       }
       
       const connector = new WebRTCConnector({
@@ -149,7 +158,7 @@ export function useConnectionManagement(
       console.log("[useConnectionManagement] Calling connector.connect()");
       console.time("WebRTC Connection Process");
       
-      const success = await connector.connect();
+      const success = await connector.connect(audioTrack);
       
       console.timeEnd("WebRTC Connection Process");
       console.log("[useConnectionManagement] Connection result:", success ? "Success" : "Failed");
@@ -170,7 +179,7 @@ export function useConnectionManagement(
       setIsConnecting(false);
       return false;
     }
-  }, [handleMessage, isConnected, isConnecting, options, disconnect, setIsConnected, setIsConnecting, toggleMicrophone]);
+  }, [handleMessage, isConnected, isConnecting, options, disconnect, setIsConnected, setIsConnecting, toggleMicrophone, getActiveAudioTrack]);
 
   return {
     connect,

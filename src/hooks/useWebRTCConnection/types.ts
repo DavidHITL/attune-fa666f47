@@ -1,14 +1,33 @@
 
+// Update the types.ts file to expose the new methods in the return types
 import { WebRTCOptions } from "@/utils/realtime/WebRTCTypes";
 
-export interface UseWebRTCConnectionOptions extends WebRTCOptions {
-  autoConnect?: boolean;
-  enableMicrophone?: boolean;
+export type WebRTCMessageRole = "user" | "assistant" | "system";
+
+export interface WebRTCMessageContent {
+  type: "text" | "audio" | "function_call" | "function_response";
+  text?: string;
+  audio?: string;
+  functionCall?: {
+    name: string;
+    arguments: string;
+  };
+  functionResponse?: {
+    name: string;
+    response: string;
+  };
 }
 
 export interface WebRTCMessage {
-  type: string;
-  [key: string]: any;
+  id: string;
+  role: WebRTCMessageRole;
+  content: WebRTCMessageContent[];
+  timestamp: number;
+}
+
+export interface UseWebRTCConnectionOptions extends Partial<WebRTCOptions> {
+  autoConnect?: boolean;
+  enableMicrophone?: boolean;
 }
 
 export interface WebRTCConnectionState {
@@ -16,25 +35,17 @@ export interface WebRTCConnectionState {
   isConnecting: boolean;
   isMicrophoneActive: boolean;
   isAiSpeaking: boolean;
-  isProcessingAudio?: boolean;
   currentTranscript: string;
-  transcriptProgress?: number;
   messages: WebRTCMessage[];
 }
 
-export interface WebRTCConnectionActions {
+export interface WebRTCConnectionResult extends WebRTCConnectionState {
+  isProcessingAudio: boolean;
+  transcriptProgress: number;
   connect: () => Promise<boolean>;
   disconnect: () => void;
   toggleMicrophone: () => Promise<boolean>;
   sendTextMessage: (text: string) => boolean;
-}
-
-export type WebRTCConnectionResult = WebRTCConnectionState & WebRTCConnectionActions;
-
-// Extended message types for storage
-export interface MessageMetadata {
-  messageType: 'text' | 'voice';
-  instructions?: string;
-  knowledgeEntries?: Record<string, any>[];
-  contextHistory?: string;
+  getActiveMediaStream: () => MediaStream | null;
+  getActiveAudioTrack: () => MediaStreamTrack | null;
 }

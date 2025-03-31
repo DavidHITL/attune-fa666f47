@@ -41,8 +41,9 @@ export class WebRTCConnectionManager extends ConnectionBase {
   /**
    * Initialize and connect to OpenAI's Realtime API using WebRTC
    * @param apiKey Ephemeral API key for authenticating with OpenAI
+   * @param audioTrack Optional MediaStreamTrack to add to the peer connection
    */
-  async connect(apiKey: string): Promise<boolean> {
+  async connect(apiKey: string, audioTrack?: MediaStreamTrack): Promise<boolean> {
     console.log("[WebRTCConnectionManager] Starting connection process");
     
     this.clearConnectionTimeout();
@@ -64,7 +65,8 @@ export class WebRTCConnectionManager extends ConnectionBase {
           console.log("[WebRTCConnectionManager] Data channel is open and ready");
           this.configureSessionWhenReady();
         },
-        this.handleError.bind(this)
+        this.handleError.bind(this),
+        audioTrack // Pass the audioTrack to the connection establisher
       );
       
       if (!connection) {

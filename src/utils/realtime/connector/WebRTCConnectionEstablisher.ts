@@ -22,6 +22,7 @@ export class WebRTCConnectionEstablisher {
    * @param onStateChange Callback for connection state changes
    * @param onDataChannelOpen Callback for when the data channel opens
    * @param onError Callback for handling errors
+   * @param audioTrack Optional audio track to add to the peer connection
    * @returns Object containing the peer connection and data channel if successful
    */
   async establish(
@@ -29,7 +30,8 @@ export class WebRTCConnectionEstablisher {
     options: WebRTCOptions,
     onStateChange: (state: RTCPeerConnectionState) => void,
     onDataChannelOpen: () => void,
-    onError: (error: unknown) => void
+    onError: (error: unknown) => void,
+    audioTrack?: MediaStreamTrack
   ): Promise<{ pc: RTCPeerConnection, dc: RTCDataChannel } | null> {
     console.log("[WebRTCConnectionEstablisher] Starting connection process");
     
@@ -60,29 +62,39 @@ export class WebRTCConnectionEstablisher {
       // Set up event listeners for the data channel
       setupDataChannelListeners(dc, options, onDataChannelOpen);
       
-      // Add microphone audio track to the peer connection before creating the offer
-      try {
-        console.log("[WebRTCConnectionEstablisher] Requesting microphone access to add audio track");
-        const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            sampleRate: 24000 // OpenAI recommends this sample rate
-          } 
-        });
+      // Add the provided audio track to the peer connection if available
+      if (audioTrack) {
+        console.log("[WebRTCConnectionEstablisher] Adding provided audio track to peer connection:", 
+          audioTrack.label || "Unnamed track");
         
-        const audioTracks = mediaStream.getAudioTracks();
-        if (audioTracks.length > 0) {
-          const audioTrack = audioTracks[0];
-          console.log("[WebRTCConnectionEstablisher] Adding audio track to peer connection:", audioTrack.label);
-          pc.addTrack(audioTrack, mediaStream);
-        } else {
-          console.warn("[WebRTCConnectionEstablisher] No audio tracks found in media stream");
+        // Create a new MediaStream with the audio track
+        const mediaStream = new MediaStream([audioTrack]);
+        pc.addTrack(audioTrack, mediaStream);
+      } else {
+        // If no audio track provided, try to get one from microphone
+        try {
+          console.log("[WebRTCConnectionEstablisher] No audio track provided, requesting microphone access");
+          const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 24000 // OpenAI recommends this sample rate
+            } 
+          });
+          
+          const audioTracks = mediaStream.getAudioTracks();
+          if (audioTracks.length > 0) {
+            const micTrack = audioTracks[0];
+            console.log("[WebRTCConnectionEstablisher] Adding microphone track to peer connection:", micTrack.label);
+            pc.addTrack(micTrack, mediaStream);
+          } else {
+            console.warn("[WebRTCConnectionEstablisher] No audio tracks found in media stream");
+          }
+        } catch (micError) {
+          console.warn("[WebRTCConnectionEstablisher] Could not access microphone, continuing without audio track:", micError);
+          // Continue without microphone - we'll use data channel for text and can add tracks later if needed
         }
-      } catch (micError) {
-        console.warn("[WebRTCConnectionEstablisher] Could not access microphone, continuing without audio track:", micError);
-        // Continue without microphone - we'll use data channel for text and can add tracks later if needed
       }
       
       // Create an offer and set local description

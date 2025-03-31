@@ -24,7 +24,11 @@ export function useConnectionActions(
   setMessages: (message: WebRTCMessage) => void
 ) {
   // Initialize microphone control hooks first
-  const { toggleMicrophone } = useMicrophoneControl(
+  const { 
+    toggleMicrophone,
+    getActiveMediaStream,
+    getActiveAudioTrack 
+  } = useMicrophoneControl(
     isConnected,
     isMicrophoneActive,
     connectorRef,
@@ -46,7 +50,8 @@ export function useConnectionActions(
     setIsMicrophoneActive,
     setCurrentTranscript,
     setIsAiSpeaking,
-    toggleMicrophone
+    toggleMicrophone,
+    getActiveAudioTrack
   );
 
   // Initialize message sending hooks
@@ -59,6 +64,8 @@ export function useConnectionActions(
     connect,
     disconnect,
     toggleMicrophone,
-    sendTextMessage
+    sendTextMessage,
+    getActiveMediaStream,
+    getActiveAudioTrack
   };
 }
