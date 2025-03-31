@@ -39,6 +39,7 @@ export function useAudioProcessor(
   // Initialize message handler with callbacks
   const messageHandler = new WebRTCMessageHandler({
     onAudioData: (base64Audio) => {
+      // Add the audio chunk to the processor's buffer
       audioProcessor.addAudioData(base64Audio);
       setIsProcessingAudio(true);
       setIsAiSpeaking(true);
@@ -47,6 +48,11 @@ export function useAudioProcessor(
       lastAudioTimestampRef.current = Date.now();
     },
     onAudioComplete: () => {
+      // Finalize audio when complete signal is received
+      audioProcessor.completeAudioMessage().catch(error => {
+        console.error("[AudioProcessor] Error finalizing audio message:", error);
+      });
+      
       setIsAiSpeaking(false);
       // Give a short delay before considering processing complete
       setTimeout(() => {

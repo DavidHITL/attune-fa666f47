@@ -9,6 +9,7 @@ export class AudioProcessor {
   private audioElement: HTMLAudioElement | null = null;
   private gainNode: GainNode | null = null;
   private isAudioContextResumed: boolean = false;
+  private currentMessageAudioBuffers: Uint8Array[] = [];
 
   constructor() {
     try {
@@ -61,29 +62,79 @@ export class AudioProcessor {
   }
 
   /**
-   * Add audio data to the playback queue
+   * Add audio data to the buffer for current message
    */
   async addAudioData(base64Audio: string): Promise<void> {
     try {
       await this.ensureAudioContextResumed();
       
       // Convert base64 to binary
-      const binaryString = atob(base64Audio);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      const binaryData = this.decodeBase64Audio(base64Audio);
+      
+      // Add to current message buffer
+      this.currentMessageAudioBuffers.push(binaryData);
+      console.log("[AudioProcessor] Added audio chunk to current message buffer, chunks:", this.currentMessageAudioBuffers.length);
+    } catch (error) {
+      console.error("[AudioProcessor] Error processing audio:", error);
+    }
+  }
+
+  /**
+   * Finalize the audio processing and prepare for playback
+   */
+  async completeAudioMessage(): Promise<void> {
+    try {
+      // If there are no chunks, do nothing
+      if (this.currentMessageAudioBuffers.length === 0) {
+        console.log("[AudioProcessor] No audio chunks to finalize");
+        return;
+      }
+
+      // Combine all chunks into one PCM buffer
+      const totalLength = this.currentMessageAudioBuffers.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combinedPcm = new Uint8Array(totalLength);
+      
+      let offset = 0;
+      for (const chunk of this.currentMessageAudioBuffers) {
+        combinedPcm.set(chunk, offset);
+        offset += chunk.length;
       }
       
-      // Add to audio queue
-      this.audioQueue.push(bytes);
-      console.log("[AudioProcessor] Added audio chunk to queue, length:", this.audioQueue.length);
+      // Create WAV data with proper headers
+      const wavData = this.createWavFromPCM(combinedPcm);
+      
+      // Add to playback queue
+      this.audioQueue.push(wavData);
+      console.log("[AudioProcessor] Added complete audio message to queue, length:", this.audioQueue.length);
+      
+      // Reset current message buffer
+      this.currentMessageAudioBuffers = [];
       
       // Start playing if not already playing
       if (!this.isPlaying) {
         this.playNextAudioChunk();
       }
     } catch (error) {
-      console.error("[AudioProcessor] Error processing audio:", error);
+      console.error("[AudioProcessor] Error finalizing audio message:", error);
+      // Reset current message buffer even on error
+      this.currentMessageAudioBuffers = [];
+    }
+  }
+
+  /**
+   * Decode base64 audio to binary data
+   */
+  private decodeBase64Audio(base64Audio: string): Uint8Array {
+    try {
+      const binaryString = atob(base64Audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes;
+    } catch (error) {
+      console.error("[AudioProcessor] Error decoding base64 audio:", error);
+      return new Uint8Array(0);
     }
   }
 
@@ -97,12 +148,9 @@ export class AudioProcessor {
     }
 
     this.isPlaying = true;
-    const audioData = this.audioQueue.shift()!;
+    const wavData = this.audioQueue.shift()!;
 
     try {
-      // Convert PCM audio to WAV format
-      const wavData = this.createWavFromPCM(audioData);
-      
       // Create blob URL for the audio element
       const blob = new Blob([wavData], { type: 'audio/wav' });
       const url = URL.createObjectURL(blob);
@@ -226,6 +274,7 @@ export class AudioProcessor {
       this.gainNode = null;
     }
     this.audioQueue = [];
+    this.currentMessageAudioBuffers = [];
     this.isPlaying = false;
     this.isAudioContextResumed = false;
   }

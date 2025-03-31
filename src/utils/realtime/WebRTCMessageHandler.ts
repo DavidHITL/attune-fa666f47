@@ -76,6 +76,12 @@ export class WebRTCMessageHandler {
           this.currentTranscript = "";
         }
       }
+      else if (message.type === "response.done") {
+        // Response is complete - this is another signal that audio is done
+        if (this.options.onAudioComplete) {
+          this.options.onAudioComplete();
+        }
+      }
     } catch (error) {
       console.error("[WebRTCMessageHandler] Error handling message:", error);
     }
