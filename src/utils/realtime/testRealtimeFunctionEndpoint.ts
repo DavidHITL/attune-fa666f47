@@ -20,21 +20,28 @@ export const testRealtimeFunctionEndpoint = async (): Promise<{success: boolean;
       },
     });
     
-    const data = await response.text();
-    console.log("[testRealtimeFunctionEndpoint] HTTP response:", response.status, data);
+    let responseData;
+    try {
+      responseData = await response.json();
+      console.log("[testRealtimeFunctionEndpoint] HTTP response:", response.status, responseData);
+    } catch (e) {
+      const textResponse = await response.text();
+      console.log("[testRealtimeFunctionEndpoint] HTTP response (text):", response.status, textResponse);
+      responseData = { rawText: textResponse };
+    }
     
     if (!response.ok) {
       return {
         success: false,
-        message: `HTTP endpoint returned status ${response.status}: ${data}`,
-        data: { status: response.status, body: data }
+        message: `HTTP endpoint returned status ${response.status}`,
+        data: { status: response.status, body: responseData }
       };
     }
     
     return {
       success: true,
-      message: `Successfully connected to HTTP endpoint. Status: ${response.status}`,
-      data: { status: response.status, body: data }
+      message: `Successfully connected to HTTP endpoint. Status: ${response.status}. The function is accessible and responding.`,
+      data: { status: response.status, body: responseData }
     };
   } catch (error) {
     console.error("[testRealtimeFunctionEndpoint] Error testing endpoint:", error);
