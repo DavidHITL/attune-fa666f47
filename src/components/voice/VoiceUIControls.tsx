@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 interface VoiceUIControlsProps {
   isConnecting: boolean;
-  connectionStatus: 'connecting' | 'connected' | 'disconnected';
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'failed';
 }
 
 const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
@@ -32,6 +32,7 @@ const VoiceUIControls: React.FC<VoiceUIControlsProps> = ({
           <p id={statusId} className="text-gray-500">
             {connectionStatus === 'connected' ? 'Connected to AI voice service' : 
              connectionStatus === 'connecting' ? 'Establishing connection...' :
+             connectionStatus === 'failed' ? 'Connection failed' :
              'Not connected'}
           </p>
         </div>
