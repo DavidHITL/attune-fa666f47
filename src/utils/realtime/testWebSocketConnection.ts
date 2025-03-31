@@ -14,178 +14,200 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
       console.log("[testWebSocketConnection] Connecting to:", wsUrl);
       console.log("[testWebSocketConnection] Browser WebSocket support check:", typeof WebSocket);
       
-      // Create a WebSocket connection with protocols
+      // Create a WebSocket connection with protocols - crucial for OpenAI
+      // OpenAI's documentation mentions json and specific protocols
       const protocols = ['json', 'openai-realtime'];
       console.log("[testWebSocketConnection] Using protocols:", protocols.join(', '));
       
-      // Try connection with specific protocol first
-      const ws = new WebSocket(wsUrl, protocols);
-      ws.binaryType = "arraybuffer";
+      // Try connection without protocol first as a baseline test
+      console.log("[testWebSocketConnection] First attempting connection without protocols");
+      const basicWs = new WebSocket(wsUrl);
+      basicWs.binaryType = "arraybuffer";
       
-      console.log("[testWebSocketConnection] WebSocket created, waiting for connection...");
-      console.log("[testWebSocketConnection] Initial readyState:", ws.readyState);
-      
-      // Set timeout for connection
-      const timeoutId = setTimeout(() => {
-        console.error("[testWebSocketConnection] Connection timed out after 15 seconds");
+      const basicTimeoutId = setTimeout(() => {
+        console.error("[testWebSocketConnection] Basic connection timed out after 5 seconds");
         try {
-          ws.close();
+          basicWs.close();
         } catch (e) {
-          console.error("[testWebSocketConnection] Error closing socket after timeout:", e);
+          console.error("[testWebSocketConnection] Error closing basic socket after timeout:", e);
         }
-        resolve({
-          success: false,
-          message: "Connection timed out after 15 seconds. Check Supabase Edge Function logs for errors. This may be due to network issues, CORS problems, or server configuration issues.",
-          close: () => {}
-        });
-      }, 15000); // Longer timeout for slower connections
+        
+        // After basic connection times out, try with protocols
+        console.log("[testWebSocketConnection] Now trying with specific protocols");
+        tryWithProtocols();
+      }, 5000);
       
-      // Log readyState changes
-      const stateInterval = setInterval(() => {
-        if (ws) {
-          console.log("[testWebSocketConnection] Current readyState:", ws.readyState);
-        } else {
-          clearInterval(stateInterval);
-        }
-      }, 1000);
-      
-      // Handle connection events
-      ws.onopen = () => {
-        clearTimeout(timeoutId);
-        clearInterval(stateInterval);
-        console.log("[testWebSocketConnection] Connection established successfully");
-        console.log("[testWebSocketConnection] Selected protocol:", ws.protocol || "none");
+      basicWs.onopen = () => {
+        clearTimeout(basicTimeoutId);
+        console.log("[testWebSocketConnection] Basic connection established successfully");
         
         try {
-          ws.send(JSON.stringify({
+          basicWs.send(JSON.stringify({
             type: "ping",
-            message: "Connection test",
+            message: "Basic connection test",
             timestamp: new Date().toISOString()
           }));
-          console.log("[testWebSocketConnection] Sent test ping message");
+          console.log("[testWebSocketConnection] Sent basic test ping message");
         } catch (sendError) {
-          console.error("[testWebSocketConnection] Error sending test message:", sendError);
+          console.error("[testWebSocketConnection] Error sending basic test message:", sendError);
         }
         
-        resolve({
-          success: true,
-          message: `WebSocket connection established successfully${ws.protocol ? ` with protocol: ${ws.protocol}` : ''}`,
-          close: () => {
-            console.log("[testWebSocketConnection] Manually closing WebSocket connection");
-            clearInterval(stateInterval);
-            try {
-              ws.close();
-            } catch (e) {
-              console.error("[testWebSocketConnection] Error closing connection:", e);
-            }
+        setTimeout(() => {
+          try {
+            basicWs.close();
+          } catch (e) {
+            console.error("[testWebSocketConnection] Error closing basic connection:", e);
           }
-        });
+          
+          // After successfully testing basic connection, try with protocols
+          tryWithProtocols();
+        }, 1000);
       };
       
-      ws.onmessage = (event) => {
-        console.log("[testWebSocketConnection] Received message:", typeof event.data === 'string' ? event.data : "Binary data");
-        try {
-          const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          console.log("[testWebSocketConnection] Parsed message data:", data);
-          if (data && data.type === "connection.established") {
-            console.log("[testWebSocketConnection] Server confirmed connection");
-          }
-        } catch (e) {
-          // Non-JSON message, just log it
-          console.log("[testWebSocketConnection] Received non-JSON message");
-        }
+      basicWs.onerror = (error) => {
+        clearTimeout(basicTimeoutId);
+        console.error("[testWebSocketConnection] Basic WebSocket error:", error);
+        
+        // If basic connection failed, try with protocols
+        tryWithProtocols();
       };
       
-      ws.onerror = (error) => {
-        clearTimeout(timeoutId);
-        clearInterval(stateInterval);
-        console.error("[testWebSocketConnection] WebSocket error:", error);
+      basicWs.onclose = (event) => {
+        clearTimeout(basicTimeoutId);
+        console.log(`[testWebSocketConnection] Basic connection closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
+      };
+      
+      basicWs.onmessage = (event) => {
+        console.log("[testWebSocketConnection] Received message on basic connection:", 
+          typeof event.data === 'string' ? event.data : "Binary data");
+      };
+      
+      // Function to test connection with specific protocols
+      const tryWithProtocols = () => {
+        console.log("[testWebSocketConnection] Testing with specific protocols:", protocols);
         
-        // Try without protocols after error
-        console.log("[testWebSocketConnection] Error with protocol, retrying without protocol");
-        try {
-          ws.close();
-        } catch (e) {
-          console.error("[testWebSocketConnection] Error closing socket after error:", e);
-        }
+        // Try connection with specific protocol
+        const ws = new WebSocket(wsUrl, protocols);
+        ws.binaryType = "arraybuffer";
         
-        // Retry without protocols
-        console.log("[testWebSocketConnection] Attempting connection without protocols");
-        const basicWs = new WebSocket(wsUrl);
-        basicWs.binaryType = "arraybuffer";
+        console.log("[testWebSocketConnection] Protocol WebSocket created, initial readyState:", ws.readyState);
         
-        console.log("[testWebSocketConnection] Fallback WebSocket created, waiting for connection...");
-        
-        // Set timeout for fallback connection
-        const fallbackTimeoutId = setTimeout(() => {
-          console.error("[testWebSocketConnection] Fallback connection timed out");
-          clearInterval(fallbackStateInterval);
+        // Set timeout for connection
+        const timeoutId = setTimeout(() => {
+          console.error("[testWebSocketConnection] Protocol connection timed out after 15 seconds");
+          try {
+            ws.close();
+          } catch (e) {
+            console.error("[testWebSocketConnection] Error closing protocol socket after timeout:", e);
+          }
           resolve({
             success: false,
-            message: "WebSocket connection failed with and without protocols. Check Supabase Edge Function logs for errors. The server may not be available or may be misconfigured.",
+            message: "Connection timed out after 15 seconds. The server might not support the protocols ['json', 'openai-realtime']. Try without protocols or check Supabase Edge Function logs.",
             close: () => {}
           });
-        }, 10000);
+        }, 15000);
         
-        // Log readyState changes for fallback connection
-        const fallbackStateInterval = setInterval(() => {
-          if (basicWs) {
-            console.log("[testWebSocketConnection] Fallback readyState:", basicWs.readyState);
+        // Log readyState changes for debugging
+        const stateInterval = setInterval(() => {
+          if (ws) {
+            console.log("[testWebSocketConnection] Protocol socket readyState:", ws.readyState);
           } else {
-            clearInterval(fallbackStateInterval);
+            clearInterval(stateInterval);
           }
         }, 1000);
         
-        basicWs.onopen = () => {
-          clearTimeout(fallbackTimeoutId);
-          clearInterval(fallbackStateInterval);
-          console.log("[testWebSocketConnection] Connection without protocol established successfully");
+        // Handle connection events
+        ws.onopen = () => {
+          clearTimeout(timeoutId);
+          clearInterval(stateInterval);
+          console.log("[testWebSocketConnection] Protocol connection established successfully");
+          console.log("[testWebSocketConnection] Selected protocol:", ws.protocol || "none");
+          
+          try {
+            ws.send(JSON.stringify({
+              type: "ping",
+              message: "Protocol connection test",
+              timestamp: new Date().toISOString()
+            }));
+            console.log("[testWebSocketConnection] Sent protocol test ping message");
+          } catch (sendError) {
+            console.error("[testWebSocketConnection] Error sending protocol test message:", sendError);
+          }
+          
+          // Send an auth message if protocol suggests OpenAI connection
+          if (ws.protocol && ws.protocol.includes('openai')) {
+            try {
+              console.log("[testWebSocketConnection] Detected OpenAI protocol, sending mock auth message");
+              ws.send(JSON.stringify({
+                type: "auth",
+                authorization: "Bearer test_token" // Just for testing the protocol handling
+              }));
+            } catch (authError) {
+              console.error("[testWebSocketConnection] Error sending mock auth message:", authError);
+            }
+          }
+          
           resolve({
             success: true,
-            message: "WebSocket connection established successfully without protocols",
+            message: `WebSocket connection established successfully${ws.protocol ? ` with protocol: ${ws.protocol}` : ''}`,
             close: () => {
-              console.log("[testWebSocketConnection] Closing fallback WebSocket connection");
+              console.log("[testWebSocketConnection] Manually closing WebSocket connection");
+              clearInterval(stateInterval);
               try {
-                basicWs.close();
+                ws.close();
               } catch (e) {
-                console.error("[testWebSocketConnection] Error closing fallback connection:", e);
+                console.error("[testWebSocketConnection] Error closing connection:", e);
               }
             }
           });
         };
         
-        basicWs.onerror = (fallbackError) => {
-          clearTimeout(fallbackTimeoutId);
-          clearInterval(fallbackStateInterval);
-          console.error("[testWebSocketConnection] Both connection attempts failed:", fallbackError);
+        ws.onmessage = (event) => {
+          console.log("[testWebSocketConnection] Received protocol message:", 
+            typeof event.data === 'string' ? event.data : "Binary data");
+          try {
+            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            console.log("[testWebSocketConnection] Parsed protocol message data:", data);
+          } catch (e) {
+            // Non-JSON message, just log it
+            console.log("[testWebSocketConnection] Received non-JSON protocol message");
+          }
+        };
+        
+        ws.onerror = (error) => {
+          clearTimeout(timeoutId);
+          clearInterval(stateInterval);
+          console.error("[testWebSocketConnection] Protocol WebSocket error:", error);
+          
           resolve({
             success: false,
-            message: "WebSocket connection failed with and without protocols. Check your network connection and Supabase Edge Function logs. Possible issues: CORS configuration, WebSocket upgrade handling, or server errors.",
-            close: () => {}
+            message: `WebSocket connection with protocols failed. The server might not support the protocols ['json', 'openai-realtime']. Check Supabase Edge Function logs.`,
+            close: () => {
+              try {
+                ws.close();
+              } catch (e) {
+                // Ignore close errors
+              }
+            }
           });
         };
         
-        basicWs.onclose = (event) => {
-          clearTimeout(fallbackTimeoutId);
-          clearInterval(fallbackStateInterval);
-          console.log(`[testWebSocketConnection] Fallback connection closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
+        ws.onclose = (event) => {
+          clearTimeout(timeoutId);
+          clearInterval(stateInterval);
+          console.log(
+            `[testWebSocketConnection] Protocol connection closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`
+          );
+          
+          // Only resolve if not already resolved (by onopen or onerror)
+          if (!event.wasClean) {
+            resolve({
+              success: false,
+              message: `Connection closed unexpectedly (Code: ${event.code}). This might indicate protocol negotiation issues, CORS problems, or an error in the Edge Function.`,
+              close: () => {}
+            });
+          }
         };
-      };
-      
-      ws.onclose = (event) => {
-        clearTimeout(timeoutId);
-        clearInterval(stateInterval);
-        console.log(
-          `[testWebSocketConnection] Connection closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`
-        );
-        
-        if (!event.wasClean) {
-          resolve({
-            success: false,
-            message: `Connection closed unexpectedly (Code: ${event.code}). This might indicate server-side issues, network problems, or CORS issues.`,
-            close: () => {}
-          });
-        }
       };
     } catch (error) {
       console.error("[testWebSocketConnection] Error creating WebSocket:", error);

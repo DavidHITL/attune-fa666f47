@@ -1,62 +1,47 @@
 
 /**
- * Tests HTTP access to the realtime function endpoint
+ * Tests the realtime function endpoint using various methods
  */
-export const testRealtimeFunctionEndpoint = async (): Promise<{success: boolean, message: string}> => {
-  console.log("[testRealtimeFunctionEndpoint] Testing HTTP access to realtime function");
+export const testRealtimeFunctionEndpoint = async (): Promise<{success: boolean; message: string; data?: any}> => {
+  console.log("[testRealtimeFunctionEndpoint] Starting realtime endpoint test");
   
   try {
+    // Use the correct project ID from your Supabase configuration
     const projectId = 'oseowhythgbqvllwonaz';
-    const functionUrl = `https://${projectId}.supabase.co/functions/v1/realtime-chat`;
+    const endpoint = `https://${projectId}.supabase.co/functions/v1/realtime-chat`;
+
+    // First, test using a regular HTTP request to check general accessibility
+    console.log("[testRealtimeFunctionEndpoint] Testing HTTP endpoint:", endpoint);
     
-    console.log("[testRealtimeFunctionEndpoint] Sending HTTP request to:", functionUrl);
-    
-    // Send HTTP request to check if the function is accessible
-    const response = await fetch(functionUrl, {
+    const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     });
     
-    console.log("[testRealtimeFunctionEndpoint] Response status:", response.status);
+    const data = await response.text();
+    console.log("[testRealtimeFunctionEndpoint] HTTP response:", response.status, data);
     
-    if (response.ok) {
-      try {
-        const data = await response.json();
-        console.log("[testRealtimeFunctionEndpoint] Response data:", data);
-        return {
-          success: true,
-          message: `Function accessible. Status: ${response.status}. Message: ${data.message || JSON.stringify(data)}`
-        };
-      } catch (jsonError) {
-        const text = await response.text();
-        console.log("[testRealtimeFunctionEndpoint] Response text:", text);
-        return {
-          success: true,
-          message: `Function accessible. Status: ${response.status}. Response is not JSON: ${text.substring(0, 100)}`
-        };
-      }
-    } else {
-      try {
-        const errorData = await response.json();
-        return {
-          success: false,
-          message: `Error: ${response.status} ${response.statusText}. ${errorData.error || JSON.stringify(errorData)}`
-        };
-      } catch (jsonError) {
-        const text = await response.text();
-        return {
-          success: false,
-          message: `Error: ${response.status} ${response.statusText}. ${text.substring(0, 100)}`
-        };
-      }
+    if (!response.ok) {
+      return {
+        success: false,
+        message: `HTTP endpoint returned status ${response.status}: ${data}`,
+        data: { status: response.status, body: data }
+      };
     }
+    
+    return {
+      success: true,
+      message: `Successfully connected to HTTP endpoint. Status: ${response.status}`,
+      data: { status: response.status, body: data }
+    };
   } catch (error) {
-    console.error("[testRealtimeFunctionEndpoint] Error testing function:", error);
+    console.error("[testRealtimeFunctionEndpoint] Error testing endpoint:", error);
     return {
       success: false,
-      message: `Network error: ${error instanceof Error ? error.message : String(error)}`
+      message: `Error testing endpoint: ${error instanceof Error ? error.message : String(error)}`,
+      data: { error: String(error) }
     };
   }
 };
