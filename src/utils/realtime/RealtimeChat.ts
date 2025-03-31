@@ -1,6 +1,8 @@
+
 import { EventEmitter } from './EventEmitter';
 import { ChatError, ErrorType } from './types';
-import { ConnectionManager } from './ConnectionManager';
+import { WebSocketManager as WebSocketManagerImpl } from './managers/websocket/WebSocketManager';
+import { ConnectionManager } from './managers/ConnectionManager';
 import { MessageHandler } from './MessageHandler';
 import { AudioHandler } from './AudioHandler';
 import { SessionManager } from './SessionManager';
@@ -45,8 +47,11 @@ export class RealtimeChat {
       }
     };
     
+    // Create WebSocketManager instance (using the new implementation)
+    const webSocketManager = new WebSocketManagerImpl();
+    
     // Initialize connection manager with the reconnect function
-    this.connectionManager = new ConnectionManager(projectId, this.eventEmitter, reconnect);
+    this.connectionManager = new ConnectionManager(projectId, this.eventEmitter, reconnect, webSocketManager);
     
     // Set heartbeat configuration
     this.connectionManager.setHeartbeatConfig(
@@ -57,7 +62,7 @@ export class RealtimeChat {
     
     // Initialize handlers
     this.messageHandler = new MessageHandler(
-      this.connectionManager.getWebSocketManager(),
+      webSocketManager,
       this.eventEmitter,
       transcriptCallback
     );

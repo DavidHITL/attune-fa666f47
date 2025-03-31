@@ -1,5 +1,6 @@
 
 import { EventEmitter } from '../EventEmitter';
+import { IWebSocketManager } from '../managers/interfaces/IWebSocketManager';
 
 /**
  * Manages WebSocket session state and configuration
@@ -30,7 +31,7 @@ export class SessionHandler {
   /**
    * Configure session settings after session is created
    */
-  configureSession(websocketManager: any): void {
+  configureSession(websocketManager: IWebSocketManager): void {
     if (!websocketManager) {
       console.error("Cannot configure session: WebSocketManager not available");
       return;

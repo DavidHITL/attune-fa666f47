@@ -1,4 +1,3 @@
-
 import { WebSocketConnectionHandler } from './WebSocketConnectionHandler';
 import { WebSocketTimeoutManager } from './WebSocketTimeoutManager';
 import { WebSocketMessageManager } from './WebSocketMessageManager';
@@ -6,11 +5,12 @@ import { HeartbeatManager } from '../HeartbeatManager';
 import { ConnectionLogger } from '../ConnectionLogger';
 import { WebSocketPromiseHandler } from '../WebSocketPromiseHandler';
 import { WebSocketAuthHandler } from './WebSocketAuthHandler';
+import { IWebSocketManager } from '../interfaces/IWebSocketManager';
 
 /**
  * Manages WebSocket connections
  */
-export class WebSocketManager {
+export class WebSocketManager implements IWebSocketManager {
   private websocket: WebSocket | null = null;
   private wsUrl: string | null = null;
   private protocols: string[] = ['json', 'openai-realtime'];

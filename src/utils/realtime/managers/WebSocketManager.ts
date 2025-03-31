@@ -1,4 +1,3 @@
-
 import { ConnectionStateManager } from './websocket/ConnectionStateManager';
 import { WebSocketPromiseHandler } from './WebSocketPromiseHandler';
 import { HeartbeatManager } from './HeartbeatManager';
@@ -6,11 +5,12 @@ import { ConnectionLogger } from './ConnectionLogger';
 import { WebSocketAuthHandler } from './websocket/WebSocketAuthHandler';
 import { WebSocketEventHandler } from './websocket/WebSocketEventHandler';
 import { WebSocketMessageHandler } from './websocket/WebSocketMessageHandler';
+import { IWebSocketManager } from './interfaces/IWebSocketManager';
 
 /**
  * Manages WebSocket connections
  */
-export class WebSocketManager {
+export class WebSocketManager implements IWebSocketManager {
   private websocket: WebSocket | null = null;
   public messageHandler: ((event: MessageEvent) => void) | null = null;
   public wsUrl: string | null = null;
@@ -257,5 +257,26 @@ export class WebSocketManager {
    */
   rejectOpenPromise(reason: any): void {
     this.promiseHandler.rejectOpenPromise(reason);
+  }
+
+  /**
+   * Get current connection attempt count (required for compatibility)
+   */
+  getConnectionAttempt(): number {
+    return this.connectionAttempt;
+  }
+
+  /**
+   * Set current connection attempt count (required for compatibility)
+   */
+  setConnectionAttempt(attempt: number): void {
+    this.connectionAttempt = attempt;
+  }
+
+  /**
+   * Get maximum connection attempts (required for compatibility)
+   */
+  getMaxConnectionAttempts(): number {
+    return this.maxConnectionAttempts;
   }
 }

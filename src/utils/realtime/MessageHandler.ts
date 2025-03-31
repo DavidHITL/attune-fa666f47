@@ -1,5 +1,5 @@
 
-import { WebSocketManager } from './managers/websocket/WebSocketManager';
+import { IWebSocketManager } from './managers/interfaces/IWebSocketManager';
 import { EventEmitter } from './EventEmitter';
 import { ChatError, ErrorType } from './types';
 import { TranscriptHandler } from './handlers/TranscriptHandler';
@@ -11,7 +11,7 @@ import { MessageProcessor } from './handlers/MessageProcessor';
  * Handles sending and receiving messages
  */
 export class MessageHandler {
-  private websocketManager: WebSocketManager;
+  private websocketManager: IWebSocketManager;
   private eventEmitter: EventEmitter;
   private transcriptHandler: TranscriptHandler;
   private sessionHandler: SessionHandler;
@@ -19,7 +19,7 @@ export class MessageHandler {
   private messageProcessor: MessageProcessor;
 
   constructor(
-    websocketManager: WebSocketManager,
+    websocketManager: IWebSocketManager,
     eventEmitter: EventEmitter,
     transcriptCallback: (text: string) => void
   ) {

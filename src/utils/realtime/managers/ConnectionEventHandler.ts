@@ -1,17 +1,17 @@
 
-import { WebSocketManager } from './websocket/WebSocketManager';
+import { IWebSocketManager } from './interfaces/IWebSocketManager';
 import { ConnectionState } from './ConnectionState';
 import { ReconnectionHandler } from '../ReconnectionHandler';
 import { EventEmitter } from '../EventEmitter';
 
 export class ConnectionEventHandler {
-  private webSocketManager: WebSocketManager;
+  private webSocketManager: IWebSocketManager;
   private connectionState: ConnectionState;
   private reconnectionHandler: ReconnectionHandler;
   private eventEmitter: EventEmitter;
   
   constructor(
-    webSocketManager: WebSocketManager,
+    webSocketManager: IWebSocketManager,
     connectionState: ConnectionState,
     reconnectionHandler: ReconnectionHandler,
     eventEmitter: EventEmitter

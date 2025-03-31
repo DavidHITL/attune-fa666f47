@@ -1,5 +1,5 @@
 
-import { WebSocketManager } from '../managers/WebSocketManager';
+import { IWebSocketManager } from '../managers/interfaces/IWebSocketManager';
 import { EventEmitter } from '../EventEmitter';
 import { ChatError, ErrorType } from '../types';
 import { SessionHandler } from './SessionHandler';
@@ -8,12 +8,12 @@ import { SessionHandler } from './SessionHandler';
  * Handles sending messages to the WebSocket
  */
 export class MessageSender {
-  private websocketManager: WebSocketManager;
+  private websocketManager: IWebSocketManager;
   private eventEmitter: EventEmitter;
   private sessionHandler: SessionHandler;
 
   constructor(
-    websocketManager: WebSocketManager,
+    websocketManager: IWebSocketManager,
     eventEmitter: EventEmitter,
     sessionHandler: SessionHandler
   ) {

@@ -3,7 +3,7 @@ import { EventEmitter } from '../EventEmitter';
 import { ChatError, ErrorType } from '../types';
 import { TranscriptHandler } from './TranscriptHandler';
 import { SessionHandler } from './SessionHandler';
-import { WebSocketManager } from '../managers/WebSocketManager';
+import { IWebSocketManager } from '../managers/interfaces/IWebSocketManager';
 
 /**
  * Processes incoming WebSocket messages
@@ -12,13 +12,13 @@ export class MessageProcessor {
   private eventEmitter: EventEmitter;
   private transcriptHandler: TranscriptHandler;
   private sessionHandler: SessionHandler;
-  private websocketManager: WebSocketManager;
+  private websocketManager: IWebSocketManager;
 
   constructor(
     eventEmitter: EventEmitter,
     transcriptHandler: TranscriptHandler,
     sessionHandler: SessionHandler,
-    websocketManager: WebSocketManager
+    websocketManager: IWebSocketManager
   ) {
     this.eventEmitter = eventEmitter;
     this.transcriptHandler = transcriptHandler;

@@ -1,6 +1,5 @@
-
 import { ConnectionState } from './ConnectionState';
-import { WebSocketManager } from './WebSocketManager';
+import { IWebSocketManager } from './interfaces/IWebSocketManager';
 import { ConnectionEventHandler } from './ConnectionEventHandler';
 import { ReconnectionHandler } from '../ReconnectionHandler';
 import { EventEmitter } from '../EventEmitter';
@@ -11,7 +10,7 @@ import { ConnectionInitializer } from './ConnectionInitializer';
  * Manages WebSocket connections and reconnection logic
  */
 export class ConnectionManager {
-  private webSocketManager: WebSocketManager;
+  private webSocketManager: IWebSocketManager;
   private connectionState: ConnectionState;
   private connectionEventHandler: ConnectionEventHandler;
   private reconnectionHandler: ReconnectionHandler;
@@ -20,10 +19,10 @@ export class ConnectionManager {
   private heartbeatConfig: HeartbeatConfig;
   private connectionInitializer: ConnectionInitializer;
   
-  constructor(projectId: string, eventEmitter: EventEmitter, onReconnect: () => Promise<void>) {
+  constructor(projectId: string, eventEmitter: EventEmitter, onReconnect: () => Promise<void>, webSocketManager: IWebSocketManager) {
     this.projectId = projectId;
     this.eventEmitter = eventEmitter;
-    this.webSocketManager = new WebSocketManager();
+    this.webSocketManager = webSocketManager;
     this.connectionState = new ConnectionState();
     this.reconnectionHandler = new ReconnectionHandler(onReconnect);
     this.connectionEventHandler = new ConnectionEventHandler(
@@ -91,7 +90,7 @@ export class ConnectionManager {
   /**
    * Get the WebSocket manager
    */
-  getWebSocketManager(): WebSocketManager {
+  getWebSocketManager(): IWebSocketManager {
     return this.webSocketManager;
   }
   
