@@ -39,6 +39,21 @@ export class WebRTCConnector {
    */
   async connect(audioTrack?: MediaStreamTrack): Promise<boolean> {
     try {
+      // Validate audio track if provided
+      if (audioTrack) {
+        console.log("[WebRTCConnector] Audio track provided:", 
+          audioTrack.label || "Unnamed track", 
+          "- Enabled:", audioTrack.enabled,
+          "- Ready state:", audioTrack.readyState,
+          "- ID:", audioTrack.id);
+        
+        if (audioTrack.readyState !== 'live') {
+          console.warn("[WebRTCConnector] Provided audio track is not in 'live' state:", audioTrack.readyState);
+        }
+      } else {
+        console.log("[WebRTCConnector] No audio track provided, will attempt to get microphone access during connection");
+      }
+      
       // Use withSecureOpenAI to get an ephemeral token and establish connection
       return await withSecureOpenAI(
         async (apiKey) => {
@@ -47,7 +62,15 @@ export class WebRTCConnector {
             
             // Pass the audioTrack to the connection manager
             // This will be added to the peer connection before creating the offer
-            return await this.connectionManager.connect(apiKey, audioTrack);
+            const result = await this.connectionManager.connect(apiKey, audioTrack);
+            
+            if (result) {
+              console.log("[WebRTCConnector] Successfully connected with audio track");
+            } else {
+              console.error("[WebRTCConnector] Failed to connect with audio track");
+            }
+            
+            return result;
           } catch (error) {
             console.error("[WebRTCConnector] Error connecting with ephemeral key:", error);
             throw error;

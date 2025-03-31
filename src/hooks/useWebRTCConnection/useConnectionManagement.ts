@@ -1,5 +1,5 @@
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
@@ -55,7 +55,12 @@ export function useConnectionManagement(
     console.log("[useConnectionManagement] Disconnect complete");
   }, [setIsConnected, setIsConnecting, setCurrentTranscript, setIsAiSpeaking, setIsMicrophoneActive, audioProcessorRef, connectorRef, recorderRef]);
 
-  // Connect to OpenAI Realtime API with improved state handling
+  // Ensure we clean up on unmount
+  useEffect(() => {
+    return disconnect;
+  }, [disconnect]);
+
+  // Connect to OpenAI Realtime API with improved audio handling
   const connect = useCallback(async () => {
     if (isConnected || isConnecting) {
       console.log("[useConnectionManagement] Already connected or connecting, aborting");
@@ -83,11 +88,42 @@ export function useConnectionManagement(
       }
       
       // Get any existing audio track from the microphone if available
-      const audioTrack = getActiveAudioTrack();
+      let audioTrack = getActiveAudioTrack();
+      
+      // If no track is available but we need one, try to get one now
+      // This ensures we have an audio track BEFORE creating the peer connection
+      if (!audioTrack && options.enableMicrophone) {
+        console.log("[useConnectionManagement] No active audio track but enableMicrophone is true. Attempting to get microphone permission before connecting.");
+        
+        try {
+          // Request microphone permission first - this is crucial for getting the track before offer creation
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              sampleRate: 24000,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          });
+          
+          const tracks = stream.getAudioTracks();
+          if (tracks.length > 0) {
+            audioTrack = tracks[0];
+            console.log("[useConnectionManagement] Successfully acquired audio track before connection:", 
+              audioTrack.label || "Unnamed track",
+              "- Enabled:", audioTrack.enabled,
+              "- ID:", audioTrack.id);
+          }
+        } catch (micError) {
+          console.warn("[useConnectionManagement] Could not access microphone before connection:", micError);
+          // We'll continue without a track and let the connection process try again
+        }
+      }
+      
       if (audioTrack) {
         console.log("[useConnectionManagement] Using existing audio track for connection:", audioTrack.label);
       } else {
-        console.log("[useConnectionManagement] No existing audio track available, WebRTC will request microphone access");
+        console.log("[useConnectionManagement] No audio track available, WebRTC connection will request one");
       }
       
       const connector = new WebRTCConnector({
@@ -140,12 +176,13 @@ export function useConnectionManagement(
         },
         onError: (error) => {
           console.error("[useConnectionManagement] WebRTC error:", error);
-          toast.error(`WebRTC error: ${error.message}`);
+          toast.error(`WebRTC error: ${error instanceof Error ? error.message : String(error)}`);
           
           // Only disconnect on critical errors
-          if (error.message.includes("timeout") || 
+          if (error instanceof Error &&
+             (error.message.includes("timeout") || 
               error.message.includes("failed to set remote description") ||
-              error.message.includes("API Error")) {
+              error.message.includes("API Error"))) {
             disconnect();
             setIsConnecting(false);
           }
@@ -155,10 +192,11 @@ export function useConnectionManagement(
       connectorRef.current = connector;
       
       // Attempt to connect with additional logging
-      console.log("[useConnectionManagement] Calling connector.connect()");
+      console.log("[useConnectionManagement] Calling connector.connect() with audio track:", 
+        audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
       console.time("WebRTC Connection Process");
       
-      const success = await connector.connect(audioTrack);
+      const success = await connector.connect(audioTrack || undefined);
       
       console.timeEnd("WebRTC Connection Process");
       console.log("[useConnectionManagement] Connection result:", success ? "Success" : "Failed");

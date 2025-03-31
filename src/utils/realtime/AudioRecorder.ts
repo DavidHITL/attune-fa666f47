@@ -22,9 +22,18 @@ export class AudioRecorder {
   }
 
   /**
-   * Start recording audio from the microphone
+   * Set an existing MediaStream instead of creating a new one
+   * Useful for reusing a stream that's already been requested
    */
-  async start(): Promise<boolean> {
+  setExistingMediaStream(stream: MediaStream): void {
+    this.stream = stream;
+  }
+
+  /**
+   * Start recording audio from the microphone
+   * @param reuseExistingStream If true, will use the existing stream if available
+   */
+  async start(reuseExistingStream: boolean = false): Promise<boolean> {
     if (this.isRecording) {
       console.log("[AudioRecorder] Already recording");
       return true;
@@ -33,16 +42,26 @@ export class AudioRecorder {
     try {
       console.log("[AudioRecorder] Starting audio recording");
       
-      // Request access to the microphone with explicit constraints
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: this.options.sampleRate,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
+      // If we don't have a stream yet or we're not reusing an existing one, request a new one
+      if (!this.stream || !reuseExistingStream) {
+        // Request access to the microphone with explicit constraints
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: this.options.sampleRate,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        console.log("[AudioRecorder] New MediaStream created with", 
+          this.stream.getAudioTracks().length, 
+          "audio tracks");
+      } else {
+        console.log("[AudioRecorder] Reusing existing MediaStream with", 
+          this.stream.getAudioTracks().length, 
+          "audio tracks");
+      }
       
       // Create audio context with the specified sample rate
       this.audioContext = new AudioContext({
@@ -86,8 +105,9 @@ export class AudioRecorder {
 
   /**
    * Stop recording audio
+   * @param releaseStream If true, will stop all tracks in the stream
    */
-  stop(): void {
+  stop(releaseStream: boolean = true): void {
     console.log("[AudioRecorder] Stopping recording");
     
     // Disconnect and clean up source
@@ -102,8 +122,8 @@ export class AudioRecorder {
       this.processor = null;
     }
     
-    // Stop all tracks in the stream
-    if (this.stream) {
+    // Stop all tracks in the stream if requested
+    if (this.stream && releaseStream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
     }

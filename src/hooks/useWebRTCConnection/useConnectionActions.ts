@@ -6,6 +6,7 @@ import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
+import { useEffect } from "react";
 
 export function useConnectionActions(
   isConnected: boolean,
@@ -27,7 +28,9 @@ export function useConnectionActions(
   const { 
     toggleMicrophone,
     getActiveMediaStream,
-    getActiveAudioTrack 
+    getActiveAudioTrack,
+    prewarmMicrophoneAccess,
+    isMicrophoneReady
   } = useMicrophoneControl(
     isConnected,
     isMicrophoneActive,
@@ -59,6 +62,16 @@ export function useConnectionActions(
     isConnected,
     connectorRef
   );
+  
+  // Prewarm microphone access when autoConnect is enabled
+  useEffect(() => {
+    if (options.autoConnect && !isConnected && !isConnecting) {
+      console.log("[useConnectionActions] Pre-warming microphone for auto-connect");
+      prewarmMicrophoneAccess().catch(err => {
+        console.warn("[useConnectionActions] Failed to pre-warm microphone:", err);
+      });
+    }
+  }, [options.autoConnect, isConnected, isConnecting, prewarmMicrophoneAccess]);
 
   return {
     connect,
@@ -66,6 +79,8 @@ export function useConnectionActions(
     toggleMicrophone,
     sendTextMessage,
     getActiveMediaStream,
-    getActiveAudioTrack
+    getActiveAudioTrack,
+    prewarmMicrophoneAccess,
+    isMicrophoneReady
   };
 }
