@@ -29,7 +29,7 @@ export function useAudioProcessor(
     if (!transcript.trim() || !user) return;
     
     // Save the transcript as a voice message
-    saveMessage(transcript, true, { 
+    saveMessage(transcript, false, { 
       messageType: 'voice',
     }).catch(error => {
       console.error("[AudioProcessor] Failed to save voice transcript:", error);
