@@ -26,7 +26,7 @@ export function useVoiceChatConnection({
   // Handle connection
   useEffect(() => {
     if (open && !hasAttemptedConnection.current) {
-      const checkAuthAndConnect = async () => {
+      const attemptDirectConnection = async () => {
         hasAttemptedConnection.current = true;
         setConnectionStatus('connecting');
         setIsConnecting(true);
@@ -36,8 +36,7 @@ export function useVoiceChatConnection({
           const { data: { session } } = await supabase.auth.getSession();
           
           if (!session) {
-            console.warn("[useVoiceChatConnection] No active session found, but continuing with connection attempt");
-            // We continue anyway since we've disabled JWT verification
+            console.warn("[useVoiceChatConnection] No active session found, continuing with connection attempt");
           }
           
           await connect();
@@ -58,14 +57,14 @@ export function useVoiceChatConnection({
               hasAttemptedConnection.current = false; // Allow another attempt
             }, 2000);
           } else {
-            toast.error("Could not connect after multiple attempts. Please check your API key and try again later.");
+            toast.error("Could not connect after multiple attempts. Please try again later.");
           }
         } finally {
           setIsConnecting(false);
         }
       };
       
-      checkAuthAndConnect();
+      attemptDirectConnection();
     }
     
     // Cleanup on dialog close

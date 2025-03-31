@@ -10,7 +10,6 @@ import VoiceVisualization from "./voice/VoiceVisualization";
 import { ArrowLeft } from "lucide-react";
 import VoiceUIControls from "./voice/VoiceUIControls";
 
-// Create and export the VoiceChat component
 export function VoiceChat({
   open,
   onOpenChange
@@ -45,7 +44,7 @@ export function VoiceChat({
           
           {isConnecting && (
             <div className="text-sm text-gray-500 animate-pulse">
-              Establishing secure connection...
+              Establishing direct connection to OpenAI...
             </div>
           )}
         </div>
