@@ -20,13 +20,16 @@ const Chat: React.FC = () => {
     confirmEndSession
   } = useSessionManager();
 
+  // Convert sessionEndTime from number to Date if it exists
+  const sessionEndTimeAsDate = sessionEndTime ? new Date(sessionEndTime) : null;
+
   return (
     <div className="flex flex-col h-screen">
       <NavBar />
       
       <ChatHeader 
         sessionStarted={sessionStarted}
-        sessionEndTime={sessionEndTime}
+        sessionEndTime={sessionEndTimeAsDate}
         onSessionComplete={confirmEndSession}
         onRequestEndSession={handleRequestEndSession}
       />
