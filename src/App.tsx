@@ -14,6 +14,7 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import About from "./pages/About";
 import Methodology from "./pages/Methodology";
+import TestApi from "./pages/TestApi";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => {
               <Route path="/signup" element={<SignUp />} />
               <Route path="/about" element={<About />} />
               <Route path="/methodology" element={<Methodology />} />
+              <Route path="/test-api" element={<TestApi />} />
               
               {/* Protected routes */}
               <Route
