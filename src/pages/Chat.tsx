@@ -2,15 +2,12 @@
 import React, { useState } from "react";
 import NavBar from "@/components/NavBar";
 import ChatInterface from "@/components/ChatInterface";
-import { VoiceChat } from "@/components/VoiceChat"; // Changed to named import
 import SessionStartModal from "@/components/chat/SessionStartModal";
 import EndSessionDialog from "@/components/chat/EndSessionDialog";
 import ChatHeader from "@/components/chat/ChatHeader";
 import { useSessionManager } from "@/hooks/useSessionManager";
 
 const Chat: React.FC = () => {
-  const [voiceChatOpen, setVoiceChatOpen] = useState(false);
-  
   const {
     sessionStarted,
     sessionEndTime,
@@ -23,10 +20,6 @@ const Chat: React.FC = () => {
     confirmEndSession
   } = useSessionManager();
 
-  const handlePhoneClick = () => {
-    setVoiceChatOpen(true);
-  };
-
   return (
     <div className="flex flex-col h-screen">
       <NavBar />
@@ -35,7 +28,6 @@ const Chat: React.FC = () => {
         sessionStarted={sessionStarted}
         sessionEndTime={sessionEndTime}
         onSessionComplete={confirmEndSession}
-        onVoiceChatOpen={handlePhoneClick}
         onRequestEndSession={handleRequestEndSession}
       />
       
@@ -47,11 +39,6 @@ const Chat: React.FC = () => {
           />
         </div>
       </div>
-      
-      <VoiceChat 
-        open={voiceChatOpen} 
-        onOpenChange={setVoiceChatOpen} 
-      />
       
       {/* Session Modals */}
       <SessionStartModal 
