@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { WebRTCConnector, WebRTCOptions } from "@/utils/realtime/WebRTCConnector";
+import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
+import { WebRTCOptions } from "@/utils/realtime/WebRTCTypes";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";

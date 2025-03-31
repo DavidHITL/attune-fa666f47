@@ -1,15 +1,10 @@
 
 import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
-
-export interface WebRTCOptions {
-  onTrack?: (event: RTCTrackEvent) => void;
-  onMessage?: (event: MessageEvent) => void;
-  onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
-  onError?: (error: Error) => void;
-  model?: string;
-  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
-  instructions?: string;
-}
+import { setupPeerConnectionListeners } from "./WebRTCConnectionListeners";
+import { setupDataChannelListeners } from "./WebRTCDataChannelHandler";
+import { encodeAudioData } from "./WebRTCAudioEncoder";
+import { configureSession } from "./WebRTCSessionConfig";
+import { WebRTCOptions } from "./WebRTCTypes";
 
 export class WebRTCConnector {
   private pc: RTCPeerConnection | null = null;
@@ -39,11 +34,13 @@ export class WebRTCConnector {
       });
       
       // Set up event handlers for the peer connection
-      this.setupPeerConnectionListeners(this.pc);
+      setupPeerConnectionListeners(this.pc, this.options, (state) => {
+        this.connectionState = state;
+      });
       
       // Create data channel for sending/receiving events
       this.dc = this.pc.createDataChannel("oai-events");
-      this.setupDataChannelListeners(this.dc);
+      setupDataChannelListeners(this.dc, this.options);
       
       // Create an offer to start the WebRTC handshake
       const offer = await this.pc.createOffer();
@@ -90,7 +87,11 @@ export class WebRTCConnector {
           console.log("[WebRTC] Connection established successfully");
           
           // Configure the session after connection is established
-          setTimeout(() => this.configureSession(), 1000);
+          setTimeout(() => {
+            if (this.dc) {
+              configureSession(this.dc, this.options);
+            }
+          }, 1000);
           
           return true;
         } catch (error) {
@@ -103,112 +104,6 @@ export class WebRTCConnector {
       console.error("[WebRTC] Error initializing connection:", error);
       this.handleError(error);
       return false;
-    }
-  }
-
-  /**
-   * Set up event listeners for the peer connection
-   */
-  private setupPeerConnectionListeners(pc: RTCPeerConnection): void {
-    // Track ICE connection state
-    pc.oniceconnectionstatechange = () => {
-      console.log("[WebRTC] ICE connection state:", pc.iceConnectionState);
-    };
-    
-    // Handle incoming tracks (audio)
-    pc.ontrack = (event) => {
-      console.log("[WebRTC] Received track:", event.track.kind);
-      if (this.options.onTrack) {
-        this.options.onTrack(event);
-      }
-    };
-    
-    // Handle connection state changes
-    pc.onconnectionstatechange = () => {
-      this.connectionState = pc.connectionState;
-      console.log("[WebRTC] Connection state changed:", this.connectionState);
-      
-      if (this.options.onConnectionStateChange) {
-        this.options.onConnectionStateChange(this.connectionState);
-      }
-      
-      // Handle disconnection or failure
-      if (this.connectionState === "disconnected" || this.connectionState === "failed") {
-        console.warn("[WebRTC] Connection lost or failed");
-      }
-    };
-  }
-
-  /**
-   * Set up event listeners for the data channel
-   */
-  private setupDataChannelListeners(dc: RTCDataChannel): void {
-    dc.onopen = () => {
-      console.log("[WebRTC] Data channel opened");
-    };
-    
-    dc.onclose = () => {
-      console.log("[WebRTC] Data channel closed");
-    };
-    
-    dc.onerror = (event) => {
-      console.error("[WebRTC] Data channel error:", event);
-    };
-    
-    dc.onmessage = (event) => {
-      try {
-        // Parse the message and log for debugging
-        const message = JSON.parse(event.data);
-        console.log("[WebRTC] Received message:", message.type || "unknown type");
-        
-        // Forward the message to the callback if provided
-        if (this.options.onMessage) {
-          this.options.onMessage(event);
-        }
-      } catch (error) {
-        console.error("[WebRTC] Error processing message:", error);
-      }
-    };
-  }
-
-  /**
-   * Configure the session with OpenAI after connection is established
-   */
-  private async configureSession(): Promise<void> {
-    if (!this.dc || this.dc.readyState !== "open") {
-      console.warn("[WebRTC] Data channel not ready, cannot configure session");
-      return;
-    }
-
-    try {
-      // Send session configuration to OpenAI
-      const sessionConfig = {
-        event_id: `event_${Date.now()}`,
-        type: "session.update",
-        session: {
-          modalities: ["text", "audio"],
-          instructions: this.options.instructions,
-          voice: this.options.voice,
-          input_audio_format: "pcm16",
-          output_audio_format: "pcm16",
-          input_audio_transcription: {
-            model: "whisper-1"
-          },
-          turn_detection: {
-            type: "server_vad",
-            threshold: 0.5,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 1000
-          },
-          temperature: 0.7,
-          max_response_output_tokens: "inf"
-        }
-      };
-
-      console.log("[WebRTC] Configuring session:", sessionConfig);
-      this.dc.send(JSON.stringify(sessionConfig));
-    } catch (error) {
-      console.error("[WebRTC] Error configuring session:", error);
     }
   }
 
@@ -259,7 +154,7 @@ export class WebRTCConnector {
 
     try {
       // Encode the audio data to base64
-      const encodedAudio = this.encodeAudioData(audioData);
+      const encodedAudio = encodeAudioData(audioData);
       
       // Send the audio buffer
       this.dc.send(JSON.stringify({
@@ -272,35 +167,6 @@ export class WebRTCConnector {
       console.error("[WebRTC] Error sending audio data:", error);
       return false;
     }
-  }
-
-  /**
-   * Encode audio data for sending to OpenAI
-   */
-  private encodeAudioData(float32Array: Float32Array): string {
-    const int16Array = new Int16Array(float32Array.length);
-    
-    // Convert Float32Array to Int16Array
-    for (let i = 0; i < float32Array.length; i++) {
-      // Clamp values between -1 and 1
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      // Convert to 16-bit PCM
-      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-    }
-    
-    // Convert to Uint8Array for binary encoding
-    const uint8Array = new Uint8Array(int16Array.buffer);
-    let binary = '';
-    const chunkSize = 0x8000;
-    
-    // Process in chunks to avoid call stack limits
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    
-    // Return base64 encoded string
-    return btoa(binary);
   }
 
   /**
