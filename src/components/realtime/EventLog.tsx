@@ -1,21 +1,37 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface EventLogProps {
   logs: string[];
 }
 
 const EventLog: React.FC<EventLogProps> = ({ logs }) => {
+  const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Auto-scroll to bottom when new logs are added
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [logs]);
+
   return (
-    <div className="mt-4">
-      <h3 className="text-sm font-medium mb-2">Event Log</h3>
-      <div className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md h-48 overflow-auto">
-        {logs.length === 0 ? (
-          <div className="text-gray-400 italic">No events yet</div>
+    <div className="border rounded-md overflow-hidden">
+      <div className="bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm font-medium border-b">
+        Event Log
+      </div>
+      <div 
+        ref={logRef} 
+        className="bg-gray-50 dark:bg-gray-900 text-xs font-mono p-3 overflow-y-auto max-h-[150px]"
+      >
+        {logs.length > 0 ? (
+          logs.map((log, index) => (
+            <div key={index} className="whitespace-pre-wrap mb-1">
+              {log}
+            </div>
+          ))
         ) : (
-          <pre className="text-xs whitespace-pre-wrap font-mono">
-            {logs.join('\n')}
-          </pre>
+          <div className="text-gray-400">No events logged</div>
         )}
       </div>
     </div>

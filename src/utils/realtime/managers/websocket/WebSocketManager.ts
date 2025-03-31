@@ -1,3 +1,4 @@
+
 import { WebSocketConnectionHandler } from './WebSocketConnectionHandler';
 import { WebSocketTimeoutManager } from './WebSocketTimeoutManager';
 import { WebSocketMessageManager } from './WebSocketMessageManager';
@@ -13,7 +14,7 @@ import { IWebSocketManager } from '../interfaces/IWebSocketManager';
 export class WebSocketManager implements IWebSocketManager {
   private websocket: WebSocket | null = null;
   private wsUrl: string | null = null;
-  private protocols: string[] = ['json', 'openai-realtime'];
+  private protocols: string[] = ['json']; // Default to just 'json' for wider compatibility
   private connectionAttempt = 0;
   private maxConnectionAttempts = 3;
   
@@ -96,9 +97,17 @@ export class WebSocketManager implements IWebSocketManager {
       // Create a connection promise
       const connectionPromise = this.promiseHandler.createConnectionPromise();
       
-      // Create new connection with protocols
+      // Try connection with different protocol combinations if needed
       try {
-        this.websocket = new WebSocket(finalUrl, this.protocols);
+        // First try with the specified protocols
+        if (this.protocols.length > 0) {
+          console.log("[WebSocketManager] Attempting connection with protocols:", this.protocols);
+          this.websocket = new WebSocket(finalUrl, this.protocols);
+        } else {
+          // Fall back to no protocols
+          console.log("[WebSocketManager] Attempting connection without protocols");
+          this.websocket = new WebSocket(finalUrl);
+        }
         
         // Log connection readyState changes for debugging
         this.connectionLogger.startLogging(this.websocket);
@@ -106,8 +115,8 @@ export class WebSocketManager implements IWebSocketManager {
         // Set binary type for audio data
         this.websocket.binaryType = "arraybuffer";
         
-        // Set connection timeout
-        const timeoutId = this.timeoutManager.setupConnectionTimeout(this.websocket, 10000);
+        // Set connection timeout (increase to 15 seconds for slower connections)
+        const timeoutId = this.timeoutManager.setupConnectionTimeout(this.websocket, 15000);
         
         // Configure handlers
         setupHandlers(this.websocket, timeoutId);
@@ -118,6 +127,23 @@ export class WebSocketManager implements IWebSocketManager {
         return connectionPromise;
       } catch (wsError) {
         console.error("[WebSocketManager] Error creating WebSocket:", wsError);
+        
+        // If we failed with protocols, try without any protocols
+        if (this.protocols.length > 0 && !this.websocket) {
+          console.log("[WebSocketManager] Retrying connection without protocols");
+          this.protocols = [];
+          this.websocket = new WebSocket(finalUrl);
+          
+          // Set up the same handlers and timeout
+          this.connectionLogger.startLogging(this.websocket);
+          this.websocket.binaryType = "arraybuffer";
+          const timeoutId = this.timeoutManager.setupConnectionTimeout(this.websocket, 15000);
+          setupHandlers(this.websocket, timeoutId);
+          this.connectionHandler.setupEventHandlers(this.websocket, this.connectionLogger);
+          
+          return connectionPromise;
+        }
+        
         throw wsError;
       }
     } catch (error) {

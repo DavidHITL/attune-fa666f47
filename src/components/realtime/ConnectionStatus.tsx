@@ -1,20 +1,40 @@
 
 import React from 'react';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Wifi, WifiOff, AlertCircle } from 'lucide-react';
 
 interface ConnectionStatusProps {
-  status: 'disconnected' | 'connecting' | 'connected' | 'failed';
+  status: 'connecting' | 'connected' | 'disconnected';
   error?: Error | null;
 }
 
-const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ status, error }) => {
+const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ 
+  status,
+  error
+}) => {
   return (
-    <div className="flex items-center gap-2 mb-4">
-      <span className="font-medium">Status:</span>
-      {status === 'disconnected' && <span className="text-gray-500">Not connected</span>}
-      {status === 'connecting' && <span className="text-blue-500 flex items-center"><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Connecting...</span>}
-      {status === 'connected' && <span className="text-green-500 flex items-center"><CheckCircle className="h-4 w-4 mr-1" /> Connected</span>}
-      {status === 'failed' && <span className="text-red-500 flex items-center"><XCircle className="h-4 w-4 mr-1" /> Failed</span>}
+    <div className="flex items-center gap-1.5">
+      {status === 'connected' && (
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1.5 py-1">
+          <Wifi className="h-3.5 w-3.5" />
+          <span>Connected</span>
+        </Badge>
+      )}
+      
+      {status === 'connecting' && (
+        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1.5 py-1">
+          <Wifi className="h-3.5 w-3.5 animate-pulse" />
+          <span>Connecting...</span>
+        </Badge>
+      )}
+      
+      {status === 'disconnected' && (
+        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 flex items-center gap-1.5 py-1">
+          <WifiOff className="h-3.5 w-3.5" />
+          <span>Disconnected</span>
+          {error && <AlertCircle className="h-3.5 w-3.5 ml-1" title={error.message} />}
+        </Badge>
+      )}
     </div>
   );
 };

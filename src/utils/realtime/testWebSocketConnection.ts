@@ -1,145 +1,90 @@
 
 /**
- * Tests WebSocket connection to the realtime endpoint with detailed diagnostics
+ * Utility to test WebSocket connection to the realtime chat endpoint
  */
-export const testWebSocketConnection = async (): Promise<{success: boolean; message: string; close: () => void}> => {
-  console.log("[testWebSocketConnection] Starting WebSocket connection test");
-  
+export async function testWebSocketConnection(): Promise<{ success: boolean; message: string; close: () => void }> {
   return new Promise((resolve) => {
     try {
-      // Use the correct project ID from your Supabase configuration
-      const projectId = 'oseowhythgbqvllwonaz';
+      console.log("[WebSocketTest] Starting connection test");
+      
+      // Get the Supabase project ID from the URL
+      const projectId = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID || 'oseowhythgbqvllwonaz';
       const wsUrl = `wss://${projectId}.supabase.co/functions/v1/realtime-chat`;
       
-      console.log("[testWebSocketConnection] Connecting to:", wsUrl);
-      console.log("[testWebSocketConnection] Browser WebSocket support:", typeof WebSocket !== 'undefined' ? 'Available' : 'Not Available');
+      console.log(`[WebSocketTest] Connecting to ${wsUrl}`);
       
-      // Track whether we've already resolved the promise to avoid multiple resolves
-      let hasResolved = false;
+      const socket = new WebSocket(wsUrl);
+      let timeoutId: number;
       
-      // Connection timeout handling
-      const timeoutId = setTimeout(() => {
-        console.error("[testWebSocketConnection] Connection timed out after 15 seconds");
-        if (!hasResolved) {
-          hasResolved = true;
-          resolve({
-            success: false,
-            message: "Connection timed out after 15 seconds. The server might not be responding or is unable to upgrade to WebSocket.",
-            close: () => {}
-          });
-        }
-      }, 15000);
+      // Set connection timeout
+      timeoutId = window.setTimeout(() => {
+        console.log("[WebSocketTest] Connection timeout");
+        socket.close();
+        resolve({ 
+          success: false, 
+          message: "Connection timed out after 10 seconds", 
+          close: () => {} 
+        });
+      }, 10000);
       
-      // Create WebSocket connection without protocols first (simpler approach)
-      const ws = new WebSocket(wsUrl);
-      
-      // Log all state changes for debugging
-      ws.onopen = () => {
+      socket.onopen = () => {
+        console.log("[WebSocketTest] Connection established");
         clearTimeout(timeoutId);
-        console.log("[testWebSocketConnection] Connection established successfully");
         
-        // Send a ping message to test message sending
+        // Send a test message
         try {
-          ws.send(JSON.stringify({ type: "ping", timestamp: new Date().toISOString() }));
-          console.log("[testWebSocketConnection] Ping message sent successfully");
-        } catch (sendError) {
-          console.error("[testWebSocketConnection] Failed to send ping message:", sendError);
+          socket.send(JSON.stringify({ type: "test", message: "Connection test" }));
+        } catch (err) {
+          console.error("[WebSocketTest] Error sending test message:", err);
         }
         
-        if (!hasResolved) {
-          hasResolved = true;
-          resolve({
-            success: true,
-            message: `WebSocket connection established successfully. Ready state: ${ws.readyState}`,
-            close: () => {
-              console.log("[testWebSocketConnection] Manually closing WebSocket connection");
-              ws.close();
-            }
-          });
-        }
-      };
-      
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("[testWebSocketConnection] Received message:", data);
-          
-          // If we get a response, that's already a good sign
-          if (!hasResolved) {
-            clearTimeout(timeoutId);
-            hasResolved = true;
-            resolve({
-              success: true,
-              message: `WebSocket connection success! Received message: ${JSON.stringify(data)}`,
-              close: () => {
-                console.log("[testWebSocketConnection] Closing connection after receiving message");
-                ws.close();
+        resolve({ 
+          success: true, 
+          message: "Connection established successfully", 
+          close: () => {
+            try {
+              if (socket.readyState === WebSocket.OPEN) {
+                socket.close();
               }
-            });
-          }
-        } catch (e) {
-          console.log("[testWebSocketConnection] Received non-JSON message:", event.data);
-        }
-      };
-      
-      ws.onerror = (error) => {
-        console.error("[testWebSocketConnection] WebSocket error:", error);
-        
-        // If error includes a status code, it's likely a HTTP error during upgrade
-        const errorMessage = error instanceof ErrorEvent && error.message 
-          ? `WebSocket connection failed: ${error.message}`
-          : "WebSocket connection failed. Check browser console for details.";
-        
-        // Only resolve if not resolved yet
-        if (!hasResolved) {
-          clearTimeout(timeoutId);
-          hasResolved = true;
-          resolve({
-            success: false,
-            message: errorMessage + " This often means the Edge Function failed to upgrade the connection properly.",
-            close: () => {
-              try {
-                ws.close();
-              } catch (e) {
-                // Ignore close errors
-              }
+            } catch (err) {
+              console.error("[WebSocketTest] Error closing socket:", err);
             }
-          });
-        }
+          } 
+        });
       };
       
-      ws.onclose = (event) => {
-        console.log(
-          `[testWebSocketConnection] Connection closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`
-        );
-        
-        if (!hasResolved) {
-          clearTimeout(timeoutId);
-          hasResolved = true;
-          
-          if (!event.wasClean) {
-            resolve({
-              success: false,
-              message: `Connection closed unexpectedly (Code: ${event.code}). This might indicate CORS problems or an error in the Edge Function.`,
-              close: () => {}
-            });
-          } else {
-            resolve({
-              success: true,
-              message: `Connection successfully closed (Code: ${event.code})`,
-              close: () => {}
-            });
-          }
-        }
+      socket.onerror = (event) => {
+        console.error("[WebSocketTest] WebSocket error:", event);
+        clearTimeout(timeoutId);
+        resolve({ 
+          success: false, 
+          message: "Connection failed with error", 
+          close: () => {
+            try {
+              if (socket.readyState !== WebSocket.CLOSED) {
+                socket.close();
+              }
+            } catch (err) {
+              console.error("[WebSocketTest] Error closing socket:", err);
+            }
+          } 
+        });
       };
       
+      socket.onclose = (event) => {
+        console.log("[WebSocketTest] Connection closed:", event);
+      };
+      
+      socket.onmessage = (event) => {
+        console.log("[WebSocketTest] Received message:", event.data);
+      };
     } catch (error) {
-      console.error("[testWebSocketConnection] Error creating WebSocket:", error);
-      resolve({
-        success: false,
-        message: `Error creating WebSocket: ${error instanceof Error ? error.message : String(error)}`,
-        close: () => {}
+      console.error("[WebSocketTest] Error during test:", error);
+      resolve({ 
+        success: false, 
+        message: `Test error: ${error instanceof Error ? error.message : String(error)}`, 
+        close: () => {} 
       });
     }
   });
-};
+}

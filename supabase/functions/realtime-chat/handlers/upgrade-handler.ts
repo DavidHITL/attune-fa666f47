@@ -47,10 +47,9 @@ async function upgradeWebSocket(
   idleTimeout = 120000
 ): Promise<Deno.UpgradeWebSocketResult | Response> {
   try {
-    // Try to upgrade with requested protocols first
-    console.log("[Upgrade Handler] Attempting WebSocket upgrade with protocols:", requestedProtocols || "none");
+    // Try to upgrade without protocols first - this is more reliable
+    console.log("[Upgrade Handler] Attempting WebSocket upgrade without protocols");
     const upgradeResult = Deno.upgradeWebSocket(req, {
-      protocol: requestedProtocols && requestedProtocols.length > 0 ? requestedProtocols[0] : undefined,
       idleTimeout,
     });
     
@@ -58,19 +57,26 @@ async function upgradeWebSocket(
                upgradeResult.socket.protocol || "none");
     return upgradeResult;
   } catch (upgradeError) {
-    console.error("[Upgrade Handler] Critical: WebSocket upgrade failed:", upgradeError);
+    console.error("[Upgrade Handler] Initial upgrade attempt failed:", upgradeError);
     console.error("[Upgrade Handler] Error details:", JSON.stringify({
       name: upgradeError.name,
       message: upgradeError.message,
       stack: upgradeError.stack
     }, null, 2));
     
-    // Try again without protocols if the initial attempt failed
+    // Try again with protocols if the initial attempt failed
     try {
-      console.log("[Upgrade Handler] Retrying upgrade without protocols");
-      const upgradeResult = Deno.upgradeWebSocket(req);
-      console.log("[Upgrade Handler] Fallback upgrade successful");
-      return upgradeResult;
+      if (requestedProtocols && requestedProtocols.length > 0) {
+        console.log("[Upgrade Handler] Retrying upgrade with protocols:", requestedProtocols[0]);
+        const upgradeResult = Deno.upgradeWebSocket(req, {
+          protocol: requestedProtocols[0],
+          idleTimeout,
+        });
+        console.log("[Upgrade Handler] Protocol-specific upgrade successful");
+        return upgradeResult;
+      } else {
+        throw new Error("No protocols specified and initial upgrade failed");
+      }
     } catch (fallbackError) {
       console.error("[Upgrade Handler] Fallback upgrade also failed:", fallbackError);
       return new Response(JSON.stringify({ 
