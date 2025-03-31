@@ -130,7 +130,7 @@ const DirectConnectionTester: React.FC = () => {
       
       <CardContent className="space-y-4">
         {/* Connection status */}
-        <ConnectionStatus status={connectionStatus} error={error} />
+        <ConnectionStatus status={connectionStatus} error={error} type="direct-openai" />
         
         {/* Error message if any */}
         {error && (

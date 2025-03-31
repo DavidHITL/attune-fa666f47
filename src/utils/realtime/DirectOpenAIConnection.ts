@@ -1,6 +1,6 @@
 
 import { EventEmitter } from './EventEmitter';
-import { ConnectionManager } from './connection/ConnectionManager';
+import { DirectConnectionManager } from './connection/DirectConnectionManager';
 import { RealtimeEvent, TokenResponse } from './types/events';
 
 /**
@@ -8,10 +8,10 @@ import { RealtimeEvent, TokenResponse } from './types/events';
  */
 export class DirectOpenAIConnection {
   private eventEmitter = new EventEmitter();
-  private connectionManager: ConnectionManager;
+  private connectionManager: DirectConnectionManager;
   
   constructor() {
-    this.connectionManager = new ConnectionManager(this.eventEmitter);
+    this.connectionManager = new DirectConnectionManager(this.eventEmitter);
   }
 
   /**
