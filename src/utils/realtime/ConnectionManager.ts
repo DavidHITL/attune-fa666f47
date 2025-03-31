@@ -10,5 +10,11 @@ export const ConnectionManager = {
   },
   disconnect: () => {
     console.warn("Real-time voice functionality has been removed");
-  }
+  },
+  isConnected: () => false,
+  isConnecting: () => false,
+  onMessage: () => {},
+  onError: () => {},
+  onClose: () => {},
+  onOpen: () => {}
 };

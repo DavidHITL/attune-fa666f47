@@ -1,6 +1,7 @@
 
 /**
- * Manages WebSocket connection state
+ * Simple stub for connection state 
+ * All actual realtime functionality has been removed
  */
 export class ConnectionState {
   private _isConnected: boolean = false;
@@ -16,26 +17,13 @@ export class ConnectionState {
    * Get connection state
    */
   isConnected(): boolean {
-    return this._isConnected;
+    return false; // Always return false since functionality is disabled
   }
   
   /**
-   * Check if WebSocket is connected and in OPEN state
+   * Check connection
    */
-  checkConnection(websocket: WebSocket | null): boolean {
-    if (!websocket) {
-      return false;
-    }
-    
-    // Double-check the actual WebSocket state
-    const isActuallyConnected = websocket.readyState === WebSocket.OPEN;
-    
-    // If our state says connected but WebSocket is closed, update our state
-    if (this._isConnected && !isActuallyConnected) {
-      console.warn("Connection state mismatch - updating state to match actual WebSocket state");
-      this._isConnected = false;
-    }
-    
-    return this._isConnected && isActuallyConnected;
+  checkConnection(): boolean {
+    return false; // Always return false since functionality is disabled
   }
 }

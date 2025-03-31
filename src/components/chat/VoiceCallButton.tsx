@@ -1,8 +1,6 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
-import { Phone } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
 import { toast } from "sonner";
 
 interface VoiceCallButtonProps {
@@ -10,59 +8,40 @@ interface VoiceCallButtonProps {
 }
 
 const VoiceCallButton: React.FC<VoiceCallButtonProps> = ({ onClick }) => {
-  const { toast: uiToast } = useToast();
-  const [isClicked, setIsClicked] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
   const handleClick = () => {
-    setIsClicked(true);
-    setIsLoading(true);
-    
-    // Show a more detailed toast message
-    uiToast({
-      title: "Connecting to OpenAI GPT-4o voice service",
-      description: "Establishing direct connection to the OpenAI Realtime API...",
-    });
-    
-    // Show a more visible toast using sonner with longer timeout
-    toast.promise(
-      new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // Reset the clicked state after animation completes
-          setIsClicked(false);
-          
-          try {
-            onClick();
-            resolve("Connected");
-          } catch (error) {
-            console.error("Error connecting to voice service:", error);
-            reject(error);
-          } finally {
-            setIsLoading(false);
-          }
-        }, 500); // Slightly longer animation for better feedback
-      }),
-      {
-        loading: 'Connecting to OpenAI GPT-4o...',
-        success: 'Connection to voice service established!',
-        error: 'Connection failed. Please try again later.',
-        duration: 5000 // Longer duration to ensure user sees the message
-      }
-    );
+    // Display a toast message indicating voice functionality is disabled
+    toast.info("Voice chat functionality has been disabled");
+    onClick();
   };
 
   return (
     <Button 
       variant="outline" 
       size="icon" 
-      disabled={isLoading}
-      className={`rounded-full hover:bg-blue-100 border-blue-300 transition-all duration-300 ${
-        isClicked ? 'bg-blue-100 scale-95' : ''
-      } ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+      className="rounded-full border-gray-300 opacity-60 cursor-not-allowed"
       onClick={handleClick}
-      title="Start voice conversation with OpenAI GPT-4o"
+      title="Voice chat has been disabled"
+      disabled={true}
     >
-      <Phone className={`text-blue-600 ${isLoading ? 'animate-pulse' : ''}`} size={20} />
+      <span className="sr-only">Voice chat disabled</span>
+      <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width="20" 
+        height="20" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        className="text-gray-400"
+      >
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+        <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+        <line x1="12" y1="19" x2="12" y2="23"></line>
+        <line x1="8" y1="23" x2="16" y2="23"></line>
+      </svg>
     </Button>
   );
 };

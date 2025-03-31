@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect, useRef } from "react";
-import { Send, Mic, MicOff } from "lucide-react";
-import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import React, { useState } from "react";
+import { Send } from "lucide-react";
 
 // Define the interface for chat input props
 interface ChatInputProps {
@@ -11,27 +10,12 @@ interface ChatInputProps {
 
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false }) => {
   const [message, setMessage] = useState("");
-  const previousTranscriptRef = useRef("");
-  
-  const { isListening, toggleListening, isSupported, transcript } = useSpeechRecognition();
-
-  // Use an effect to handle transcript updates instead of using the callback directly
-  useEffect(() => {
-    if (transcript && transcript !== previousTranscriptRef.current) {
-      setMessage(prev => {
-        const newMessage = prev + (prev ? ' ' : '') + transcript;
-        return newMessage;
-      });
-      previousTranscriptRef.current = transcript;
-    }
-  }, [transcript]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !isLoading) {
       onSendMessage(message);
       setMessage("");
-      previousTranscriptRef.current = "";
     }
   };
 
@@ -50,19 +34,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false 
           disabled={isLoading}
         />
         <div className="absolute right-3 flex space-x-2">
-          <button
-            type="button"
-            onClick={toggleListening}
-            className={`p-1 rounded-full ${
-              isListening 
-                ? "bg-red-500 text-white" 
-                : "text-gray-500 hover:text-blue-500"
-            }`}
-            disabled={isLoading || !isSupported}
-            title={isListening ? "Stop listening" : "Start listening"}
-          >
-            {isListening ? <MicOff size={18} /> : <Mic size={18} />}
-          </button>
           <button
             type="submit"
             className={`${
