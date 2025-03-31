@@ -22,6 +22,32 @@ export function useConnectionActions(
   setIsAiSpeaking: (isAiSpeaking: boolean) => void,
   setMessages: (message: WebRTCMessage) => void
 ) {
+  // Disconnect from OpenAI Realtime API
+  const disconnect = useCallback(() => {
+    // Stop microphone if active
+    if (recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+      setIsMicrophoneActive(false);
+    }
+    
+    // Disconnect WebRTC
+    if (connectorRef.current) {
+      connectorRef.current.disconnect();
+      connectorRef.current = null;
+    }
+    
+    // Reset state
+    setIsConnected(false);
+    setCurrentTranscript("");
+    setIsAiSpeaking(false);
+    
+    // Clean up audio processor
+    if (audioProcessorRef.current) {
+      audioProcessorRef.current.cleanup();
+    }
+  }, [setIsConnected, setCurrentTranscript, setIsAiSpeaking, setIsMicrophoneActive]);
+
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
     if (isConnected || isConnecting) return false;
@@ -71,33 +97,7 @@ export function useConnectionActions(
       setIsConnecting(false);
       return false;
     }
-  }, [handleMessage, isConnected, isConnecting, options, disconnect, toggleMicrophone]);
-
-  // Disconnect from OpenAI Realtime API
-  const disconnect = useCallback(() => {
-    // Stop microphone if active
-    if (recorderRef.current) {
-      recorderRef.current.stop();
-      recorderRef.current = null;
-      setIsMicrophoneActive(false);
-    }
-    
-    // Disconnect WebRTC
-    if (connectorRef.current) {
-      connectorRef.current.disconnect();
-      connectorRef.current = null;
-    }
-    
-    // Reset state
-    setIsConnected(false);
-    setCurrentTranscript("");
-    setIsAiSpeaking(false);
-    
-    // Clean up audio processor
-    if (audioProcessorRef.current) {
-      audioProcessorRef.current.cleanup();
-    }
-  }, []);
+  }, [handleMessage, isConnected, isConnecting, options, disconnect, setIsConnected, setIsConnecting]);
 
   // Toggle microphone on/off
   const toggleMicrophone = useCallback(async () => {
@@ -155,7 +155,7 @@ export function useConnectionActions(
         return false;
       }
     }
-  }, [isConnected, isMicrophoneActive, connectorRef]);
+  }, [isConnected, isMicrophoneActive, connectorRef, setIsMicrophoneActive]);
 
   // Send text message to OpenAI
   const sendTextMessage = useCallback((text: string) => {

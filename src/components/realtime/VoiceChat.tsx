@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     // Otherwise try to activate
     const success = await toggleMicrophone();
     
-    if (!success && microphonePermission !== 'denied') {
+    if (!success && microphonePermission !== 'granted' && microphonePermission !== 'prompt') {
       // If failed but not explicitly denied, might be a technical issue
       toast.error("Could not access microphone. Please check your device settings.");
     }

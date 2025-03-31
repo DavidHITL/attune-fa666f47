@@ -24,7 +24,7 @@ export function useAudioProcessor(
     },
     onTranscriptUpdate: (textDelta) => {
       // Fixed: Store current transcript in a variable and append delta
-      const newTranscript = "" + textDelta; // Force string conversion
+      const newTranscript = textDelta; // Use the delta directly
       setCurrentTranscript(newTranscript);
     },
     onTranscriptComplete: () => {

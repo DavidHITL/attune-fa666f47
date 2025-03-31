@@ -1,6 +1,6 @@
 
 import { useEffect } from "react";
-import { UseWebRTCConnectionOptions, WebRTCConnectionResult } from "./types";
+import { UseWebRTCConnectionOptions, WebRTCConnectionResult, WebRTCMessage } from "./types";
 import { useConnectionState } from "./useConnectionState";
 import { useMessageHandler } from "./useMessageHandler";
 import { useConnectionActions } from "./useConnectionActions";
@@ -69,10 +69,15 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
         audioProcessorRef.current.cleanup();
       }
     };
-  }, [currentTranscript]); // Add currentTranscript as a dependency since we're using it
+  }, [currentTranscript, setCurrentTranscript, setIsAiSpeaking]);
   
   // Set up message handler
   const { handleMessage } = useMessageHandler(messageHandlerRef, setMessages);
+  
+  // Create a wrapper function to adapt setMessages to the expected signature
+  const addMessage = (message: WebRTCMessage) => {
+    setMessages(prev => [...prev, message]);
+  };
   
   // Set up connection actions
   const {
@@ -94,7 +99,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     setIsMicrophoneActive,
     setCurrentTranscript,
     setIsAiSpeaking,
-    setMessages
+    addMessage // Pass our wrapper function instead
   );
   
   // Auto-connect if enabled
