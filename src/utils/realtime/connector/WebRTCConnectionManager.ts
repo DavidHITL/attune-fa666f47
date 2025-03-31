@@ -1,21 +1,21 @@
 
 import { WebRTCOptions } from "../WebRTCTypes";
-import { setupPeerConnectionListeners } from "../WebRTCConnectionListeners";
-import { setupDataChannelListeners } from "../WebRTCDataChannelHandler";
-import { createPeerConnection } from "./PeerConnectionFactory";
-import { sendOffer } from "./OfferService";
 import { ConnectionBase } from "./ConnectionBase";
 import { AudioSender } from "./AudioSender";
 import { TextMessageSender } from "./TextMessageSender";
 import { SessionManager } from "./SessionManager";
+import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
 
 export class WebRTCConnectionManager extends ConnectionBase {
   private pc: RTCPeerConnection | null = null;
   private dc: RTCDataChannel | null = null;
   private sessionManager: SessionManager | null = null;
+  private connectionEstablisher: WebRTCConnectionEstablisher;
   
   constructor(options: WebRTCOptions) {
     super(options);
+    this.connectionEstablisher = new WebRTCConnectionEstablisher();
+    
     console.log("[WebRTCConnectionManager] Initialized with options:", 
       JSON.stringify({
         model: options.model,
@@ -48,88 +48,35 @@ export class WebRTCConnectionManager extends ConnectionBase {
     this.clearConnectionTimeout();
     
     try {
-      // Create peer connection
-      this.pc = createPeerConnection();
-      
-      if (!this.pc) {
-        console.error("[WebRTCConnectionManager] Failed to create peer connection");
-        throw new Error("Failed to create peer connection");
-      }
-      
-      // Set up event listeners for the peer connection
-      setupPeerConnectionListeners(this.pc, this.options, (state) => {
-        console.log(`[WebRTCConnectionManager] Connection state changed: ${state}`);
-        this.connectionState = state;
-        
-        // Clear timeout if connection is successful
-        if (state === "connected" && this.connectionTimeout) {
-          this.clearConnectionTimeout();
+      const connection = await this.connectionEstablisher.establish(
+        apiKey,
+        this.options,
+        (state) => {
+          this.connectionState = state;
           
           // Configure the session after connection is established if data channel is ready
+          if (state === "connected") {
+            this.configureSessionWhenReady();
+          }
+        },
+        () => {
+          // This will be called when the data channel opens
+          console.log("[WebRTCConnectionManager] Data channel is open and ready");
           this.configureSessionWhenReady();
-        }
-      });
-      
-      // Create data channel for sending/receiving events - critical for OpenAI's protocol
-      console.log("[WebRTCConnectionManager] Creating data channel 'oai-events'");
-      this.dc = this.pc.createDataChannel("oai-events");
-      
-      // Set up event listeners for the data channel
-      setupDataChannelListeners(this.dc, this.options, () => {
-        // This will be called when the data channel opens
-        console.log("[WebRTCConnectionManager] Data channel is open and ready");
-        this.configureSessionWhenReady();
-      });
-      
-      // Create an offer and set local description
-      console.log("[WebRTCConnectionManager] Creating offer");
-      const offer = await this.pc.createOffer();
-      await this.pc.setLocalDescription(offer);
-      
-      console.log("[WebRTCConnectionManager] Local description set:", 
-        this.pc.localDescription ? `type: ${this.pc.localDescription.type}, length: ${this.pc.localDescription.sdp?.length || 0}` : "null");
-      
-      if (!this.pc.localDescription) {
-        console.error("[WebRTCConnectionManager] No valid local description available");
-        throw new Error("No valid local description available");
-      }
-      
-      // Set a timeout for the connection
-      this.connectionTimeout = setTimeout(() => {
-        console.error("[WebRTCConnectionManager] Connection timeout after 15 seconds");
-        if (this.options.onError) {
-          this.options.onError(new Error("Connection timeout after 15 seconds"));
-        }
-        this.disconnect();
-      }, 15000) as unknown as number;
-      
-      // Send the offer to OpenAI's Realtime API and get answer
-      console.log("[WebRTCConnectionManager] Sending SDP offer to OpenAI");
-      const result = await sendOffer(
-        this.pc.localDescription, 
-        apiKey, 
-        this.options.model || "gpt-4o-realtime-preview-2024-12-17"
+        },
+        this.handleError.bind(this)
       );
       
-      if (!result.success) {
-        console.error(`[WebRTCConnectionManager] Failed to get valid answer: ${result.error}`);
-        throw new Error(result.error || "Failed to send offer");
+      if (!connection) {
+        console.error("[WebRTCConnectionManager] Failed to establish connection");
+        return false;
       }
       
-      console.log("[WebRTCConnectionManager] Received SDP answer from OpenAI");
+      this.pc = connection.pc;
+      this.dc = connection.dc;
       
-      try {
-        // Set remote description from OpenAI response
-        await this.pc.setRemoteDescription(result.answer);
-        
-        console.log("[WebRTCConnectionManager] Remote description set successfully");
-        console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
-        
-        return true;
-      } catch (sdpError) {
-        console.error("[WebRTCConnectionManager] Error setting remote description:", sdpError);
-        throw new Error(`Failed to set remote description: ${sdpError instanceof Error ? sdpError.message : String(sdpError)}`);
-      }
+      console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
+      return true;
     } catch (error) {
       console.error("[WebRTCConnectionManager] Error connecting to OpenAI:", error);
       this.handleError(error);
@@ -196,6 +143,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
     console.log("[WebRTCConnectionManager] Disconnecting");
     
     this.clearConnectionTimeout();
+    this.connectionEstablisher.cleanup();
     
     // Reset session configuration
     if (this.sessionManager) {
