@@ -1,4 +1,6 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
 /**
  * Get an ephemeral OpenAI API key from Supabase Edge Function
  */
