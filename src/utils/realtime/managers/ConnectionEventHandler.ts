@@ -1,5 +1,5 @@
 
-import { WebSocketManager } from './WebSocketManager';
+import { WebSocketManager } from './websocket/WebSocketManager';
 import { ConnectionState } from './ConnectionState';
 import { ReconnectionHandler } from '../ReconnectionHandler';
 import { EventEmitter } from '../EventEmitter';

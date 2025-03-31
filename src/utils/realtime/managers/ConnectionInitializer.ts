@@ -1,5 +1,6 @@
 
 import { EventEmitter } from '../EventEmitter';
+import { WebSocketManager } from './websocket/WebSocketManager';
 
 /**
  * Handles WebSocket connection initialization
@@ -10,7 +11,7 @@ export class ConnectionInitializer {
    */
   async initializeConnection(
     projectId: string,
-    webSocketManager: any,
+    webSocketManager: WebSocketManager,
     connectionState: any,
     reconnectionHandler: any,
     eventEmitter: EventEmitter
