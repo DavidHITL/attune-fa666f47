@@ -1,5 +1,5 @@
 
-# project_id is required
+# Required project_id
 project_id = "oseowhythgbqvllwonaz"
-# No JWT verification for WebSocket connections
+# Disable JWT verification for testing purposes
 verify_jwt = false
