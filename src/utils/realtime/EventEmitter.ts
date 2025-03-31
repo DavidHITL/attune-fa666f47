@@ -52,4 +52,33 @@ export class EventEmitter {
   removeAllEventListeners(): void {
     this.eventListeners.clear();
   }
+
+  /**
+   * Alternative API: Subscribe to events (alias for addEventListener)
+   */
+  subscribe(callback: Function): () => void {
+    const eventName = 'event';
+    if (!this.eventListeners.has(eventName)) {
+      this.eventListeners.set(eventName, []);
+    }
+    this.eventListeners.get(eventName)?.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      const listeners = this.eventListeners.get(eventName);
+      if (!listeners) return;
+      
+      const index = listeners.indexOf(callback);
+      if (index !== -1) {
+        listeners.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Alternative API: Emit an event (alias for dispatchEvent)
+   */
+  emit(data: any): void {
+    this.dispatchEvent('event', data);
+  }
 }

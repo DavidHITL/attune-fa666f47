@@ -11,6 +11,7 @@ export interface AudioDataEvent {
 export interface TranscriptEvent {
   type: 'transcript';
   text: string;
+  isFinal?: boolean;  // Added isFinal as an optional property
 }
 
 export interface ConnectionStateEvent {
