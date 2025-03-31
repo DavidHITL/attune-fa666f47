@@ -12,7 +12,8 @@ serve(async (req) => {
   console.log(`Received ${req.method} request to ${req.url}`);
   
   // Log request headers for debugging
-  console.log("Request headers:", Object.fromEntries(req.headers.entries()));
+  const headerEntries = Array.from(req.headers.entries());
+  console.log("Request headers:", JSON.stringify(Object.fromEntries(headerEntries)));
   
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -49,25 +50,15 @@ async function handleWebSocketConnection(req: Request): Promise<Response> {
     
     // Extract protocol information
     const protocolHeader = req.headers.get("sec-websocket-protocol");
-    const protocols = protocolHeader ? protocolHeader.split(",").map(p => p.trim()) : undefined;
-    console.log("Requested WebSocket protocols:", protocols || "none");
+    console.log("Requested WebSocket protocols:", protocolHeader || "none");
     
-    // Perform WebSocket upgrade
     let upgradeResult;
     try {
-      upgradeResult = Deno.upgradeWebSocket(req, {
-        protocol: protocols && protocols.length > 0 ? protocols[0] : undefined,
-        idleTimeout: 60000, // 1 minute timeout
-      });
-      
-      console.log("WebSocket upgrade successful, selected protocol:", 
-                  upgradeResult.socket.protocol || "none");
+      // Simplify by not specifying protocols for the first attempt
+      upgradeResult = Deno.upgradeWebSocket(req);
+      console.log("WebSocket upgrade successful");
     } catch (upgradeError) {
       console.error("WebSocket upgrade failed:", upgradeError);
-      console.error("Error details:", JSON.stringify({
-        message: upgradeError.message,
-        name: upgradeError.name,
-      }));
       
       return new Response(JSON.stringify({ 
         error: "WebSocket upgrade failed", 
@@ -89,15 +80,17 @@ async function handleWebSocketConnection(req: Request): Promise<Response> {
         // Send immediate confirmation to client
         socket.send(JSON.stringify({ 
           type: "connection.established", 
-          protocol: socket.protocol || "none",
           timestamp: new Date().toISOString() 
         }));
+        console.log("Sent connection confirmation to client");
       } catch (error) {
         console.error("Error sending connection confirmation:", error);
       }
       
       // Connect to OpenAI
-      connectToOpenAI(socket);
+      setTimeout(() => {
+        connectToOpenAI(socket);
+      }, 500); // Small delay to ensure client is ready
     };
     
     socket.onclose = (event) => {
@@ -152,6 +145,7 @@ function connectToOpenAI(clientSocket: WebSocket): void {
         type: "auth",
         authorization: `Bearer ${apiKey}`
       }));
+      console.log("Sent authentication to OpenAI");
       
       // Inform client that we're connected to OpenAI
       clientSocket.send(JSON.stringify({
@@ -174,6 +168,8 @@ function connectToOpenAI(clientSocket: WebSocket): void {
               timestamp: new Date().toISOString()
             }));
           }
+        } else {
+          console.warn(`Cannot forward message, OpenAI socket state: ${openaiSocket.readyState}`);
         }
       };
     };
@@ -194,6 +190,8 @@ function connectToOpenAI(clientSocket: WebSocket): void {
         } catch (error) {
           console.error("Error forwarding OpenAI message to client:", error);
         }
+      } else {
+        console.warn(`Cannot forward OpenAI message, client socket state: ${clientSocket.readyState}`);
       }
     };
     
@@ -244,6 +242,7 @@ function connectToOpenAI(clientSocket: WebSocket): void {
       if (openaiSocket.readyState === WebSocket.OPEN && 
           clientSocket.readyState === WebSocket.OPEN) {
         try {
+          console.log("Sending ping to keep connection alive");
           openaiSocket.send(JSON.stringify({ type: "ping" }));
         } catch (error) {
           console.error("Error sending ping:", error);
