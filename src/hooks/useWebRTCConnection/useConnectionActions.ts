@@ -1,82 +1,26 @@
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
-import { WebRTCOptions } from "@/utils/realtime/WebRTCTypes";
-import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
-import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
-import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
+import { useCallback } from "react";
 import { toast } from "sonner";
+import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
+import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
+import { UseWebRTCConnectionOptions } from "./types";
 
-export interface UseWebRTCConnectionOptions extends WebRTCOptions {
-  autoConnect?: boolean;
-  enableMicrophone?: boolean;
-}
-
-export interface WebRTCMessage {
-  type: string;
-  [key: string]: any;
-}
-
-export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}) {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
-  const [messages, setMessages] = useState<WebRTCMessage[]>([]);
-  const [currentTranscript, setCurrentTranscript] = useState("");
-  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  
-  const connectorRef = useRef<WebRTCConnector | null>(null);
-  const recorderRef = useRef<AudioRecorder | null>(null);
-  const audioProcessorRef = useRef<AudioProcessor | null>(null);
-  const messageHandlerRef = useRef<WebRTCMessageHandler | null>(null);
-
-  // Initialize audio processor
-  useEffect(() => {
-    audioProcessorRef.current = new AudioProcessor();
-
-    // Initialize message handler
-    messageHandlerRef.current = new WebRTCMessageHandler({
-      onAudioData: (base64Audio) => {
-        if (audioProcessorRef.current) {
-          audioProcessorRef.current.addAudioData(base64Audio);
-          setIsAiSpeaking(true);
-        }
-      },
-      onAudioComplete: () => {
-        setIsAiSpeaking(false);
-      },
-      onTranscriptUpdate: (textDelta) => {
-        setCurrentTranscript(prev => prev + textDelta);
-      },
-      onTranscriptComplete: () => {
-        setTimeout(() => setCurrentTranscript(""), 1000);
-      }
-    });
-
-    return () => {
-      if (audioProcessorRef.current) {
-        audioProcessorRef.current.cleanup();
-      }
-    };
-  }, []);
-
-  // Handle incoming WebRTC messages
-  const handleMessage = useCallback((event: MessageEvent) => {
-    try {
-      const message = JSON.parse(event.data);
-      
-      // Add to messages for debugging/display
-      setMessages(prev => [...prev, message]);
-      
-      // Use the message handler to process the message
-      if (messageHandlerRef.current) {
-        messageHandlerRef.current.handleMessage(event);
-      }
-    } catch (error) {
-      console.error("[useWebRTCConnection] Error handling message:", error);
-    }
-  }, []);
-
+export function useConnectionActions(
+  isConnected: boolean,
+  isConnecting: boolean,
+  isMicrophoneActive: boolean,
+  connectorRef: React.MutableRefObject<WebRTCConnector | null>,
+  recorderRef: React.MutableRefObject<AudioRecorder | null>,
+  audioProcessorRef: React.MutableRefObject<AudioProcessor | null>,
+  handleMessage: (event: MessageEvent) => void,
+  options: UseWebRTCConnectionOptions,
+  setIsConnected: (isConnected: boolean) => void,
+  setIsConnecting: (isConnecting: boolean) => void,
+  setIsMicrophoneActive: (isMicrophoneActive: boolean) => void,
+  setCurrentTranscript: (currentTranscript: string) => void,
+  setIsAiSpeaking: (isAiSpeaking: boolean) => void,
+  setMessages: (messages: any[]) => void
+) {
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
     if (isConnected || isConnecting) return false;
@@ -196,7 +140,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}) {
         return false;
       }
     }
-  }, [isConnected, isMicrophoneActive]);
+  }, [isConnected, isMicrophoneActive, connectorRef, recorderRef]);
 
   // Send text message to OpenAI
   const sendTextMessage = useCallback((text: string) => {
@@ -212,26 +156,9 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}) {
       toast.error(`Error sending message: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
-  }, [isConnected]);
-
-  // Auto-connect if enabled
-  useEffect(() => {
-    if (options.autoConnect && !isConnected && !isConnecting) {
-      connect();
-    }
-    
-    return () => {
-      disconnect();
-    };
-  }, [connect, disconnect, isConnected, isConnecting, options.autoConnect]);
+  }, [isConnected, connectorRef]);
 
   return {
-    isConnected,
-    isConnecting,
-    isMicrophoneActive,
-    isAiSpeaking,
-    currentTranscript,
-    messages,
     connect,
     disconnect,
     toggleMicrophone,
