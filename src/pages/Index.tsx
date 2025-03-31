@@ -6,7 +6,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    navigate("/chat");
+    navigate("/test-api");
   }, [navigate]);
 
   return null;
