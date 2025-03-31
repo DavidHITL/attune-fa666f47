@@ -126,4 +126,22 @@ export class AudioRecorder {
   isActive(): boolean {
     return this.isRecording;
   }
+
+  /**
+   * Get the current MediaStream if recording is active
+   * @returns The active MediaStream or null if not recording
+   */
+  getMediaStream(): MediaStream | null {
+    return this.stream;
+  }
+
+  /**
+   * Get an audio track from the MediaStream if available
+   * @returns The first audio track or null if not available
+   */
+  getAudioTrack(): MediaStreamTrack | null {
+    if (!this.stream) return null;
+    const tracks = this.stream.getAudioTracks();
+    return tracks.length > 0 ? tracks[0] : null;
+  }
 }

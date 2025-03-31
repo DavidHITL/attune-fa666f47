@@ -1,5 +1,5 @@
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
@@ -11,6 +11,9 @@ export function useMicrophoneControl(
   recorderRef: React.MutableRefObject<AudioRecorder | null>,
   setIsMicrophoneActive: (isMicrophoneActive: boolean) => void
 ) {
+  // Store the last MediaStream reference here
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
   // Toggle microphone on/off
   const toggleMicrophone = useCallback(async () => {
     if (!isConnected || !connectorRef.current) {
@@ -21,6 +24,7 @@ export function useMicrophoneControl(
     if (isMicrophoneActive && recorderRef.current) {
       // Stop recording
       recorderRef.current.stop();
+      mediaStreamRef.current = null;  // Clear the reference when stopping
       recorderRef.current = null;
       setIsMicrophoneActive(false);
       return true;
@@ -54,6 +58,8 @@ export function useMicrophoneControl(
         
         if (success) {
           recorderRef.current = recorder;
+          // Store the MediaStream reference when starting
+          mediaStreamRef.current = recorder.getMediaStream();
           setIsMicrophoneActive(true);
           toast.success("Microphone activated");
           return true;
@@ -69,7 +75,27 @@ export function useMicrophoneControl(
     }
   }, [isConnected, isMicrophoneActive, connectorRef, setIsMicrophoneActive]);
 
+  /**
+   * Get the current active MediaStream, if available
+   */
+  const getActiveMediaStream = useCallback(() => {
+    return mediaStreamRef.current || (recorderRef.current?.getMediaStream() || null);
+  }, [recorderRef]);
+
+  /**
+   * Get the current active audio track, if available
+   */
+  const getActiveAudioTrack = useCallback(() => {
+    const stream = getActiveMediaStream();
+    if (!stream) return null;
+    
+    const tracks = stream.getAudioTracks();
+    return tracks.length > 0 ? tracks[0] : null;
+  }, [getActiveMediaStream]);
+
   return {
-    toggleMicrophone
+    toggleMicrophone,
+    getActiveMediaStream,
+    getActiveAudioTrack
   };
 }
