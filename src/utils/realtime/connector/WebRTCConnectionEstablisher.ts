@@ -67,16 +67,16 @@ export class WebRTCConnectionEstablisher {
       // This is a critical step for voice-enabled applications
       if (audioTrack) {
         console.log("[WebRTCConnectionEstablisher] Adding provided audio track to peer connection:", 
-          audioTrack.label || "Unnamed track");
+          audioTrack.label || "Unnamed track", 
+          "- Enabled:", audioTrack.enabled, 
+          "- ID:", audioTrack.id);
         
         // Create a new MediaStream with the audio track
-        // This is necessary to properly add the track to the RTCPeerConnection
         const mediaStream = new MediaStream([audioTrack]);
         
         // Add the track to the peer connection, associating it with the stream
-        // This creates a sender that will transmit this audio track to the remote peer
-        pc.addTrack(audioTrack, mediaStream);
-        console.log("[WebRTCConnectionEstablisher] Audio track added successfully");
+        const sender = pc.addTrack(audioTrack, mediaStream);
+        console.log("[WebRTCConnectionEstablisher] Audio track added successfully with sender ID:", sender.track?.id || "unknown");
       } else {
         // If no audio track provided, try to get one from microphone
         try {
@@ -93,11 +93,14 @@ export class WebRTCConnectionEstablisher {
           const audioTracks = mediaStream.getAudioTracks();
           if (audioTracks.length > 0) {
             const micTrack = audioTracks[0];
-            console.log("[WebRTCConnectionEstablisher] Adding microphone track to peer connection:", micTrack.label);
+            console.log("[WebRTCConnectionEstablisher] Adding microphone track to peer connection:", 
+              micTrack.label || "Unnamed microphone", 
+              "- Enabled:", micTrack.enabled, 
+              "- ID:", micTrack.id);
             
             // Add the first audio track from the microphone to the peer connection
-            pc.addTrack(micTrack, mediaStream);
-            console.log("[WebRTCConnectionEstablisher] Microphone track added successfully");
+            const sender = pc.addTrack(micTrack, mediaStream);
+            console.log("[WebRTCConnectionEstablisher] Microphone track added successfully with sender ID:", sender.track?.id || "unknown");
           } else {
             console.warn("[WebRTCConnectionEstablisher] No audio tracks found in media stream");
           }
@@ -108,10 +111,36 @@ export class WebRTCConnectionEstablisher {
       }
       
       // Step 5: Create an offer and set local description
-      // This is where the SDP (Session Description Protocol) is created
-      // The SDP contains all the media capabilities and constraints
       console.log("[WebRTCConnectionEstablisher] Creating offer");
       const offer = await pc.createOffer();
+      
+      // Log SDP offer details - including checking for audio media section
+      if (offer.sdp) {
+        console.log("[WebRTCConnectionEstablisher] SDP offer created with length:", offer.sdp.length);
+        
+        // Check for audio media section in the SDP
+        const hasAudioSection = offer.sdp.includes("m=audio");
+        console.log("[WebRTCConnectionEstablisher] SDP contains audio media section:", hasAudioSection);
+        
+        if (hasAudioSection) {
+          // Extract and log the audio media section for debugging
+          const audioSectionMatch = offer.sdp.match(/m=audio.*(?:\r\n|\r|\n)(?:.*(?:\r\n|\r|\n))*/);
+          if (audioSectionMatch) {
+            console.log("[WebRTCConnectionEstablisher] Audio section details:", audioSectionMatch[0]);
+          }
+        } else {
+          console.warn("[WebRTCConnectionEstablisher] WARNING: No audio media section found in SDP offer!");
+        }
+        
+        // Log the first and last few lines of the SDP for debugging
+        const sdpLines = offer.sdp.split("\n");
+        const firstLines = sdpLines.slice(0, 5).join("\n");
+        const lastLines = sdpLines.slice(-5).join("\n");
+        console.log("[WebRTCConnectionEstablisher] SDP offer preview (first 5 lines):\n", firstLines);
+        console.log("[WebRTCConnectionEstablisher] SDP offer preview (last 5 lines):\n", lastLines);
+      } else {
+        console.warn("[WebRTCConnectionEstablisher] SDP offer is empty!");
+      }
       
       // Step 6: Set the local description on the peer connection
       // This applies the offer as the local description
