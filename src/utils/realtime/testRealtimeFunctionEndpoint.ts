@@ -1,16 +1,16 @@
 
 /**
- * Tests the realtime function endpoint using various methods
+ * Tests the realtime function endpoint using HTTP
  */
 export const testRealtimeFunctionEndpoint = async (): Promise<{success: boolean; message: string; data?: any}> => {
-  console.log("[testRealtimeFunctionEndpoint] Starting realtime endpoint test");
+  console.log("[testRealtimeFunctionEndpoint] Starting realtime endpoint HTTP test");
   
   try {
     // Use the correct project ID from your Supabase configuration
     const projectId = 'oseowhythgbqvllwonaz';
     const endpoint = `https://${projectId}.supabase.co/functions/v1/realtime-chat`;
 
-    // First, test using a regular HTTP request to check general accessibility
+    // Test using a regular HTTP request to check general accessibility
     console.log("[testRealtimeFunctionEndpoint] Testing HTTP endpoint:", endpoint);
     
     const response = await fetch(endpoint, {
