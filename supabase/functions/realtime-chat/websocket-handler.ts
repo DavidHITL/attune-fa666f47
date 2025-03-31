@@ -40,8 +40,12 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     console.log(`[WebSocket Handler] Socket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
   };
   
-  // Initialize connections and handlers
-  initializeConnections(socket);
+  // CRITICAL FIX: Initialize connections asynchronously AFTER returning the response
+  // This prevents any delay in returning the 101 Switching Protocols response
+  setTimeout(() => {
+    initializeConnections(socket);
+  }, 0);
   
+  // Return the response immediately for a successful WebSocket handshake
   return response;
 }
