@@ -638,11 +638,11 @@ export class DirectOpenAIConnection {
   addEventListener(
     callback: (event: RealtimeEvent) => void
   ): () => void {
-    const eventId = this.eventEmitter.addEventListener('event', callback);
+    const eventHandler = this.eventEmitter.addEventListener('event', callback);
     
     // Return unsubscribe function
     return () => {
-      this.eventEmitter.removeEventListener('event', eventId);
+      this.eventEmitter.removeEventListener('event', eventHandler);
     };
   }
 

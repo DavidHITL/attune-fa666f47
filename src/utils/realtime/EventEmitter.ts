@@ -11,12 +11,14 @@ export class EventEmitter {
 
   /**
    * Register an event listener
+   * @returns The function that was registered (for removal later)
    */
-  addEventListener(eventName: string, callback: Function): void {
+  addEventListener(eventName: string, callback: Function): Function {
     if (!this.eventListeners.has(eventName)) {
       this.eventListeners.set(eventName, []);
     }
     this.eventListeners.get(eventName)?.push(callback);
+    return callback; // Return the callback for easier removal
   }
 
   /**
