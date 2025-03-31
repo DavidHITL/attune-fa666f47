@@ -1,95 +1,91 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
-// CORS headers for browser compatibility
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-// Create a response with CORS headers
-const createResponse = (body: any, status: number = 200) => {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" }
-  });
-};
-
-// Function to generate a secure random string
-function generateSecureToken(length: number = 32): string {
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const randomValues = new Uint8Array(length);
-  crypto.getRandomValues(randomValues);
-  
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += charset[randomValues[i] % charset.length];
-  }
-  return result;
 }
 
-// Main server function
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
   }
-
+  
   try {
-    // Get the authorization header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return createResponse({ error: "Missing authorization header" }, 401);
-    }
-
-    // Create Supabase client with the authorization header
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false }
-    });
-
     // Verify the user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const authHeader = req.headers.get('Authorization')
     
-    if (authError || !user) {
-      console.error("Authentication error:", authError);
-      return createResponse({ error: "Unauthorized access" }, 401);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
-
-    // Generate ephemeral API key
-    const ephemeralKey = generateSecureToken(40);
     
-    // Set expiration time (1 minute from now)
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 1);
+    // Get the OpenAI API key from environment variable
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
     
-    // Store the ephemeral key in Supabase with user ID and expiration
-    const { error: insertError } = await supabase
-      .from('ephemeral_keys')
-      .insert({
-        user_id: user.id,
-        key: ephemeralKey,
-        expires_at: expiresAt.toISOString(),
-        created_at: new Date().toISOString()
-      });
+    if (!OPENAI_API_KEY) {
+      console.error('OPENAI_API_KEY environment variable not set')
+      return new Response(
+        JSON.stringify({ error: 'OpenAI API key not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    console.log('Generating ephemeral key for OpenAI API')
+    
+    // Create a client secret for use with WebRTC
+    const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-realtime-preview-2024-12-17",
+      }),
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`OpenAI API error (${response.status}):`, errorText)
       
-    if (insertError) {
-      console.error("Error storing ephemeral key:", insertError);
-      return createResponse({ error: "Failed to generate ephemeral key" }, 500);
+      return new Response(
+        JSON.stringify({ 
+          error: `Failed to generate ephemeral key: ${response.status} ${response.statusText}`,
+          details: errorText
+        }),
+        { 
+          status: response.status, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
-
-    // Return the ephemeral key to the client
-    return createResponse({
-      ephemeralKey,
-      expiresAt: expiresAt.toISOString()
-    });
     
+    const data = await response.json()
+    
+    console.log('Successfully generated ephemeral key')
+    
+    // Return the ephemeral key
+    return new Response(
+      JSON.stringify(data),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   } catch (error) {
-    console.error("Error in generate-ephemeral-key function:", error);
-    return createResponse({ error: "Internal server error" }, 500);
+    console.error('Error generating ephemeral key:', error)
+    
+    return new Response(
+      JSON.stringify({ 
+        error: 'Failed to generate ephemeral key',
+        message: error.message
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
   }
-});
+})

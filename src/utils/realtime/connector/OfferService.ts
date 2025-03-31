@@ -77,6 +77,10 @@ export async function sendOffer(
       
       if (sdpResponse.status === 401) {
         errorMessage = `Authentication error: Invalid API key or unauthorized access`;
+      } else if (sdpResponse.status === 403) {
+        errorMessage = `Authorization error: Your API key doesn't have permission to use this endpoint`;
+      } else if (sdpResponse.status === 429) {
+        errorMessage = `Rate limit exceeded: Please try again later`;
       }
       
       console.error("[WebRTC] API Error:", errorMessage);
