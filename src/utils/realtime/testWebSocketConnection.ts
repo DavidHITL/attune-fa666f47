@@ -13,9 +13,11 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
       
       console.log("[testWebSocketConnection] Connecting to:", wsUrl);
       
-      // Create a WebSocket connection without protocols initially to test basic connectivity
-      console.log("[testWebSocketConnection] Attempting basic connection without protocols");
-      const ws = new WebSocket(wsUrl);
+      // Create a WebSocket connection - try both with and without protocols
+      const protocols = ['json', 'openai-realtime'];
+      console.log("[testWebSocketConnection] Using protocols:", protocols.join(', '));
+      const ws = new WebSocket(wsUrl, protocols);
+      ws.binaryType = "arraybuffer";
       
       // Set timeout for connection
       const timeoutId = setTimeout(() => {
@@ -36,6 +38,7 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
       ws.onopen = () => {
         clearTimeout(timeoutId);
         console.log("[testWebSocketConnection] Connection established successfully");
+        console.log("[testWebSocketConnection] Selected protocol:", ws.protocol || "none");
         
         try {
           ws.send(JSON.stringify({type: "ping", message: "Connection test"}));
@@ -46,7 +49,7 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
         
         resolve({
           success: true,
-          message: "WebSocket connection established successfully",
+          message: `WebSocket connection established successfully${ws.protocol ? ` with protocol: ${ws.protocol}` : ''}`,
           close: () => {
             console.log("[testWebSocketConnection] Manually closing WebSocket connection");
             try {
@@ -60,43 +63,44 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
       
       ws.onmessage = (event) => {
         console.log("[testWebSocketConnection] Received message:", event.data);
-        // Don't resolve here, already resolved in onopen
+        try {
+          const data = JSON.parse(event.data);
+          if (data && data.type === "connection.established") {
+            console.log("[testWebSocketConnection] Server confirmed connection");
+          }
+        } catch (e) {
+          // Non-JSON message, just log it
+          console.log("[testWebSocketConnection] Received non-JSON message");
+        }
       };
       
       ws.onerror = (error) => {
         clearTimeout(timeoutId);
         console.error("[testWebSocketConnection] WebSocket error:", error);
         
-        // Check if we tried without protocols, try again with protocols
-        if (!ws.protocol) {
-          console.log("[testWebSocketConnection] Retrying with protocols...");
+        // Try without protocols if this is a protocol error
+        if (ws.protocol) {
+          console.log("[testWebSocketConnection] Error with protocol, retrying without protocol");
           try {
             ws.close();
           } catch (e) {
             // Ignore close errors
           }
           
-          // Try with protocols
-          const protocolWs = new WebSocket(wsUrl, ['json', 'openai-realtime']);
+          // Retry without protocols
+          const basicWs = new WebSocket(wsUrl);
+          basicWs.binaryType = "arraybuffer";
           
-          protocolWs.onopen = () => {
+          basicWs.onopen = () => {
             clearTimeout(timeoutId);
-            console.log("[testWebSocketConnection] Connection with protocols established successfully");
-            console.log("[testWebSocketConnection] Selected protocol:", protocolWs.protocol || "none");
-            
-            try {
-              protocolWs.send(JSON.stringify({type: "ping", message: "Connection test with protocols"}));
-            } catch (sendError) {
-              console.error("[testWebSocketConnection] Error sending test message:", sendError);
-            }
-            
+            console.log("[testWebSocketConnection] Connection without protocol established successfully");
             resolve({
               success: true,
-              message: "WebSocket connection established successfully with protocols",
+              message: "WebSocket connection established successfully without protocols",
               close: () => {
-                console.log("[testWebSocketConnection] Manually closing protocol WebSocket connection");
+                console.log("[testWebSocketConnection] Closing fallback WebSocket connection");
                 try {
-                  protocolWs.close();
+                  basicWs.close();
                 } catch (e) {
                   // Ignore close errors
                 }
@@ -104,30 +108,22 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
             });
           };
           
-          protocolWs.onerror = () => {
-            clearTimeout(timeoutId);
-            console.error("[testWebSocketConnection] WebSocket connection failed with and without protocols");
-            
+          basicWs.onerror = () => {
+            console.error("[testWebSocketConnection] Both connection attempts failed");
             resolve({
               success: false,
-              message: "WebSocket connection failed with and without protocols",
+              message: "WebSocket connection failed with and without protocols. Check the server logs for details.",
               close: () => {}
             });
           };
           
-          return; // Exit this error handler since we're trying a new connection
+          return; // Exit this handler since we're trying a new connection
         }
         
         resolve({
           success: false,
-          message: "WebSocket connection error occurred",
-          close: () => {
-            try {
-              ws.close();
-            } catch (e) {
-              // Ignore close errors
-            }
-          }
+          message: "WebSocket connection error occurred. Check browser console for details.",
+          close: () => {}
         });
       };
       
@@ -138,10 +134,10 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
         );
         
         // Only resolve if we haven't already resolved from another handler
-        if (event.code !== 1000) {
+        if (!event.wasClean && event.code !== 1000) {
           resolve({
             success: false,
-            message: `Connection closed unexpectedly. Code: ${event.code}`,
+            message: `Connection closed unexpectedly (Code: ${event.code}). This might be due to CORS or server configuration issues.`,
             close: () => {}
           });
         }

@@ -1,39 +1,20 @@
 
-// Utils for the realtime-chat edge function
-
-// CORS headers
+// Define CORS headers for use in the function
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, sec-websocket-protocol, upgrade',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
-// Create a standard error response
-export function createErrorResponse(error: any): Response {
-  console.error("Error details:", JSON.stringify({
-    name: error.name,
-    message: error.message,
-    stack: error.stack
-  }));
-  
-  return new Response(
-    JSON.stringify({
-      error: "An error occurred",
-      details: error instanceof Error ? error.message : String(error),
-      time: new Date().toISOString()
-    }),
-    {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    }
-  );
-}
-
-// Get the OpenAI API key from environment variables
+// Helper to get the OpenAI API key
 export function getOpenAIApiKey(): string {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not set in environment variables');
+    console.error("Missing OPENAI_API_KEY environment variable");
+    throw new Error("OpenAI API key not configured");
   }
+  
   return apiKey;
 }
 
@@ -41,8 +22,25 @@ export function getOpenAIApiKey(): string {
 export function handleCorsPreflightRequest(req: Request): Response | null {
   if (req.method === "OPTIONS") {
     return new Response(null, {
-      headers: corsHeaders
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Max-Age": "86400", // 24 hours
+      }
     });
   }
   return null;
+}
+
+// Error handling helper
+export function createErrorResponse(error: unknown): Response {
+  return new Response(
+    JSON.stringify({
+      error: "An unexpected error occurred",
+      message: error instanceof Error ? error.message : String(error),
+    }),
+    {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
+  );
 }

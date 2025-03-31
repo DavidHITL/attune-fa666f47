@@ -1,4 +1,3 @@
-
 import { corsHeaders, getOpenAIApiKey } from "./utils.ts";
 import { WebSocketOptions, defaultOptions, createErrorResponse, MutableRef, ConnectionHandlerOptions } from "./types.ts";
 import { setupClientConnectionHandlers } from "./client-handler.ts";
@@ -8,6 +7,17 @@ import { setupOpenAIConnection } from "./openai-handler.ts";
  * Handle WebSocket upgrade requests and manage the connection to OpenAI's Realtime API
  */
 export async function handleWebSocketRequest(req: Request, options: WebSocketOptions = defaultOptions): Promise<Response> {
+  // Allow CORS preflight for websockets
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, sec-websocket-protocol, upgrade"
+      }
+    });
+  }
+  
   try {
     console.log("Processing WebSocket upgrade request for OpenAI Realtime API");
     console.log("Request URL:", req.url);
@@ -89,6 +99,19 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
       };
 
       try {
+        // Send confirmation message to client immediately after connection
+        try {
+          socket.send(JSON.stringify({ 
+            type: "connection.established", 
+            message: "WebSocket connection established", 
+            protocol: socket.protocol || "none",
+            time: new Date().toISOString() 
+          }));
+          console.log("Sent connection established message to client");
+        } catch (sendError) {
+          console.error("Error sending confirmation message:", sendError);
+        }
+        
         const OPENAI_API_KEY = getOpenAIApiKey();
         console.log("API key retrieved successfully");
         
@@ -117,23 +140,6 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
             clearInterval(pingInterval);
           }
         }, 30000); // Send ping every 30 seconds
-        
-        // Send confirmation message to client
-        try {
-          socket.send(JSON.stringify({ 
-            type: "connection.established", 
-            message: "WebSocket connection established", 
-            time: new Date().toISOString() 
-          }));
-          console.log("Sent connection established message to client");
-        } catch (sendError) {
-          console.error("Error sending confirmation message:", sendError);
-          console.error("Error details:", JSON.stringify({
-            name: sendError.name,
-            message: sendError.message,
-            stack: sendError.stack
-          }));
-        }
         
         // Set up client connection handlers with detailed error handling
         try {
