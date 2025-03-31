@@ -1,22 +1,28 @@
 
-// Types for WebSocket handler
-import { corsHeaders } from "./utils.ts";
+// Types for the realtime-chat edge function
 
-// Configuration options for the WebSocket handler
+export type MutableRef<T> = { current: T };
+
 export interface WebSocketOptions {
   reconnectAttempts?: number;
-  connectionTimeout?: number;
+  reconnectDelay?: number;
+  debug?: boolean;
 }
 
-// Default configuration
 export const defaultOptions: WebSocketOptions = {
   reconnectAttempts: 3,
-  connectionTimeout: 30000, // 30 seconds
+  reconnectDelay: 2000,
+  debug: false
 };
 
-// Define references for mutable variables
-export interface MutableRef<T> {
-  current: T;
+export interface OpenAISocketOptions {
+  socket: WebSocket;
+  apiKey: string;
+  openAISocket: WebSocket;
+  reconnectTimeoutRef: MutableRef<number | undefined>;
+  connectionAttemptsRef: MutableRef<number>;
+  maxConnectionAttempts: number;
+  retryConnect: () => void;
 }
 
 export interface ConnectionHandlerOptions {
@@ -25,19 +31,4 @@ export interface ConnectionHandlerOptions {
   reconnectTimeoutRef: MutableRef<number | undefined>;
   connectionAttemptsRef: MutableRef<number>;
   maxConnectionAttempts: number;
-}
-
-export interface OpenAISocketOptions extends ConnectionHandlerOptions {
-  apiKey: string;
-}
-
-// Response helper functions
-export function createErrorResponse(error: unknown, status = 500): Response {
-  console.error("WebSocket error:", error);
-  return new Response(JSON.stringify({ 
-    error: error instanceof Error ? error.message : String(error) 
-  }), { 
-    status, 
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-  });
 }

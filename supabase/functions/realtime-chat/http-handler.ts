@@ -1,39 +1,20 @@
 
-import { corsHeaders, createErrorResponse, createSuccessResponse, getOpenAIApiKey } from "./utils.ts";
+// HTTP handler for the realtime-chat edge function
+
+import { corsHeaders } from "./utils.ts";
 
 /**
- * Handle HTTP requests to create a new OpenAI Realtime session
+ * Handle standard HTTP requests to the edge function
  */
-export async function handleHttpRequest(req: Request): Promise<Response> {
-  try {
-    const OPENAI_API_KEY = getOpenAIApiKey();
-    
-    // Create a session with OpenAI
-    console.log("Creating a new OpenAI Realtime session with gpt-4o");
-    const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-realtime-preview-2024-10-01",
-        voice: "alloy",
-        instructions: "You are a helpful AI assistant that speaks naturally with users. Keep responses concise and conversational. You're using the GPT-4o model with advanced reasoning capabilities."
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI API error:", errorText);
-      throw new Error(`OpenAI API returned status ${response.status}: ${errorText}`);
-    }
-    
-    const data = await response.json();
-    console.log("Session created:", data);
-    
-    return createSuccessResponse(data);
-  } catch (error) {
-    return createErrorResponse(error);
-  }
+export function handleHttpRequest(req: Request): Response {
+  // Return API information
+  return new Response(JSON.stringify({
+    service: "OpenAI Realtime Chat Relay",
+    status: "active",
+    usage: "Connect via WebSocket to use this service",
+    time: new Date().toISOString()
+  }), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
 }

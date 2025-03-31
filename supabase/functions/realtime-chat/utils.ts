@@ -1,47 +1,48 @@
 
-// Common utility functions and constants for the realtime chat edge function
+// Utils for the realtime-chat edge function
 
-// CORS headers for all responses
+// CORS headers
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper to handle CORS preflight requests
-export function handleCorsPreflightRequest(req: Request): Response | null {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  return null;
-}
-
-// Helper to create error responses
-export function createErrorResponse(error: Error | string, status = 500): Response {
-  console.error("Error:", error);
-  const message = error instanceof Error ? error.message : String(error);
+// Create a standard error response
+export function createErrorResponse(error: any): Response {
+  console.error("Error details:", JSON.stringify({
+    name: error.name,
+    message: error.message,
+    stack: error.stack
+  }));
   
-  return new Response(JSON.stringify({ 
-    error: message,
-    details: "There was an error processing your request. Please check if the OpenAI API key is configured correctly and the service is available."
-  }), {
-    status: status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return new Response(
+    JSON.stringify({
+      error: "An error occurred",
+      details: error instanceof Error ? error.message : String(error),
+      time: new Date().toISOString()
+    }),
+    {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  );
 }
 
-// Helper to check for required API key
+// Get the OpenAI API key from environment variables
 export function getOpenAIApiKey(): string {
-  // Use OPENAI_API_KEY as the primary key name
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) {
-    throw new Error('OpenAI API key not configured. Please add OPENAI_API_KEY to your environment variables.');
+    throw new Error('OPENAI_API_KEY is not set in environment variables');
   }
   return apiKey;
 }
 
-// Helper to create a success response
-export function createSuccessResponse(data: any): Response {
-  return new Response(JSON.stringify(data), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+// Handle CORS preflight requests
+export function handleCorsPreflightRequest(req: Request): Response | null {
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: corsHeaders
+    });
+  }
+  return null;
 }

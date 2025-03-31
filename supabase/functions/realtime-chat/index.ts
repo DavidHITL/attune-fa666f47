@@ -9,6 +9,11 @@ import { handleHttpRequest } from "./http-handler.ts";
 serve(async (req) => {
   try {
     console.log(`Received ${req.method} request to ${req.url}`);
+    
+    // Log basic request info for debugging
+    const url = new URL(req.url);
+    console.log("Request path:", url.pathname);
+    console.log("Request query:", url.search);
     console.log("Headers:", JSON.stringify(Object.fromEntries(req.headers.entries())));
     
     // Handle CORS preflight requests
