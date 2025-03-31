@@ -1,3 +1,4 @@
+
 import { corsHeaders, getOpenAIApiKey } from "./utils.ts";
 import { WebSocketOptions, defaultOptions, createErrorResponse, MutableRef, ConnectionHandlerOptions } from "./types.ts";
 import { setupClientConnectionHandlers } from "./client-handler.ts";
@@ -44,7 +45,8 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
       // Upgrade the connection to WebSocket, passing along any requested protocols
       console.log("Attempting to upgrade connection to WebSocket with protocols:", requestedProtocols);
       upgradeResult = Deno.upgradeWebSocket(req, {
-        protocol: requestedProtocols ? requestedProtocols[0] : undefined
+        protocol: requestedProtocols ? requestedProtocols[0] : undefined,
+        idleTimeout: 60000, // 60 seconds idle timeout
       });
       
       console.log("WebSocket upgrade successful" + 

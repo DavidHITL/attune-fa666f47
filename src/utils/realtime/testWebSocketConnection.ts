@@ -13,15 +13,18 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
       
       console.log("[testWebSocketConnection] Connecting to:", wsUrl);
       
-      // Create a WebSocket connection with protocols
-      const protocols = ['json', 'openai-realtime'];
-      console.log("[testWebSocketConnection] Using protocols:", protocols);
-      const ws = new WebSocket(wsUrl, protocols);
+      // Create a WebSocket connection without protocols initially to test basic connectivity
+      console.log("[testWebSocketConnection] Attempting basic connection without protocols");
+      const ws = new WebSocket(wsUrl);
       
       // Set timeout for connection
       const timeoutId = setTimeout(() => {
         console.error("[testWebSocketConnection] Connection timed out after 5 seconds");
-        ws.close();
+        try {
+          ws.close();
+        } catch (e) {
+          // Ignore close errors
+        }
         resolve({
           success: false,
           message: "Connection timed out after 5 seconds",
@@ -33,7 +36,7 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
       ws.onopen = () => {
         clearTimeout(timeoutId);
         console.log("[testWebSocketConnection] Connection established successfully");
-        console.log("[testWebSocketConnection] Selected protocol:", ws.protocol || "none");
+        
         try {
           ws.send(JSON.stringify({type: "ping", message: "Connection test"}));
           console.log("[testWebSocketConnection] Sent test ping message");
@@ -46,7 +49,11 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
           message: "WebSocket connection established successfully",
           close: () => {
             console.log("[testWebSocketConnection] Manually closing WebSocket connection");
-            ws.close();
+            try {
+              ws.close();
+            } catch (e) {
+              // Ignore close errors
+            }
           }
         });
       };
@@ -59,6 +66,57 @@ export const testWebSocketConnection = async (): Promise<{success: boolean; mess
       ws.onerror = (error) => {
         clearTimeout(timeoutId);
         console.error("[testWebSocketConnection] WebSocket error:", error);
+        
+        // Check if we tried without protocols, try again with protocols
+        if (!ws.protocol) {
+          console.log("[testWebSocketConnection] Retrying with protocols...");
+          try {
+            ws.close();
+          } catch (e) {
+            // Ignore close errors
+          }
+          
+          // Try with protocols
+          const protocolWs = new WebSocket(wsUrl, ['json', 'openai-realtime']);
+          
+          protocolWs.onopen = () => {
+            clearTimeout(timeoutId);
+            console.log("[testWebSocketConnection] Connection with protocols established successfully");
+            console.log("[testWebSocketConnection] Selected protocol:", protocolWs.protocol || "none");
+            
+            try {
+              protocolWs.send(JSON.stringify({type: "ping", message: "Connection test with protocols"}));
+            } catch (sendError) {
+              console.error("[testWebSocketConnection] Error sending test message:", sendError);
+            }
+            
+            resolve({
+              success: true,
+              message: "WebSocket connection established successfully with protocols",
+              close: () => {
+                console.log("[testWebSocketConnection] Manually closing protocol WebSocket connection");
+                try {
+                  protocolWs.close();
+                } catch (e) {
+                  // Ignore close errors
+                }
+              }
+            });
+          };
+          
+          protocolWs.onerror = () => {
+            clearTimeout(timeoutId);
+            console.error("[testWebSocketConnection] WebSocket connection failed with and without protocols");
+            
+            resolve({
+              success: false,
+              message: "WebSocket connection failed with and without protocols",
+              close: () => {}
+            });
+          };
+          
+          return; // Exit this error handler since we're trying a new connection
+        }
         
         resolve({
           success: false,

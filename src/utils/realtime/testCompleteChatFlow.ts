@@ -13,13 +13,17 @@ export const testCompleteChatFlow = async (): Promise<{success: boolean, message
       
       console.log("[testCompleteChatFlow] Connecting to:", wsUrl);
       
-      // Create a WebSocket connection
+      // Create a WebSocket connection - try without protocols first
       const ws = new WebSocket(wsUrl);
       
       // Set a timeout for connection
       const timeoutId = setTimeout(() => {
         console.error("[testCompleteChatFlow] Connection timed out after 5 seconds");
-        ws.close();
+        try {
+          ws.close();
+        } catch (e) {
+          // Ignore close errors
+        }
         resolve({
           success: false,
           message: "Connection timed out after 5 seconds",
@@ -62,7 +66,11 @@ export const testCompleteChatFlow = async (): Promise<{success: boolean, message
             message: "Chat flow test initiated",
             close: () => {
               console.log("[testCompleteChatFlow] Manually closing WebSocket connection");
-              ws.close();
+              try {
+                ws.close();
+              } catch (e) {
+                // Ignore close errors
+              }
             }
           });
         } catch (sendError) {
@@ -71,7 +79,11 @@ export const testCompleteChatFlow = async (): Promise<{success: boolean, message
             success: false,
             message: `Error sending init message: ${sendError instanceof Error ? sendError.message : String(sendError)}`,
             close: () => {
-              ws.close();
+              try {
+                ws.close();
+              } catch (e) {
+                // Ignore close errors
+              }
             }
           });
         }
@@ -90,11 +102,86 @@ export const testCompleteChatFlow = async (): Promise<{success: boolean, message
       ws.onerror = (error) => {
         clearTimeout(timeoutId);
         console.error("[testCompleteChatFlow] WebSocket error:", error);
+        
+        // If first attempt failed, try with protocols
+        if (!ws.protocol) {
+          console.log("[testCompleteChatFlow] Retrying with protocols...");
+          try {
+            ws.close();
+          } catch (e) {
+            // Ignore close errors
+          }
+          
+          // Try with protocols
+          const protocolWs = new WebSocket(wsUrl, ['json', 'openai-realtime']);
+          
+          protocolWs.onopen = () => {
+            clearTimeout(timeoutId);
+            console.log("[testCompleteChatFlow] Connection with protocols established");
+            console.log("[testCompleteChatFlow] Selected protocol:", protocolWs.protocol || "none");
+            
+            // Send session initialization with protocols
+            try {
+              protocolWs.send(JSON.stringify({
+                type: "session_init",
+                message: "Initialize session with protocols",
+                data: { 
+                  userId: "test-user-id",
+                  sessionId: `test-session-protocol-${Date.now()}`
+                }
+              }));
+              
+              resolve({
+                success: true,
+                message: "Chat flow test initiated with protocols",
+                close: () => {
+                  console.log("[testCompleteChatFlow] Manually closing protocol WebSocket connection");
+                  try {
+                    protocolWs.close();
+                  } catch (e) {
+                    // Ignore close errors
+                  }
+                }
+              });
+            } catch (sendError) {
+              console.error("[testCompleteChatFlow] Error sending init message with protocols:", sendError);
+              resolve({
+                success: false,
+                message: `Error with protocols: ${sendError instanceof Error ? sendError.message : String(sendError)}`,
+                close: () => {
+                  try {
+                    protocolWs.close();
+                  } catch (e) {
+                    // Ignore close errors
+                  }
+                }
+              });
+            }
+          };
+          
+          protocolWs.onerror = () => {
+            clearTimeout(timeoutId);
+            console.error("[testCompleteChatFlow] WebSocket failed with and without protocols");
+            
+            resolve({
+              success: false,
+              message: "WebSocket connection failed with and without protocols",
+              close: () => {}
+            });
+          };
+          
+          return; // Exit this error handler since we're trying a new connection
+        }
+        
         resolve({
           success: false,
           message: "WebSocket connection error occurred",
           close: () => {
-            ws.close();
+            try {
+              ws.close();
+            } catch (e) {
+              // Ignore close errors
+            }
           }
         });
       };
