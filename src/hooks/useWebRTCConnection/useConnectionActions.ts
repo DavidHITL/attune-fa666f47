@@ -3,7 +3,8 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
-import { UseWebRTCConnectionOptions } from "./types";
+import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
+import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
 
 export function useConnectionActions(
   isConnected: boolean,
@@ -19,7 +20,7 @@ export function useConnectionActions(
   setIsMicrophoneActive: (isMicrophoneActive: boolean) => void,
   setCurrentTranscript: (currentTranscript: string) => void,
   setIsAiSpeaking: (isAiSpeaking: boolean) => void,
-  setMessages: (messages: any[]) => void
+  setMessages: (message: WebRTCMessage) => void
 ) {
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
@@ -91,7 +92,6 @@ export function useConnectionActions(
     setIsConnected(false);
     setCurrentTranscript("");
     setIsAiSpeaking(false);
-    setMessages([]);
     
     // Clean up audio processor
     if (audioProcessorRef.current) {

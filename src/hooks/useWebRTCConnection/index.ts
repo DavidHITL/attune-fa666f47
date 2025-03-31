@@ -14,7 +14,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
   // Set default options
   const connectionOptions = {
     model: "gpt-4o-realtime-preview-2024-12-17",
-    voice: "alloy",
+    voice: "alloy" as const,
     instructions: "You are a helpful assistant. Be concise in your responses.",
     autoConnect: false,
     enableMicrophone: false,
@@ -94,7 +94,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     setIsMicrophoneActive,
     setCurrentTranscript,
     setIsAiSpeaking,
-    setMessages
+    (newMessages) => setMessages(prev => [...prev, newMessages])
   );
   
   // Auto-connect if enabled

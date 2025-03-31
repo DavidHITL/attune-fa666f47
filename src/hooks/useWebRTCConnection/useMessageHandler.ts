@@ -5,7 +5,7 @@ import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
 
 export function useMessageHandler(
   messageHandlerRef: React.MutableRefObject<WebRTCMessageHandler | null>,
-  setMessages: (setter: (prev: WebRTCMessage[]) => WebRTCMessage[]) => void
+  setMessages: React.Dispatch<React.SetStateAction<WebRTCMessage[]>>
 ) {
   // Handle incoming WebRTC messages
   const handleMessage = useCallback((event: MessageEvent) => {

@@ -11,7 +11,7 @@ export function useConnectionState(): WebRTCConnectionState & {
   recorderRef: React.MutableRefObject<AudioRecorder | null>;
   audioProcessorRef: React.MutableRefObject<AudioProcessor | null>;
   messageHandlerRef: React.MutableRefObject<WebRTCMessageHandler | null>;
-  setMessages: (messages: WebRTCMessage[]) => void;
+  setMessages: React.Dispatch<React.SetStateAction<WebRTCMessage[]>>;
   setIsConnected: (isConnected: boolean) => void;
   setIsConnecting: (isConnecting: boolean) => void;
   setIsMicrophoneActive: (isMicrophoneActive: boolean) => void;
