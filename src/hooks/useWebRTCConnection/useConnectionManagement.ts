@@ -22,8 +22,11 @@ export function useConnectionManagement(
 ) {
   // Disconnect from OpenAI Realtime API
   const disconnect = useCallback(() => {
+    console.log("[useConnectionManagement] Disconnecting from OpenAI Realtime API");
+    
     // Stop microphone if active
     if (recorderRef.current) {
+      console.log("[useConnectionManagement] Stopping microphone");
       recorderRef.current.stop();
       recorderRef.current = null;
       setIsMicrophoneActive(false);
@@ -31,6 +34,7 @@ export function useConnectionManagement(
     
     // Disconnect WebRTC
     if (connectorRef.current) {
+      console.log("[useConnectionManagement] Disconnecting WebRTC connector");
       connectorRef.current.disconnect();
       connectorRef.current = null;
     }
@@ -42,20 +46,33 @@ export function useConnectionManagement(
     
     // Clean up audio processor
     if (audioProcessorRef.current) {
+      console.log("[useConnectionManagement] Cleaning up audio processor");
       audioProcessorRef.current.cleanup();
     }
-  }, [setIsConnected, setCurrentTranscript, setIsAiSpeaking, setIsMicrophoneActive]);
+    
+    console.log("[useConnectionManagement] Disconnect complete");
+  }, [setIsConnected, setCurrentTranscript, setIsAiSpeaking, setIsMicrophoneActive, audioProcessorRef, connectorRef, recorderRef]);
 
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
-    if (isConnected || isConnecting) return false;
+    if (isConnected || isConnecting) {
+      console.log("[useConnectionManagement] Already connected or connecting, aborting");
+      return false;
+    }
     
     try {
+      console.log("[useConnectionManagement] Starting connection process");
       setIsConnecting(true);
       
-      console.log("[useConnectionManagement] Starting connection process");
-      
       // Create a new WebRTC connector
+      console.log("[useConnectionManagement] Creating WebRTC connector with options:", 
+        JSON.stringify({
+          model: options.model || "gpt-4o-realtime-preview-2024-12-17",
+          voice: options.voice || "alloy",
+          hasInstructions: !!options.instructions
+        })
+      );
+      
       const connector = new WebRTCConnector({
         ...options,
         onMessage: handleMessage,
@@ -63,6 +80,7 @@ export function useConnectionManagement(
           console.log("[useConnectionManagement] Connection state changed:", state);
           setIsConnected(state === "connected");
           if (state === "failed" || state === "disconnected") {
+            console.warn("[useConnectionManagement] WebRTC connection lost:", state);
             toast.error("WebRTC connection lost. Please reconnect.");
             disconnect();
           }
@@ -87,15 +105,18 @@ export function useConnectionManagement(
         
         // Start microphone if enabled
         if (options.enableMicrophone) {
+          console.log("[useConnectionManagement] Auto-enabling microphone");
           await toggleMicrophone();
         }
+        
+        setIsConnecting(false);
+        return true;
       } else {
         toast.error("Failed to connect to OpenAI Realtime API");
         connectorRef.current = null;
+        setIsConnecting(false);
+        return false;
       }
-      
-      setIsConnecting(false);
-      return success;
     } catch (error) {
       console.error("[useConnectionManagement] Connection error:", error);
       toast.error(`Connection error: ${error instanceof Error ? error.message : String(error)}`);

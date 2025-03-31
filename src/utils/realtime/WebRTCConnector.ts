@@ -22,6 +22,20 @@ export class WebRTCConnector {
       instructions: "You are a helpful assistant. Be concise in your responses.",
       ...options
     };
+    
+    console.log("[WebRTCConnector] Initialized with options:", 
+      JSON.stringify({
+        model: this.options.model,
+        voice: this.options.voice,
+        hasInstructions: !!this.options.instructions,
+        hasCallbacks: {
+          onMessage: !!this.options.onMessage,
+          onConnectionStateChange: !!this.options.onConnectionStateChange,
+          onError: !!this.options.onError,
+          onTrack: !!this.options.onTrack
+        }
+      })
+    );
   }
 
   /**
@@ -29,66 +43,81 @@ export class WebRTCConnector {
    */
   async connect(): Promise<boolean> {
     try {
-      console.log("[WebRTC] Initializing connection");
+      console.log("[WebRTCConnector] Starting connection process");
       
       // Create peer connection and set up listeners
       this.pc = createPeerConnection();
       
       if (!this.pc) {
+        console.error("[WebRTCConnector] Failed to create peer connection");
         throw new Error("Failed to create peer connection");
       }
       
       setupPeerConnectionListeners(this.pc, this.options, (state) => {
+        console.log(`[WebRTCConnector] Connection state changed: ${state}`);
         this.connectionState = state;
       });
       
       // Create data channel for sending/receiving events
+      console.log("[WebRTCConnector] Creating data channel");
       this.dc = this.pc.createDataChannel("oai-events");
       setupDataChannelListeners(this.dc, this.options);
       
       // Create an offer and set local description
+      console.log("[WebRTCConnector] Creating offer");
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
+      
+      console.log("[WebRTCConnector] Local description set");
       
       // Send offer to OpenAI using secure API client
       return await withSecureOpenAI(async (apiKey) => {
         try {
           if (!this.pc || !this.pc.localDescription) {
+            console.error("[WebRTCConnector] No valid local description available");
             throw new Error("No valid local description available");
           }
           
-          console.log("[WebRTC] Sending offer to OpenAI");
+          console.log("[WebRTCConnector] Sending offer to OpenAI");
           
           // Send the offer to OpenAI and get answer
-          const result = await sendOffer(this.pc.localDescription, apiKey, this.options.model || "");
-          
-          console.log("[WebRTC] Received answer:", result.success ? "Success" : "Failed");
+          const result = await sendOffer(
+            this.pc.localDescription, 
+            apiKey, 
+            this.options.model || "gpt-4o-realtime-preview-2024-12-17"
+          );
           
           if (!result.success) {
+            console.error(`[WebRTCConnector] Failed to get valid answer: ${result.error}`);
             throw new Error(result.error || "Failed to send offer");
           }
+          
+          console.log("[WebRTCConnector] Setting remote description from answer");
           
           // Set remote description from OpenAI response
           await this.pc.setRemoteDescription(result.answer);
           
-          console.log("[WebRTC] Connection established successfully");
+          console.log("[WebRTCConnector] Connection established successfully");
           
           // Configure the session after connection is established
           setTimeout(() => {
-            if (this.dc) {
+            if (this.dc && this.dc.readyState === "open") {
+              console.log("[WebRTCConnector] Configuring session");
               configureSession(this.dc, this.options);
+            } else {
+              console.warn(`[WebRTCConnector] Data channel not ready for session config, state: ${this.dc?.readyState}`);
             }
           }, 1000);
           
           return true;
         } catch (error) {
-          console.error("[WebRTC] Error connecting to OpenAI:", error);
+          console.error("[WebRTCConnector] Error connecting to OpenAI:", error);
           this.handleError(error);
           return false;
         }
       });
     } catch (error) {
-      console.error("[WebRTC] Error initializing connection:", error);
+      console.error("[WebRTCConnector] Error initializing connection:", error);
       this.handleError(error);
       return false;
     }
@@ -99,14 +128,14 @@ export class WebRTCConnector {
    */
   sendTextMessage(text: string): boolean {
     if (!this.dc) {
-      console.error("[WebRTC] Data channel not available");
+      console.error("[WebRTCConnector] Data channel not available");
       return false;
     }
     
     try {
       return sendTextMessage(this.dc, text);
     } catch (error) {
-      console.error("[WebRTC] Error sending message:", error);
+      console.error("[WebRTCConnector] Error sending message:", error);
       this.handleError(error);
       return false;
     }
@@ -117,14 +146,14 @@ export class WebRTCConnector {
    */
   sendAudioData(audioData: Float32Array): boolean {
     if (!this.dc) {
-      console.error("[WebRTC] Data channel not available");
+      console.error("[WebRTCConnector] Data channel not available");
       return false;
     }
     
     try {
       return sendAudioData(this.dc, audioData, encodeAudioData);
     } catch (error) {
-      console.error("[WebRTC] Error sending audio data:", error);
+      console.error("[WebRTCConnector] Error sending audio data:", error);
       this.handleError(error);
       return false;
     }
@@ -141,7 +170,7 @@ export class WebRTCConnector {
    * Disconnect from the OpenAI Realtime API
    */
   disconnect(): void {
-    console.log("[WebRTC] Disconnecting");
+    console.log("[WebRTCConnector] Disconnecting");
     
     // Close the data channel if it exists
     if (this.dc) {
