@@ -1,7 +1,11 @@
 
+import { ConnectionStateManager } from './websocket/ConnectionStateManager';
+import { WebSocketPromiseHandler } from './WebSocketPromiseHandler';
 import { HeartbeatManager } from './HeartbeatManager';
 import { ConnectionLogger } from './ConnectionLogger';
-import { WebSocketPromiseHandler } from './WebSocketPromiseHandler';
+import { WebSocketAuthHandler } from './websocket/WebSocketAuthHandler';
+import { WebSocketEventHandler } from './websocket/WebSocketEventHandler';
+import { WebSocketMessageHandler } from './websocket/WebSocketMessageHandler';
 
 /**
  * Manages WebSocket connections
@@ -17,11 +21,19 @@ export class WebSocketManager {
   private heartbeatManager: HeartbeatManager;
   private connectionLogger: ConnectionLogger;
   private promiseHandler: WebSocketPromiseHandler;
+  private stateManager: ConnectionStateManager;
+  private authHandler: WebSocketAuthHandler;
+  private eventHandler: WebSocketEventHandler;
+  private messageManager: WebSocketMessageHandler;
 
   constructor() {
     this.heartbeatManager = new HeartbeatManager(this.reconnect.bind(this));
     this.connectionLogger = new ConnectionLogger();
     this.promiseHandler = new WebSocketPromiseHandler();
+    this.stateManager = new ConnectionStateManager();
+    this.authHandler = new WebSocketAuthHandler();
+    this.eventHandler = new WebSocketEventHandler();
+    this.messageManager = new WebSocketMessageHandler();
   }
 
   /**
@@ -82,21 +94,8 @@ export class WebSocketManager {
       this.connectionAttempt++;
       console.log(`[WebSocketManager] Connection attempt ${this.connectionAttempt} of ${this.maxConnectionAttempts}`);
       
-      // Get auth token if available from Supabase
-      let finalUrl = this.wsUrl;
-      try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        const { data } = await supabase.auth.getSession();
-        
-        if (data.session?.access_token) {
-          console.log("[WebSocketManager] Adding auth token to connection");
-          // Add token to URL as a query parameter
-          const separator = finalUrl.includes('?') ? '&' : '?';
-          finalUrl = `${finalUrl}${separator}token=${data.session.access_token}`;
-        }
-      } catch (error) {
-        console.warn("[WebSocketManager] Could not get auth token:", error);
-      }
+      // Get the final URL with auth token if available
+      const finalUrl = await this.authHandler.getAuthenticatedUrl(this.wsUrl);
       
       console.log("[WebSocketManager] Final connection URL:", finalUrl);
       
@@ -114,32 +113,18 @@ export class WebSocketManager {
         this.websocket.binaryType = "arraybuffer";
         
         // Set connection timeout
-        const timeoutId = window.setTimeout(() => {
-          console.error("[WebSocketManager] Connection timed out");
-          this.promiseHandler.rejectOpenPromise(new Error("Connection timeout"));
-          
-          if (this.websocket) {
-            try {
-              this.websocket.close();
-            } catch (closeError) {
-              console.error("[WebSocketManager] Error closing WebSocket after timeout:", closeError);
-            }
-          }
-        }, 10000);
+        const timeoutId = this.eventHandler.setupConnectionTimeout(
+          this.websocket,
+          this.promiseHandler,
+          10000
+        );
         
         // Configure handlers
         setupHandlers(this.websocket, timeoutId);
         
-        // Add event listener for unhandled errors
-        this.websocket.addEventListener('error', (event) => {
-          console.error("[WebSocketManager] WebSocket error event:", event);
-        });
-        
-        // Add close handler to stop logging
-        this.websocket.addEventListener('close', (event) => {
-          this.connectionLogger.stopLogging();
-          this.connectionLogger.logCloseEvent(event);
-        });
+        // Add event listeners
+        this.eventHandler.setupErrorHandlers(this.websocket);
+        this.eventHandler.setupCloseHandlers(this.websocket, this.connectionLogger);
         
         return connectionPromise;
       } catch (wsError) {
@@ -236,21 +221,7 @@ export class WebSocketManager {
    * Send a message through the WebSocket
    */
   send(message: any): boolean {
-    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
-      console.error("[WebSocketManager] WebSocket is not connected, state:", 
-                  this.websocket ? this.websocket.readyState : "null");
-      return false;
-    }
-    
-    try {
-      const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
-      console.log("[WebSocketManager] Sending message:", message.type || "unknown type");
-      this.websocket.send(messageStr);
-      return true;
-    } catch (error) {
-      console.error("[WebSocketManager] Error sending WebSocket message:", error);
-      return false;
-    }
+    return this.messageManager.sendMessage(this.websocket, message);
   }
 
   /**
