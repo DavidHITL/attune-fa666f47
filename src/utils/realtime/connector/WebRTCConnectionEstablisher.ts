@@ -18,6 +18,7 @@ export class WebRTCConnectionEstablisher {
   
   /**
    * Establish a WebRTC connection with OpenAI
+   * @param apiKey The ephemeral API key for authentication
    * @param options Configuration options for the connection
    * @param onStateChange Callback for connection state changes
    * @param onDataChannelOpen Callback for when the data channel opens
@@ -36,7 +37,7 @@ export class WebRTCConnectionEstablisher {
     console.log("[WebRTCConnectionEstablisher] Starting connection process");
     
     try {
-      // Create peer connection
+      // Step 1: Create peer connection with ICE servers configuration
       const pc = createPeerConnection();
       
       if (!pc) {
@@ -44,7 +45,7 @@ export class WebRTCConnectionEstablisher {
         throw new Error("Failed to create peer connection");
       }
       
-      // Set up event listeners for the peer connection
+      // Step 2: Set up event listeners for the peer connection
       setupPeerConnectionListeners(pc, options, (state) => {
         console.log(`[WebRTCConnectionEstablisher] Connection state changed: ${state}`);
         onStateChange(state);
@@ -55,21 +56,27 @@ export class WebRTCConnectionEstablisher {
         }
       });
       
-      // Create data channel for sending/receiving events - critical for OpenAI's protocol
+      // Step 3: Create data channel for sending/receiving events - critical for OpenAI's protocol
       console.log("[WebRTCConnectionEstablisher] Creating data channel 'oai-events'");
       const dc = pc.createDataChannel("oai-events");
       
       // Set up event listeners for the data channel
       setupDataChannelListeners(dc, options, onDataChannelOpen);
       
-      // Add the provided audio track to the peer connection if available
+      // Step 4: Add the audio track to the peer connection
+      // This is a critical step for voice-enabled applications
       if (audioTrack) {
         console.log("[WebRTCConnectionEstablisher] Adding provided audio track to peer connection:", 
           audioTrack.label || "Unnamed track");
         
         // Create a new MediaStream with the audio track
+        // This is necessary to properly add the track to the RTCPeerConnection
         const mediaStream = new MediaStream([audioTrack]);
+        
+        // Add the track to the peer connection, associating it with the stream
+        // This creates a sender that will transmit this audio track to the remote peer
         pc.addTrack(audioTrack, mediaStream);
+        console.log("[WebRTCConnectionEstablisher] Audio track added successfully");
       } else {
         // If no audio track provided, try to get one from microphone
         try {
@@ -87,7 +94,10 @@ export class WebRTCConnectionEstablisher {
           if (audioTracks.length > 0) {
             const micTrack = audioTracks[0];
             console.log("[WebRTCConnectionEstablisher] Adding microphone track to peer connection:", micTrack.label);
+            
+            // Add the first audio track from the microphone to the peer connection
             pc.addTrack(micTrack, mediaStream);
+            console.log("[WebRTCConnectionEstablisher] Microphone track added successfully");
           } else {
             console.warn("[WebRTCConnectionEstablisher] No audio tracks found in media stream");
           }
@@ -97,9 +107,14 @@ export class WebRTCConnectionEstablisher {
         }
       }
       
-      // Create an offer and set local description
+      // Step 5: Create an offer and set local description
+      // This is where the SDP (Session Description Protocol) is created
+      // The SDP contains all the media capabilities and constraints
       console.log("[WebRTCConnectionEstablisher] Creating offer");
       const offer = await pc.createOffer();
+      
+      // Step 6: Set the local description on the peer connection
+      // This applies the offer as the local description
       await pc.setLocalDescription(offer);
       
       console.log("[WebRTCConnectionEstablisher] Local description set:", 
@@ -116,7 +131,7 @@ export class WebRTCConnectionEstablisher {
         onError(new Error("Connection timeout after 15 seconds"));
       }, 15000);
       
-      // Send the offer to OpenAI's Realtime API and get answer
+      // Step 7: Send the offer to OpenAI's Realtime API and get answer
       console.log("[WebRTCConnectionEstablisher] Sending SDP offer to OpenAI");
       const result = await sendOffer(
         pc.localDescription, 
@@ -153,13 +168,13 @@ export class WebRTCConnectionEstablisher {
       });
       
       try {
-        // Set remote description from OpenAI response
+        // Step 8: Set remote description from OpenAI response
         console.log("[WebRTCConnectionEstablisher] Setting remote description");
         await pc.setRemoteDescription(result.answer);
         console.log("[WebRTCConnectionEstablisher] Remote description set successfully");
         
         try {
-          // Wait for the connection to be established
+          // Step 9: Wait for the connection to be established
           console.log("[WebRTCConnectionEstablisher] Waiting for connection to be established");
           await connectionPromise;
           console.log("[WebRTCConnectionEstablisher] WebRTC connection established successfully");

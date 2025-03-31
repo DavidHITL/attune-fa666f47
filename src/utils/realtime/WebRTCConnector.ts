@@ -44,6 +44,9 @@ export class WebRTCConnector {
         async (apiKey) => {
           try {
             console.log("[WebRTCConnector] Got ephemeral key, connecting to OpenAI Realtime API");
+            
+            // Pass the audioTrack to the connection manager
+            // This will be added to the peer connection before creating the offer
             return await this.connectionManager.connect(apiKey, audioTrack);
           } catch (error) {
             console.error("[WebRTCConnector] Error connecting with ephemeral key:", error);
