@@ -34,14 +34,13 @@ export async function sendOffer(
     console.log(`[WebRTC] Using model: ${model}`);
     console.log(`[WebRTC] Requesting from endpoint: ${requestUrl}`);
     
-    console.log("[WebRTC] About to send SDP offer to OpenAI");
-    
     // Log the first and last 100 chars of the SDP for debugging
     const sdpPreview = localDescription.sdp.length > 200 
       ? `${localDescription.sdp.substring(0, 100)}...${localDescription.sdp.substring(localDescription.sdp.length - 100)}`
       : localDescription.sdp;
     console.log(`[WebRTC] SDP offer preview: ${sdpPreview}`);
     
+    console.time("[WebRTC] SDP API Request Time");
     const sdpResponse = await fetch(requestUrl, {
       method: "POST",
       body: localDescription.sdp,
@@ -50,38 +49,45 @@ export async function sendOffer(
         "Content-Type": "application/sdp"
       }
     });
+    console.timeEnd("[WebRTC] SDP API Request Time");
 
     // Log response status for debugging
     console.log(`[WebRTC] SDP response status: ${sdpResponse.status}`);
 
     // Check for HTTP errors
     if (!sdpResponse.ok) {
-      const errorText = await sdpResponse.text();
-      console.error("[WebRTC] API Error Status:", sdpResponse.status);
-      console.error("[WebRTC] API Error Response:", errorText);
+      let errorMessage = `API Error: ${sdpResponse.status}`;
       
       try {
-        // Try to parse the error as JSON for more detail
-        const errorJson = JSON.parse(errorText);
-        console.error("[WebRTC] API Error Details:", errorJson);
-      } catch (e) {
-        // Not JSON, continue with the text error
+        const errorText = await sdpResponse.text();
+        console.error("[WebRTC] API Error Response:", errorText);
+        
+        try {
+          // Try to parse the error as JSON for more detail
+          const errorJson = JSON.parse(errorText);
+          console.error("[WebRTC] API Error Details:", errorJson);
+          errorMessage += ` - ${errorJson.error?.message || errorText}`;
+        } catch (e) {
+          // Not JSON, use the text
+          errorMessage += ` - ${errorText}`;
+        }
+      } catch (textError) {
+        console.error("[WebRTC] Couldn't read error response text:", textError);
       }
       
       if (sdpResponse.status === 401) {
-        return {
-          success: false,
-          error: `Authentication error: Invalid API key or unauthorized access`
-        };
+        errorMessage = `Authentication error: Invalid API key or unauthorized access`;
       }
       
+      console.error("[WebRTC] API Error:", errorMessage);
       return {
         success: false,
-        error: `API Error: ${sdpResponse.status} - ${errorText}`
+        error: errorMessage
       };
     }
 
     // Get the SDP answer from OpenAI
+    console.log("[WebRTC] Reading response body");
     const sdpAnswer = await sdpResponse.text();
     console.log("[WebRTC] Received SDP answer with length:", sdpAnswer.length);
     

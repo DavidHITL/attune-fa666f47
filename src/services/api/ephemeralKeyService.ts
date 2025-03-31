@@ -1,145 +1,50 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
-
-// In-memory cache for the ephemeral key to avoid unnecessary requests
-let cachedEphemeralKey: { key: string; expiresAt: Date } | null = null;
-let cachedOpenAIKey: { key: string; expiresAt: Date } | null = null;
-
-// Minimum time before expiry to trigger a refresh (30 seconds)
-const REFRESH_THRESHOLD_MS = 30 * 1000;
-
 /**
- * Request an ephemeral API key from the server
- * @returns Promise with the ephemeral key and its expiration time
+ * Get an ephemeral OpenAI API key from Supabase Edge Function
  */
-export const requestEphemeralKey = async () => {
+export async function getEphemeralKey(): Promise<string> {
   try {
-    // If we have a cached key that's still valid (with refresh threshold)
-    if (cachedEphemeralKey && new Date() < new Date(cachedEphemeralKey.expiresAt.getTime() - REFRESH_THRESHOLD_MS)) {
-      console.log("Using cached ephemeral key");
-      return cachedEphemeralKey;
-    }
+    console.log("[ephemeralKeyService] Requesting ephemeral key from Supabase");
     
-    console.log("Requesting new ephemeral key");
+    const { data, error } = await supabase.functions.invoke('generate-ephemeral-key');
     
-    // Check if user is authenticated first
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      console.error("No valid session found when requesting ephemeral key");
-      throw new Error("Authentication required");
-    }
-    
-    // Call the Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke('generate-ephemeral-key', {
-      method: 'POST'
-    });
-
     if (error) {
-      console.error("Error requesting ephemeral key:", error);
+      console.error("[ephemeralKeyService] Error fetching ephemeral key:", error);
       throw new Error(`Failed to get ephemeral key: ${error.message}`);
     }
-
-    if (!data || !data.ephemeralKey) {
-      console.error("Invalid response from server:", data);
-      throw new Error("Invalid response from server");
+    
+    if (!data || !data.client_secret?.value) {
+      console.error("[ephemeralKeyService] Invalid response format:", data);
+      throw new Error("Invalid ephemeral key response format");
     }
-
-    // Store the ephemeral key in memory cache
-    cachedEphemeralKey = {
-      key: data.ephemeralKey,
-      expiresAt: new Date(data.expiresAt)
-    };
-
-    console.log("Successfully obtained ephemeral key, expires at:", cachedEphemeralKey.expiresAt);
-    return cachedEphemeralKey;
+    
+    console.log("[ephemeralKeyService] Successfully obtained ephemeral key");
+    return data.client_secret.value;
   } catch (error) {
-    console.error("Error in requestEphemeralKey:", error);
-    toast({
-      title: "API Error",
-      description: "Failed to obtain API access. Please try again.",
-      variant: "destructive"
-    });
-    throw error;
+    console.error("[ephemeralKeyService] Exception getting ephemeral key:", error);
+    throw new Error(`Failed to get ephemeral key: ${error instanceof Error ? error.message : String(error)}`);
   }
-};
+}
 
 /**
- * Verify an ephemeral key and get the actual OpenAI API key
- * @param ephemeralKey The ephemeral key to verify
- * @returns Promise with the actual OpenAI API key and its expiration time
+ * Helper function to wrap API calls with secure OpenAI authentication
  */
-export const verifyEphemeralKey = async (ephemeralKey: string) => {
+export async function withSecureOpenAI<T>(
+  apiCallback: (apiKey: string) => Promise<T>
+): Promise<T> {
   try {
-    // If we have a cached OpenAI key that's still valid (with refresh threshold)
-    if (cachedOpenAIKey && new Date() < new Date(cachedOpenAIKey.expiresAt.getTime() - REFRESH_THRESHOLD_MS)) {
-      console.log("Using cached OpenAI key");
-      return cachedOpenAIKey;
+    console.log("[ephemeralKeyService] Starting secure OpenAI API call");
+    const ephemeralKey = await getEphemeralKey();
+    
+    if (!ephemeralKey) {
+      console.error("[ephemeralKeyService] No valid ephemeral key returned");
+      throw new Error("Failed to get valid ephemeral key");
     }
     
-    console.log("Verifying ephemeral key to get OpenAI key");
-    
-    // Check if user is authenticated first
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      console.error("No valid session found when verifying ephemeral key");
-      throw new Error("Authentication required");
-    }
-    
-    // Call the Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke('verify-ephemeral-key', {
-      method: 'POST',
-      body: { ephemeralKey }
-    });
-
-    if (error) {
-      console.error("Error verifying ephemeral key:", error);
-      throw new Error(`Failed to verify key: ${error.message}`);
-    }
-
-    if (!data || !data.openaiKey) {
-      console.error("Invalid response from server:", data);
-      throw new Error("Invalid response from server");
-    }
-
-    // Store the OpenAI key in memory cache
-    cachedOpenAIKey = {
-      key: data.openaiKey,
-      expiresAt: new Date(data.expiresAt)
-    };
-
-    console.log("Successfully verified ephemeral key and obtained OpenAI key");
-    return cachedOpenAIKey;
+    console.log("[ephemeralKeyService] Executing API callback with ephemeral key");
+    return await apiCallback(ephemeralKey);
   } catch (error) {
-    console.error("Error in verifyEphemeralKey:", error);
-    toast({
-      title: "API Key Error",
-      description: "Failed to authenticate with OpenAI API. Please try again.",
-      variant: "destructive"
-    });
-    throw error;
+    console.error("[ephemeralKeyService] Error in secure API call:", error);
+    throw new Error(`Secure API call failed: ${error instanceof Error ? error.message : String(error)}`);
   }
-};
-
-/**
- * Complete OpenAI API flow: request ephemeral key, verify it, and use the actual API key
- * @param apiCall Function that will use the OpenAI API key
- * @returns Promise with the result of the API call
- */
-export const withSecureOpenAI = async <T>(apiCall: (apiKey: string) => Promise<T>): Promise<T> => {
-  try {
-    // Step 1: Get ephemeral key (with automatic refresh if needed)
-    const { key: ephemeralKey } = await requestEphemeralKey();
-    
-    // Step 2: Verify ephemeral key and get actual OpenAI API key
-    const { key: openaiKey } = await verifyEphemeralKey(ephemeralKey);
-    
-    console.log("Calling OpenAI API with secure key");
-    
-    // Step 3: Use the actual OpenAI API key for the API call
-    return await apiCall(openaiKey);
-  } catch (error) {
-    console.error("Error in withSecureOpenAI:", error);
-    throw error;
-  }
-};
+}

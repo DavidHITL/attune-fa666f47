@@ -1,0 +1,4 @@
+
+name = "test-openai-connection"
+path_wrangler_toml = "./supabase/functions/test-openai-connection/wrangler.toml"
+deploy_function_command = "cd supabase/functions/test-openai-connection && npm i wrangler && npx wrangler deploy"

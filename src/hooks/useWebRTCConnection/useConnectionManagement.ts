@@ -79,7 +79,12 @@ export function useConnectionManagement(
         onConnectionStateChange: (state) => {
           console.log("[useConnectionManagement] Connection state changed:", state);
           setIsConnected(state === "connected");
-          if (state === "failed" || state === "disconnected") {
+          
+          if (state === "connected") {
+            console.log("[useConnectionManagement] WebRTC connection established successfully");
+            toast.success("Connected to OpenAI Realtime API");
+          }
+          else if (state === "failed" || state === "disconnected") {
             console.warn("[useConnectionManagement] WebRTC connection lost:", state);
             toast.error("WebRTC connection lost. Please reconnect.");
             disconnect();
@@ -88,10 +93,24 @@ export function useConnectionManagement(
         onError: (error) => {
           console.error("[useConnectionManagement] WebRTC error:", error);
           toast.error(`WebRTC error: ${error.message}`);
+          
+          // Automatically disconnect on critical errors
+          disconnect();
+          setIsConnecting(false);
         }
       });
       
       connectorRef.current = connector;
+      
+      // Set a connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (!isConnected) {
+          console.error("[useConnectionManagement] Connection timeout after 15 seconds");
+          toast.error("Connection timeout. Please try again.");
+          disconnect();
+          setIsConnecting(false);
+        }
+      }, 15000);
       
       // Attempt to connect with additional logging
       console.log("[useConnectionManagement] Calling connector.connect()");
@@ -99,12 +118,14 @@ export function useConnectionManagement(
       
       const success = await connector.connect();
       
+      // Clear the timeout if we got a response
+      clearTimeout(connectionTimeout);
+      
       console.timeEnd("WebRTC Connection Process");
       console.log("[useConnectionManagement] Connection result:", success ? "Success" : "Failed");
       
       if (success) {
         setIsConnected(true);
-        toast.success("Connected to OpenAI Realtime API");
         
         // Start microphone if enabled
         if (options.enableMicrophone) {
@@ -117,12 +138,14 @@ export function useConnectionManagement(
       } else {
         toast.error("Failed to connect to OpenAI Realtime API. Check console for details.");
         connectorRef.current = null;
+        disconnect();
         setIsConnecting(false);
         return false;
       }
     } catch (error) {
       console.error("[useConnectionManagement] Connection error:", error);
       toast.error(`Connection error: ${error instanceof Error ? error.message : String(error)}`);
+      disconnect();
       setIsConnecting(false);
       return false;
     }

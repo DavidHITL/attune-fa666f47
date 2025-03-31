@@ -31,7 +31,8 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     }
     
     // Log request headers for debugging
-    logWithTimestamp(`[WebSocket Handler] Request headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
+    const headers = Object.fromEntries(req.headers.entries());
+    logWithTimestamp(`[WebSocket Handler] Request headers: ${JSON.stringify(headers)}`);
     
     // Handle the WebSocket upgrade request
     const upgradeResult = await handleUpgrade(req);
@@ -47,6 +48,15 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     
     logWithTimestamp("[WebSocket Handler] WebSocket connection established successfully");
     
+    // Add basic error handling for the connection
+    socket.onerror = (event) => {
+      logWithTimestamp("[WebSocket Handler] Socket error event received", "error");
+    };
+
+    socket.onclose = (event) => {
+      logWithTimestamp(`[WebSocket Handler] Socket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
+    };
+    
     // Send an immediate message to the client to confirm the connection
     try {
       socket.send(JSON.stringify({ 
@@ -59,20 +69,11 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
       logWithTimestamp("[WebSocket Handler] Error sending initial message: " + (e instanceof Error ? e.message : String(e)), "error");
     }
     
-    // Set up initial error and close handlers for debugging
-    socket.onerror = (event) => {
-      logWithTimestamp("[WebSocket Handler] Socket error: " + JSON.stringify(event), "error");
-    };
-
-    socket.onclose = (event) => {
-      logWithTimestamp(`[WebSocket Handler] Socket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}, Clean: ${event.wasClean}`);
-    };
-    
     // Add a basic message handler for pings
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        logWithTimestamp("[WebSocket Handler] Received message: " + data.type || "unknown type");
+        logWithTimestamp("[WebSocket Handler] Received message type: " + (data.type || "unknown type"));
         
         // Handle ping messages immediately with a pong
         if (data.type === "ping") {
@@ -91,6 +92,7 @@ export async function handleWebSocketRequest(req: Request, options: WebSocketOpt
     // Initialize connections asynchronously AFTER returning the response
     setTimeout(() => {
       try {
+        logWithTimestamp("[WebSocket Handler] Starting connection initialization");
         initializeConnections(socket);
         logWithTimestamp("[WebSocket Handler] Connection initialization completed");
       } catch (error) {
