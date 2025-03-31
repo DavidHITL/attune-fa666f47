@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { calculateSessionProgress } from "@/utils/sessionUtils";
 import DatabaseConnectionAlert from "./chat/DatabaseConnectionAlert";
 import ChatLoadingState from "./chat/ChatLoadingState";
+import RealtimeChat from "./realtime/RealtimeChat";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
@@ -24,6 +25,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   const { user, isLoading: isAuthLoading } = useAuth();
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const didInitialFetchRef = useRef(false);
+  const [showRealtimeChat, setShowRealtimeChat] = useState(false);
   
   // Calculate session progress using the utility function
   const sessionProgress = calculateSessionProgress(sessionStarted, sessionEndTime);
@@ -133,6 +135,11 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
 
   const isLoading = isLoadingMessages || isSendingMessage || isAuthLoading;
 
+  // Function to toggle real-time chat
+  const toggleRealtimeChat = () => {
+    setShowRealtimeChat(prev => !prev);
+  };
+
   // Show loading state
   if (isAuthLoading) {
     return <ChatLoadingState />;
@@ -154,6 +161,31 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       <div className="bg-apple-gray-6">
         <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
+      
+      {user && (
+        <>
+          <div className="fixed bottom-20 right-4 z-40">
+            <button
+              onClick={toggleRealtimeChat}
+              className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-2 shadow-lg"
+              title="Toggle Voice Chat"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+              </svg>
+            </button>
+          </div>
+          
+          {showRealtimeChat && (
+            <RealtimeChat
+              sessionStarted={sessionStarted}
+              sessionEndTime={sessionEndTime}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 };
