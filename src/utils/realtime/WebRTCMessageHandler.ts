@@ -1,5 +1,6 @@
 
 import { WebRTCMessage } from "@/hooks/useWebRTCConnection";
+import { saveMessage } from "@/services/messages/messageStorage";
 
 export interface WebRTCMessageHandlerOptions {
   onTranscriptUpdate?: (text: string) => void;
@@ -8,6 +9,7 @@ export interface WebRTCMessageHandlerOptions {
   onAudioComplete?: () => void;
   onMessageReceived?: (message: WebRTCMessage) => void;
   onFinalTranscript?: (transcript: string) => void;
+  instructions?: string;
 }
 
 /**
@@ -65,6 +67,9 @@ export class WebRTCMessageHandler {
           // Notify about final transcript if callback is provided
           if (this.options.onFinalTranscript && this.currentTranscript.trim()) {
             this.options.onFinalTranscript(this.currentTranscript);
+            
+            // Save the transcript to database with metadata
+            this.saveTranscriptToDatabase();
           }
           
           // Reset current transcript
@@ -74,5 +79,23 @@ export class WebRTCMessageHandler {
     } catch (error) {
       console.error("[WebRTCMessageHandler] Error handling message:", error);
     }
+  }
+  
+  /**
+   * Save transcript to database
+   */
+  private saveTranscriptToDatabase(): void {
+    // Skip if transcript is empty
+    if (!this.currentTranscript.trim()) {
+      return;
+    }
+    
+    // Save the transcript to the database with metadata
+    saveMessage(this.currentTranscript, false, { 
+      messageType: 'voice',
+      instructions: this.options.instructions,
+    }).catch(error => {
+      console.error("[WebRTCMessageHandler] Error saving transcript:", error);
+    });
   }
 }

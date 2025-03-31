@@ -2,6 +2,7 @@
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { MessageMetadata } from "@/hooks/useWebRTCConnection/types";
 
 export interface ChatMessage {
   role: string;
@@ -26,11 +27,25 @@ export const generateUniqueId = (): string => {
 };
 
 // Create a message object
-export const createMessageObject = (text: string, isUser: boolean): Message => {
+export const createMessageObject = (
+  text: string, 
+  isUser: boolean, 
+  metadata: Partial<MessageMetadata> = {}
+): Message => {
   return {
     id: generateUniqueId(),
     text,
     isUser,
-    timestamp: new Date()
+    timestamp: new Date(),
+    messageType: metadata.messageType || 'text'
   };
+};
+
+// Format conversation history for AI context
+export const formatConversationHistory = (messages: Message[]): string => {
+  return messages.map(msg => {
+    const role = msg.isUser ? "User" : "Assistant";
+    const type = msg.messageType === 'voice' ? "[Voice]" : "";
+    return `${role}${type}: ${msg.text}`;
+  }).join("\n\n");
 };

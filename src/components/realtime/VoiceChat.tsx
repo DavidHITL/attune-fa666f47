@@ -117,6 +117,25 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     }
   };
 
+  // Save transcript when AI finishes speaking
+  useEffect(() => {
+    const saveTranscript = async () => {
+      if (!isAiSpeaking && currentTranscript && user) {
+        try {
+          await saveMessage(currentTranscript, false, { 
+            messageType: 'voice',
+            instructions: systemPrompt
+          });
+          console.log("AI transcript saved to database");
+        } catch (error) {
+          console.error("Failed to save AI transcript:", error);
+        }
+      }
+    };
+    
+    saveTranscript();
+  }, [isAiSpeaking, currentTranscript, user, systemPrompt]);
+
   // Handle component unmount
   useEffect(() => {
     return () => {

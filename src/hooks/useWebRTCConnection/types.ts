@@ -36,4 +36,5 @@ export interface MessageMetadata {
   messageType: 'text' | 'voice';
   instructions?: string;
   knowledgeEntries?: Record<string, any>[];
+  contextHistory?: string;
 }
