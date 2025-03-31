@@ -27,7 +27,7 @@ export const createMessageObject = (
     text: text,
     isUser: isUser,
     timestamp: new Date(),
-    messageType: metadata.messageType || 'text'
+    messageType: (metadata.messageType === 'voice' ? 'voice' : 'text') // Ensure it's either 'voice' or 'text'
   };
 };
 
@@ -54,7 +54,7 @@ export const saveMessage = async (
           user_id: userId,
           content: text,
           sender_type: isUser ? 'user' : 'bot',
-          message_type: metadata.messageType || 'text',
+          message_type: metadata.messageType === 'voice' ? 'voice' : 'text', // Ensure it's either 'voice' or 'text'
           instructions: metadata.instructions,
           knowledge_entries: metadata.knowledgeEntries
         },
@@ -114,7 +114,7 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
       text: msg.content || '', // Map content to text
       isUser: msg.sender_type === 'user', // Map sender_type to isUser
       timestamp: new Date(msg.created_at),
-      messageType: msg.message_type || 'text'
+      messageType: (msg.message_type === 'voice' ? 'voice' : 'text') as 'text' | 'voice' // Ensure correct type
     }));
 
     return messages;

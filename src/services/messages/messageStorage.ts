@@ -33,7 +33,7 @@ export const saveMessage = async (
         content: text,
         user_id: session.user.id,
         sender_type: isUser ? 'user' : 'bot',
-        message_type: metadata.messageType || 'text',
+        message_type: metadata.messageType === 'voice' ? 'voice' : 'text', // Ensure it's either 'voice' or 'text'
         instructions: metadata.instructions,
         knowledge_entries: metadata.knowledgeEntries || null
       })
@@ -98,7 +98,7 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
       text: dbMessage.content || '',
       isUser: dbMessage.sender_type === 'user',
       timestamp: new Date(dbMessage.created_at),
-      messageType: dbMessage.message_type || 'text'
+      messageType: (dbMessage.message_type === 'voice' ? 'voice' : 'text') as 'text' | 'voice' // Ensure correct type
     }));
     
     console.log(`Fetched ${formattedMessages.length} messages from database`);
