@@ -78,6 +78,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ephemeral_keys: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          key: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          key: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          key?: string
+          used?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string | null
