@@ -53,7 +53,19 @@ serve(async (req: Request) => {
       );
     }
     
-    console.log('Generating ephemeral key for OpenAI API');
+    // Get parameters from request body
+    let params;
+    try {
+      params = await req.json();
+    } catch (e) {
+      params = {};
+    }
+    
+    const model = params.model || "gpt-4o-realtime-preview-2024-12-17";
+    const voice = params.voice || "alloy";
+    const instructions = params.instructions || "You are a helpful assistant. Be concise in your responses.";
+    
+    console.log(`Generating ephemeral key for OpenAI API with model: ${model}, voice: ${voice}`);
     
     // Create a client secret for use with WebRTC
     const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
@@ -63,7 +75,9 @@ serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "gpt-4o-realtime-preview-2024-12-17",
+        model: model,
+        voice: voice,
+        instructions: instructions
       }),
     })
     
@@ -85,7 +99,7 @@ serve(async (req: Request) => {
     
     const data = await response.json();
     
-    console.log('Successfully generated ephemeral key');
+    console.log('Successfully generated ephemeral key, expires at:', new Date(data.client_secret.expires_at * 1000).toISOString());
     
     // Return the ephemeral key
     return new Response(
