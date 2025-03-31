@@ -21,6 +21,7 @@ export function getOpenAIApiKey(): string {
 // Handle CORS preflight requests
 export function handleCorsPreflightRequest(req: Request): Response | null {
   if (req.method === "OPTIONS") {
+    console.log("Handling CORS preflight request with headers:", JSON.stringify(corsHeaders));
     return new Response(null, {
       headers: {
         ...corsHeaders,
@@ -33,14 +34,26 @@ export function handleCorsPreflightRequest(req: Request): Response | null {
 
 // Error handling helper
 export function createErrorResponse(error: unknown): Response {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  console.error("Creating error response:", errorMessage);
+  
   return new Response(
     JSON.stringify({
       error: "An unexpected error occurred",
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage,
+      timestamp: new Date().toISOString(),
     }),
     {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     }
   );
+}
+
+// Helper to log all request headers for debugging
+export function logRequestHeaders(req: Request): void {
+  console.log("Request headers:");
+  for (const [key, value] of req.headers.entries()) {
+    console.log(`  ${key}: ${value}`);
+  }
 }
