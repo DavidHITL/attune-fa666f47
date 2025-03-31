@@ -51,6 +51,7 @@ export async function sendOffer(
       throw new Error("Invalid or empty API key");
     }
     
+    // Send the SDP offer to OpenAI with the ephemeral token
     const sdpResponse = await fetch(requestUrl, {
       method: "POST",
       body: localDescription.sdp,

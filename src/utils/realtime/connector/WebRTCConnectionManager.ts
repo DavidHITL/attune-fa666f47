@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "../WebRTCTypes";
 import { setupPeerConnectionListeners } from "../WebRTCConnectionListeners";
 import { setupDataChannelListeners } from "../WebRTCDataChannelHandler";
@@ -46,50 +47,52 @@ export class WebRTCConnectionManager extends ConnectionBase {
     
     this.clearConnectionTimeout();
     
-    // Create peer connection and set up listeners
-    this.pc = createPeerConnection();
-    
-    if (!this.pc) {
-      console.error("[WebRTCConnectionManager] Failed to create peer connection");
-      throw new Error("Failed to create peer connection");
-    }
-    
-    setupPeerConnectionListeners(this.pc, this.options, (state) => {
-      console.log(`[WebRTCConnectionManager] Connection state changed: ${state}`);
-      this.connectionState = state;
-      
-      // Clear timeout if connection is successful
-      if (state === "connected" && this.connectionTimeout) {
-        this.clearConnectionTimeout();
-        
-        // Configure the session after connection is established if data channel is ready
-        this.configureSessionWhenReady();
-      }
-    });
-    
-    // Create data channel for sending/receiving events
-    console.log("[WebRTCConnectionManager] Creating data channel");
-    this.dc = this.pc.createDataChannel("oai-events");
-    setupDataChannelListeners(this.dc, this.options, () => {
-      // This will be called when the data channel opens
-      console.log("[WebRTCConnectionManager] Data channel is open and ready");
-      this.configureSessionWhenReady();
-    });
-    
-    // Create an offer and set local description
-    console.log("[WebRTCConnectionManager] Creating offer");
-    const offer = await this.pc.createOffer();
-    await this.pc.setLocalDescription(offer);
-    
-    console.log("[WebRTCConnectionManager] Local description set");
-    
     try {
-      if (!this.pc || !this.pc.localDescription) {
+      // Create peer connection
+      this.pc = createPeerConnection();
+      
+      if (!this.pc) {
+        console.error("[WebRTCConnectionManager] Failed to create peer connection");
+        throw new Error("Failed to create peer connection");
+      }
+      
+      // Set up event listeners for the peer connection
+      setupPeerConnectionListeners(this.pc, this.options, (state) => {
+        console.log(`[WebRTCConnectionManager] Connection state changed: ${state}`);
+        this.connectionState = state;
+        
+        // Clear timeout if connection is successful
+        if (state === "connected" && this.connectionTimeout) {
+          this.clearConnectionTimeout();
+          
+          // Configure the session after connection is established if data channel is ready
+          this.configureSessionWhenReady();
+        }
+      });
+      
+      // Create data channel for sending/receiving events - critical for OpenAI's protocol
+      console.log("[WebRTCConnectionManager] Creating data channel 'oai-events'");
+      this.dc = this.pc.createDataChannel("oai-events");
+      
+      // Set up event listeners for the data channel
+      setupDataChannelListeners(this.dc, this.options, () => {
+        // This will be called when the data channel opens
+        console.log("[WebRTCConnectionManager] Data channel is open and ready");
+        this.configureSessionWhenReady();
+      });
+      
+      // Create an offer and set local description
+      console.log("[WebRTCConnectionManager] Creating offer");
+      const offer = await this.pc.createOffer();
+      await this.pc.setLocalDescription(offer);
+      
+      console.log("[WebRTCConnectionManager] Local description set:", 
+        this.pc.localDescription ? `type: ${this.pc.localDescription.type}, length: ${this.pc.localDescription.sdp?.length || 0}` : "null");
+      
+      if (!this.pc.localDescription) {
         console.error("[WebRTCConnectionManager] No valid local description available");
         throw new Error("No valid local description available");
       }
-      
-      console.log("[WebRTCConnectionManager] Sending offer to OpenAI");
       
       // Set a timeout for the connection
       this.connectionTimeout = setTimeout(() => {
@@ -100,7 +103,8 @@ export class WebRTCConnectionManager extends ConnectionBase {
         this.disconnect();
       }, 15000) as unknown as number;
       
-      // Send the offer to OpenAI and get answer
+      // Send the offer to OpenAI's Realtime API and get answer
+      console.log("[WebRTCConnectionManager] Sending SDP offer to OpenAI");
       const result = await sendOffer(
         this.pc.localDescription, 
         apiKey, 
@@ -112,14 +116,14 @@ export class WebRTCConnectionManager extends ConnectionBase {
         throw new Error(result.error || "Failed to send offer");
       }
       
-      console.log("[WebRTCConnectionManager] Setting remote description from answer");
+      console.log("[WebRTCConnectionManager] Received SDP answer from OpenAI");
       
       try {
         // Set remote description from OpenAI response
         await this.pc.setRemoteDescription(result.answer);
         
         console.log("[WebRTCConnectionManager] Remote description set successfully");
-        console.log("[WebRTCConnectionManager] Connection established successfully");
+        console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
         
         return true;
       } catch (sdpError) {
