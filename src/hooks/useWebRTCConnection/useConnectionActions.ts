@@ -40,6 +40,7 @@ export function useConnectionActions(
     isMicrophoneActive,
     connectorRef,
     recorderRef,
+    audioProcessorRef,
     setIsMicrophoneActive
   );
 
@@ -61,17 +62,17 @@ export function useConnectionActions(
     getActiveAudioTrack
   );
 
+  // Monitor data channel readiness first before using it
+  const { isDataChannelReady } = useDataChannelStatus(
+    isConnected,
+    connectorRef
+  );
+  
   // Initialize message sending hooks
   const { sendTextMessage, commitAudioBuffer } = useMessageManager(
     isConnected,
     connectorRef,
     isDataChannelReady
-  );
-  
-  // Monitor data channel readiness
-  const { isDataChannelReady } = useDataChannelStatus(
-    isConnected,
-    connectorRef
   );
   
   // Initialize microphone prewarming

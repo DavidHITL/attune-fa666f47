@@ -82,6 +82,14 @@ export class AudioProcessor {
   }
 
   /**
+   * Stop audio processing and clean up resources
+   */
+  stop(): void {
+    console.log("[AudioProcessor] Stopping audio processor");
+    this.cleanup();
+  }
+
+  /**
    * Clean up resources
    */
   cleanup(): void {
