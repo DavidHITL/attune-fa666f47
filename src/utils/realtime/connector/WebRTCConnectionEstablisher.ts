@@ -1,7 +1,8 @@
-
 import { WebRTCOptions } from "../WebRTCTypes";
 import { SDPParser } from "../SDPParser"; 
 import { AudioSender } from './AudioSender';
+import { AudioTrackManager } from './AudioTrackManager';
+import { OpenAIRealtimeApiClient } from './OpenAIRealtimeApiClient';
 
 interface RTCPeerConnectionWithNewTracks extends RTCPeerConnection {
   addTrack(track: MediaStreamTrack, stream: MediaStream): RTCRtpSender;
@@ -46,28 +47,58 @@ export class WebRTCConnectionEstablisher {
         return null;
       }
 
-      // 2. Add Transceiver for Audio if audioTrack is provided
-      if (audioTrack) {
+      // 2. Add the audio track from microphone to the peer connection
+      let usedAudioTrack = audioTrack;
+      
+      // If no audio track was provided, try to get one directly
+      if (!usedAudioTrack) {
+        console.log("[WebRTCConnectionEstablisher] No audio track provided, attempting to get one");
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 24000 // Setting recommended sample rate for OpenAI
+            } 
+          });
+          usedAudioTrack = stream.getAudioTracks()[0];
+          console.log("[WebRTCConnectionEstablisher] Successfully acquired microphone track:", 
+            usedAudioTrack.label || "Unnamed track", 
+            "- ID:", usedAudioTrack.id);
+        } catch (err) {
+          console.warn("[WebRTCConnectionEstablisher] Could not access microphone:", err);
+          // Continue without audio track - we can still use data channel for text
+        }
+      }
+      
+      // Add the audio track if we have one (either provided or acquired)
+      if (usedAudioTrack) {
         console.log("[WebRTCConnectionEstablisher] Adding audio track to peer connection:", 
-          audioTrack.label || "Unnamed track", 
-          "- Enabled:", audioTrack.enabled, 
-          "- ID:", audioTrack.id);
+          usedAudioTrack.label || "Unnamed track", 
+          "- Enabled:", usedAudioTrack.enabled, 
+          "- ID:", usedAudioTrack.id);
         
         // Reset the audio state before adding the track
         AudioSender.resetAudioState();
         
-        // Add the audio track and create a transceiver with sendonly direction
-        const sender = (this.pc as RTCPeerConnectionWithNewTracks).addTrack(audioTrack, new MediaStream([audioTrack]));
+        // Create a new MediaStream with the track
+        const mediaStream = new MediaStream([usedAudioTrack]);
         
-        // Use addTransceiver method to set direction instead of directly setting it on the sender
+        // Add the track to the peer connection
+        const sender = this.pc.addTrack(usedAudioTrack, mediaStream);
+        console.log("[WebRTCConnectionEstablisher] Audio track added to peer connection with sender ID:", 
+          sender.track?.id || "unknown");
+          
+        // Use transceiver to set direction if needed
         const transceivers = this.pc.getTransceivers();
         const audioTransceiver = transceivers.find(t => t.sender === sender);
         if (audioTransceiver) {
-          audioTransceiver.direction = "sendonly";
+          audioTransceiver.direction = "sendrecv"; // Allow bi-directional audio
           console.log("[WebRTCConnectionEstablisher] Audio transceiver direction set to:", audioTransceiver.direction);
-        } else {
-          console.warn("[WebRTCConnectionEstablisher] Could not find audio transceiver");
         }
+      } else {
+        console.log("[WebRTCConnectionEstablisher] No audio track available, continuing without audio input");
       }
 
       // 3. Create Data Channel
@@ -78,44 +109,31 @@ export class WebRTCConnectionEstablisher {
         return null;
       }
 
-      // 4. Get Offer SDP from OpenAI
-      const offer = await this.getOfferSDP(apiKey);
-      if (!offer) {
-        console.error("[WebRTCConnectionEstablisher] Failed to get offer SDP");
-        this.closeConnection();
-        return null;
-      }
-
-      // 5. Set Remote Description
-      await this.pc.setRemoteDescription({ type: "offer", sdp: offer });
-      console.log("[WebRTCConnectionEstablisher] Remote description set");
-
-      // 6. Create and Set Answer
-      const answer = await this.pc.createAnswer();
-      await this.pc.setLocalDescription(answer);
+      // 4. Create offer
+      console.log("[WebRTCConnectionEstablisher] Creating offer");
+      const offer = await this.pc.createOffer();
+      await this.pc.setLocalDescription(offer);
       console.log("[WebRTCConnectionEstablisher] Local description set");
 
-      // 7. Send Answer SDP to OpenAI
-      const answerToSend = this.pc.localDescription?.sdp;
-      if (!answerToSend) {
-        console.error("[WebRTCConnectionEstablisher] Failed to get local description");
+      // 5. Send the offer to OpenAI and get answer
+      const offerResult = await OpenAIRealtimeApiClient.sendOffer(
+        this.pc.localDescription as RTCSessionDescription,
+        apiKey,
+        this.options?.model || "gpt-4o-realtime-preview-2024-12-17"
+      );
+      
+      if (!offerResult.success || !offerResult.answer) {
+        console.error("[WebRTCConnectionEstablisher] Failed to get answer SDP:", offerResult.error);
+        this.onError?.(new Error(offerResult.error || "Failed to get answer SDP"));
         this.closeConnection();
         return null;
       }
-
-      const iceCandidates = await this.sendAnswerSDP(apiKey, answerToSend);
-      if (!iceCandidates) {
-        console.error("[WebRTCConnectionEstablisher] Failed to send answer SDP");
-        this.closeConnection();
-        return null;
-      }
-
-      // 8. Add ICE Candidates
-      iceCandidates.forEach((candidate) => {
-        this.pc?.addIceCandidate(candidate);
-      });
-      console.log("[WebRTCConnectionEstablisher] ICE candidates added");
-
+      
+      // 6. Set Remote Description from the answer
+      await this.pc.setRemoteDescription(offerResult.answer);
+      console.log("[WebRTCConnectionEstablisher] Remote description set");
+      
+      console.log("[WebRTCConnectionEstablisher] WebRTC connection established successfully");
       return { pc: this.pc, dc: this.dc };
     } catch (error) {
       console.error("[WebRTCConnectionEstablisher] Error during connection establishment:", error);
@@ -195,92 +213,6 @@ export class WebRTCConnectionEstablisher {
       return dc;
     } catch (error) {
       console.error("[WebRTCConnectionEstablisher] Error creating data channel:", error);
-      this.onError?.(error);
-      return null;
-    }
-  }
-
-  /**
-   * Get the offer SDP from OpenAI
-   * @param apiKey OpenAI API key
-   */
-  private async getOfferSDP(apiKey: string): Promise<string | null> {
-    try {
-      const response = await fetch("https://api.openai.com/v1/audio/realtime/webrtc/offer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.options?.model,
-          voice: this.options?.voice,
-        }),
-      });
-
-      if (!response.ok) {
-        console.error(`[WebRTCConnectionEstablisher] Failed to get offer SDP, status: ${response.status}`);
-        this.onError?.(new Error(`Failed to get offer SDP, status: ${response.status}`));
-        return null;
-      }
-
-      const data = await response.json();
-      const offer = data.sdp;
-
-      if (!offer) {
-        console.error("[WebRTCConnectionEstablisher] Offer SDP is empty");
-        this.onError?.(new Error("Offer SDP is empty"));
-        return null;
-      }
-
-      return offer;
-    } catch (error) {
-      console.error("[WebRTCConnectionEstablisher] Error getting offer SDP:", error);
-      this.onError?.(error);
-      return null;
-    }
-  }
-
-  /**
-   * Send the answer SDP to OpenAI
-   * @param apiKey OpenAI API key
-   * @param answerSDP Answer SDP
-   */
-  private async sendAnswerSDP(apiKey: string, answerSDP: string): Promise<RTCIceCandidate[] | null> {
-    try {
-      const sdpObject = this.sdpParser.parseSDP(answerSDP);
-      const midValue = this.sdpParser.getMidValue(sdpObject);
-
-      const response = await fetch("https://api.openai.com/v1/audio/realtime/webrtc/answer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          sdp: answerSDP,
-          mid: midValue,
-        }),
-      });
-
-      if (!response.ok) {
-        console.error(`[WebRTCConnectionEstablisher] Failed to send answer SDP, status: ${response.status}`);
-        this.onError?.(new Error(`Failed to send answer SDP, status: ${response.status}`));
-        return null;
-      }
-
-      const data = await response.json();
-      const iceCandidates = data.ice_candidates;
-
-      if (!iceCandidates) {
-        console.error("[WebRTCConnectionEstablisher] ICE candidates are empty");
-        this.onError?.(new Error("ICE candidates are empty"));
-        return null;
-      }
-
-      return iceCandidates;
-    } catch (error) {
-      console.error("[WebRTCConnectionEstablisher] Error sending answer SDP:", error);
       this.onError?.(error);
       return null;
     }
