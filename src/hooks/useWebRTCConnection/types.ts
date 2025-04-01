@@ -1,3 +1,4 @@
+
 export interface WebRTCMessage {
   type: string;
   text?: string;
@@ -8,6 +9,7 @@ export interface WebRTCMessage {
 export interface MessageMetadata {
   messageType: 'text' | 'voice';
   instructions?: string;
+  knowledgeEntries?: any; // Add the missing property
 }
 
 export interface UseWebRTCConnectionOptions {
@@ -40,4 +42,14 @@ export interface WebRTCConnectionResult {
   commitAudioBuffer: () => boolean;
   getActiveMediaStream: () => MediaStream | null;
   getActiveAudioTrack: () => MediaStreamTrack | null;
+}
+
+// Add the missing WebRTCConnectionState interface
+export interface WebRTCConnectionState {
+  isConnected: boolean;
+  isConnecting: boolean;
+  isMicrophoneActive: boolean;
+  isAiSpeaking: boolean;
+  currentTranscript: string;
+  messages: WebRTCMessage[];
 }
