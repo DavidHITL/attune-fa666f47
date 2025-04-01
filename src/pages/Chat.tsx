@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import ChatInterface from "@/components/ChatInterface";
@@ -6,7 +5,7 @@ import SessionStartModal from "@/components/chat/SessionStartModal";
 import EndSessionDialog from "@/components/chat/EndSessionDialog";
 import ChatHeader from "@/components/chat/ChatHeader";
 import { useSessionManager } from "@/hooks/useSessionManager";
-import { fetchUserContext } from "@/services/contextEnrichmentService";
+import { fetchUserContext } from "@/services/context";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 

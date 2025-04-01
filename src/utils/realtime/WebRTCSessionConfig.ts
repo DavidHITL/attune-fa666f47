@@ -1,6 +1,6 @@
 
 import { WebRTCOptions } from "./WebRTCTypes";
-import { enhanceInstructionsWithContext } from "@/services/contextEnrichmentService";
+import { enhanceInstructionsWithContext } from "@/services/context";
 
 /**
  * Configure the WebRTC session after connection is established

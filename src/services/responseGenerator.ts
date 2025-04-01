@@ -2,7 +2,7 @@
 import { Message } from "@/components/MessageBubble";
 import { createMessageObject } from "./chatApiService";
 import { withSecureOpenAI } from "./api/ephemeralKeyService";
-import { fetchUserContext } from "./contextEnrichmentService";
+import { fetchUserContext } from "@/services/context";
 import { TherapyConcept, TherapySource } from "./terryRealKnowledgeService";
 
 /**
