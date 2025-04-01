@@ -29,14 +29,14 @@ export class ConnectionBase {
    * Clear the connection timeout
    */
   protected clearConnectionTimeout(): void {
-    this.connectionTimeout.clear();
+    this.connectionTimeout.clearTimeout();
   }
   
   /**
    * Set a connection timeout that will fire if connection takes too long
    */
   protected setConnectionTimeout(timeoutCallback: () => void, timeoutMs: number = 15000): void {
-    this.connectionTimeout.set(timeoutCallback, timeoutMs);
+    this.connectionTimeout.setTimeout(timeoutCallback, timeoutMs);
   }
   
   /**
