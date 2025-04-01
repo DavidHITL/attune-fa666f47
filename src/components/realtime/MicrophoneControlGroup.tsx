@@ -46,7 +46,7 @@ const MicrophoneControlGroup: React.FC<MicrophoneControlGroupProps> = ({
         isConnecting={isConnecting}
         isMicrophoneActive={isMicrophoneActive}
         isAiSpeaking={isAiSpeaking}
-        onDisconnect={onClose}
+        onToggleMicrophone={onToggleMicrophone}
         onClose={onClose}
       />
     </div>
