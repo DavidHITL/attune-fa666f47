@@ -32,7 +32,8 @@ export async function handleRequest(req: Request): Promise<Response> {
       therapySources: contextData.therapySources?.length || 0,
       recentMessages: contextData.recentMessages?.length || 0,
       userDetails: contextData.userDetails ? Object.keys(contextData.userDetails).length : 0,
-      criticalInformation: contextData.criticalInformation?.length || 0
+      criticalInformation: contextData.criticalInformation?.length || 0,
+      analysisResults: contextData.analysisResults ? "present" : "absent"
     });
   }
 
@@ -56,6 +57,31 @@ export async function handleRequest(req: Request): Promise<Response> {
     
     if (contextData.criticalInformation?.length) {
       systemPrompt = `CRITICAL THERAPEUTIC INSIGHTS (maintain awareness of these):\n${contextData.criticalInformation.join('\n')}\n\n${systemPrompt}`;
+    }
+    
+    // Add analysis results if available
+    if (contextData.analysisResults) {
+      let analysisText = "USER ANALYSIS RESULTS:\n";
+      
+      if (contextData.analysisResults.summary) {
+        analysisText += `Summary: ${contextData.analysisResults.summary}\n`;
+      }
+      
+      if (contextData.analysisResults.keywords && contextData.analysisResults.keywords.length) {
+        analysisText += `Key Themes: ${contextData.analysisResults.keywords.join(', ')}\n`;
+      }
+      
+      if (contextData.analysisResults.losingStrategies) {
+        const strategies = contextData.analysisResults.losingStrategies;
+        analysisText += "Losing Strategies Analysis:\n";
+        if ('beingRight' in strategies) analysisText += `- Being Right: ${strategies.beingRight}/5\n`;
+        if ('controlling' in strategies) analysisText += `- Controlling: ${strategies.controlling}/5\n`;
+        if ('unbridledSelfExpression' in strategies) analysisText += `- Unbridled Self-Expression: ${strategies.unbridledSelfExpression}/5\n`;
+        if ('retaliation' in strategies) analysisText += `- Retaliation: ${strategies.retaliation}/5\n`;
+        if ('withdrawal' in strategies) analysisText += `- Withdrawal: ${strategies.withdrawal}/5\n`;
+      }
+      
+      systemPrompt = `${analysisText}\n\n${systemPrompt}`;
     }
     
     if (contextData.therapyConcepts?.length) {

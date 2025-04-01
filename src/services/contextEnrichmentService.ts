@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMessagesWithMetadata } from "@/services/messages/messageStorage";
 
@@ -12,13 +11,24 @@ export interface ContextData {
   knowledgeEntries?: any[];
   userDetails?: Record<string, string>; // For consistent personal details like names
   criticalInformation?: string[]; // For important therapeutic insights that must be retained
+  analysisResults?: {
+    summary?: string;
+    keywords?: string[];
+    losingStrategies?: {
+      beingRight: number;
+      unbridledSelfExpression: number;
+      controlling: number;
+      retaliation: number;
+      withdrawal: number;
+    };
+  }; // New field for analysis results
 }
 
 /**
  * Maximum number of messages to include in context
- * Increased from 15 to 25 for better continuity
+ * Increased from 25 to 100 for better continuity
  */
-const MAX_MESSAGE_COUNT = 25;
+const MAX_MESSAGE_COUNT = 100;
 
 /**
  * Format chat history for the AI context window
@@ -101,6 +111,35 @@ const extractCriticalInformation = (messages: any[]): string[] => {
 };
 
 /**
+ * Fetch user's analysis results from database
+ */
+const fetchAnalysisResults = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('analysis_results')
+      .select('summary_text, keywords, losing_strategy_flags')
+      .eq('user_id', userId)
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (error || !data) {
+      console.log("No analysis results found or error:", error);
+      return null;
+    }
+    
+    return {
+      summary: data.summary_text,
+      keywords: data.keywords,
+      losingStrategies: data.losing_strategy_flags
+    };
+  } catch (err) {
+    console.error("Error fetching analysis results:", err);
+    return null;
+  }
+};
+
+/**
  * Fetch user context data from Supabase
  */
 export const fetchUserContext = async (userId?: string): Promise<ContextData | null> => {
@@ -155,6 +194,9 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
     // Extract critical information
     const criticalInformation = extractCriticalInformation(messages);
     
+    // Fetch analysis results
+    const analysisResults = await fetchAnalysisResults(userId);
+    
     // Create a summary
     const historySummary = messages.length > 0 
       ? `User has ${messages.length} previous messages in conversation history.` 
@@ -166,7 +208,8 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
       userInstructions: customInstructions || undefined,
       knowledgeEntries: knowledgeEntries.length > 0 ? knowledgeEntries : undefined,
       userDetails: Object.keys(userDetails).length > 0 ? userDetails : undefined,
-      criticalInformation: criticalInformation.length > 0 ? criticalInformation : undefined
+      criticalInformation: criticalInformation.length > 0 ? criticalInformation : undefined,
+      analysisResults: analysisResults || undefined
     };
   } catch (error) {
     console.error("Error fetching user context:", error);
@@ -203,6 +246,29 @@ export const enhanceInstructionsWithContext = async (
   // Add critical information that should be remembered across sessions
   if (userContext.criticalInformation?.length) {
     enrichedInstructions += `\n\nCRITICAL THERAPEUTIC INSIGHTS (maintain awareness of these):\n${userContext.criticalInformation.join('\n')}`;
+  }
+  
+  // Add analysis results if available
+  if (userContext.analysisResults) {
+    enrichedInstructions += "\n\nUSER ANALYSIS RESULTS:";
+    
+    if (userContext.analysisResults.summary) {
+      enrichedInstructions += `\nSummary: ${userContext.analysisResults.summary}`;
+    }
+    
+    if (userContext.analysisResults.keywords && userContext.analysisResults.keywords.length > 0) {
+      enrichedInstructions += `\nKey Themes: ${userContext.analysisResults.keywords.join(', ')}`;
+    }
+    
+    if (userContext.analysisResults.losingStrategies) {
+      const strategies = userContext.analysisResults.losingStrategies;
+      enrichedInstructions += "\nLosing Strategies Analysis:";
+      if ('beingRight' in strategies) enrichedInstructions += `\n- Being Right: ${strategies.beingRight}/5`;
+      if ('controlling' in strategies) enrichedInstructions += `\n- Controlling: ${strategies.controlling}/5`;
+      if ('unbridledSelfExpression' in strategies) enrichedInstructions += `\n- Unbridled Self-Expression: ${strategies.unbridledSelfExpression}/5`;
+      if ('retaliation' in strategies) enrichedInstructions += `\n- Retaliation: ${strategies.retaliation}/5`;
+      if ('withdrawal' in strategies) enrichedInstructions += `\n- Withdrawal: ${strategies.withdrawal}/5`;
+    }
   }
   
   // Add user instructions if available

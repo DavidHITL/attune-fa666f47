@@ -49,6 +49,9 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
         priority_hints: [
           "Maintain consistent awareness of user details across the conversation",
           "Remember important personal details like names and relationship history",
+          "Apply insights from previous pattern analysis to current interaction",
+          "Maintain continuity between text and voice conversations",
+          "Prioritize remembering personal names and relationship details",
           "Provide continuous therapeutic support without forgetting previously discussed topics"
         ]
       }

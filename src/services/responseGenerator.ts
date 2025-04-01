@@ -44,7 +44,8 @@ export const generateResponse = async (
         hasInstructions: !!contextData.userInstructions,
         knowledgeEntries: contextData.knowledgeEntries?.length || 0,
         userDetails: contextData.userDetails ? Object.keys(contextData.userDetails).length : 0,
-        criticalInformation: contextData.criticalInformation?.length || 0
+        criticalInformation: contextData.criticalInformation?.length || 0,
+        hasAnalysisResults: !!contextData.analysisResults
       });
     }
 
@@ -65,7 +66,8 @@ export const generateResponse = async (
               therapyConcepts: contextData.knowledgeEntries?.filter(k => k.type === 'concept'),
               therapySources: contextData.knowledgeEntries?.filter(k => k.type === 'source'),
               userDetails: contextData.userDetails,
-              criticalInformation: contextData.criticalInformation
+              criticalInformation: contextData.criticalInformation,
+              analysisResults: contextData.analysisResults
             } : null
           })
         });

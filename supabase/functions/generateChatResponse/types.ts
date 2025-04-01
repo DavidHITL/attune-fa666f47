@@ -7,7 +7,18 @@ export interface RequestBody {
     therapyConcepts?: any[];
     therapySources?: any[];
     recentMessages?: string[];
-    userDetails?: Record<string, string>; // New field for consistent user details
-    criticalInformation?: string[]; // New field for critical information to always include
+    userDetails?: Record<string, string>; // User details field
+    criticalInformation?: string[]; // Critical information field
+    analysisResults?: {
+      summary?: string;
+      keywords?: string[];
+      losingStrategies?: {
+        beingRight: number;
+        unbridledSelfExpression: number;
+        controlling: number;
+        retaliation: number;
+        withdrawal: number;
+      };
+    }; // New field for analysis results
   };
 }
