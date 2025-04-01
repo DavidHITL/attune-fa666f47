@@ -1,40 +1,33 @@
 
 /**
- * Handles sending audio data through WebRTC data channel
- * NOTE: This class is now mostly deprecated as we now use direct WebRTC audio track
- * instead of sending audio data through the data channel. It's kept for compatibility
- * and for the commitAudioBuffer functionality, which is still useful.
+ * Utility class for sending audio data and audio-related commands
+ * via WebRTC data channel
  */
 export class AudioSender {
-  private static lastAudioSentTimestamp = 0;
-  private static audioChunkCounter = 0;
-  
   /**
-   * Send commit event to indicate the end of an audio segment
-   * This tells OpenAI that the current utterance is complete
-   * @param dc Data channel to send the commit through
-   * @returns Whether the commit was successful
+   * Commits the current audio buffer to signal the end of an utterance
+   * This tells OpenAI that the current audio segment is complete
+   * @param dc The WebRTC data channel to use for sending
+   * @returns Boolean indicating success
    */
-  static commitAudioBuffer(dc: RTCDataChannel): boolean {
-    if (dc.readyState !== "open") {
-      console.error(`[AudioSender] Data channel not open for audio commit, current state: ${dc.readyState}`);
+  static commitAudioBuffer(dc: RTCDataChannel | null): boolean {
+    if (!dc || dc.readyState !== "open") {
+      console.error("[AudioSender] Data channel not open for committing audio buffer");
       return false;
     }
     
     try {
-      console.log("[AudioSender] Committing audio buffer, signaling end of user speech");
+      // Send a simple commit event to notify the server
+      // OpenAI needs this with server VAD to allow for manual end-of-utterance signals
+      const commitEvent = {
+        type: 'input_audio_buffer.commit',
+      };
       
-      // Send the commit event
-      dc.send(JSON.stringify({
-        type: 'input_audio_buffer.commit'
-      }));
-      
-      // Reset chunk counter after commit
-      this.audioChunkCounter = 0;
-      
+      dc.send(JSON.stringify(commitEvent));
+      console.log("[AudioSender] Audio buffer commit signal sent");
       return true;
     } catch (error) {
-      console.error("[AudioSender] Error committing audio buffer:", error);
+      console.error("[AudioSender] Error sending audio buffer commit:", error);
       return false;
     }
   }

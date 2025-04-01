@@ -73,8 +73,11 @@ export function useMicrophoneControl(
       // Stop recording 
       // Note: We're not using this for audio sending anymore, but for controlling the mic UI state
       recorderRef.current.stop();
+      
       // Don't clear the mediaStreamRef if we're just pausing - keep it for fast resume
-      const shouldPreserveStream = true; // Set to false if you want to release resources immediately
+      // IMPORTANT: We're specifically NOT destroying the peer connection or disconnecting
+      // when just toggling the mic off
+      const shouldPreserveStream = true; // Keep the stream for fast resume
       
       if (!shouldPreserveStream) {
         if (mediaStreamRef.current) {
@@ -87,6 +90,7 @@ export function useMicrophoneControl(
       setIsMicrophoneActive(false);
       
       // Send a commit signal to let OpenAI know we're done speaking
+      // but DO NOT disconnect the entire session
       if (connectorRef.current) {
         connectorRef.current.commitAudioBuffer();
       }

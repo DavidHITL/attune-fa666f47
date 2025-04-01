@@ -72,6 +72,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     // If already active, just toggle off
     if (isMicrophoneActive) {
       // When turning off the mic, commit the audio buffer to signal the end of the utterance
+      // But DO NOT disconnect the entire session!
       if (isConnected) {
         commitAudioBuffer();
       }
@@ -158,9 +159,12 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     saveTranscript();
   }, [isAiSpeaking, currentTranscript, user, systemPrompt]);
 
-  // Handle component unmount
+  // Handle component unmount - only disconnect when truly ending the session
   useEffect(() => {
     return () => {
+      // Only disconnect the WebRTC connection when the component is unmounting
+      // This ensures we don't disconnect when just toggling the microphone
+      console.log("[VoiceChat] Component unmounting, disconnecting WebRTC connection");
       disconnect();
     };
   }, [disconnect]);
