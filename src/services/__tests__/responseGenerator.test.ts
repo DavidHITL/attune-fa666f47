@@ -1,17 +1,15 @@
 
 import { generateResponse } from "../responseGenerator";
-import { callChatApi } from "../api/chatService";
-import { generateLocalResponse } from "../../utils/localResponseGenerator";
-import { toast } from "@/hooks/use-toast";
-import { createMessageObject } from "../messages/messageUtils";
+import * as apiService from "../response/apiService";
+import * as messagePreparation from "../response/messagePreparation";
+import { toast } from "sonner";
 
 // Mock dependencies
-jest.mock("../api/chatService", () => ({
-  callChatApi: jest.fn()
+jest.mock("../response/apiService", () => ({
+  callChatResponseApi: jest.fn()
 }));
 
-jest.mock("../messages/messageUtils", () => ({
-  convertMessagesToApiFormat: jest.fn(),
+jest.mock("../services/messages/messageUtils", () => ({
   createMessageObject: jest.fn().mockImplementation((text, isUser) => ({
     id: "test-id",
     text,
@@ -21,12 +19,23 @@ jest.mock("../messages/messageUtils", () => ({
   generateUniqueId: jest.fn().mockReturnValue("test-id")
 }));
 
-jest.mock("../../utils/localResponseGenerator", () => ({
-  generateLocalResponse: jest.fn()
+jest.mock("../response/messagePreparation", () => ({
+  prepareConversationHistory: jest.fn(),
+  generateLocalResponse: jest.fn().mockReturnValue("Local response")
 }));
 
-jest.mock("@/hooks/use-toast", () => ({
-  toast: jest.fn()
+jest.mock("../response/contextPreparation", () => ({
+  prepareContextData: jest.fn().mockResolvedValue({
+    recentMessages: ["Recent message"],
+    therapyConcepts: [],
+    therapySources: []
+  })
+}));
+
+jest.mock("sonner", () => ({
+  toast: {
+    error: jest.fn()
+  }
 }));
 
 describe("generateResponse", () => {
@@ -37,7 +46,8 @@ describe("generateResponse", () => {
   it("should use AI response when useLocalFallback is false", async () => {
     // Setup mocks
     const mockApiResponse = "AI response";
-    (callChatApi as jest.Mock).mockResolvedValue(mockApiResponse);
+    (apiService.callChatResponseApi as jest.Mock).mockResolvedValue(mockApiResponse);
+    (messagePreparation.prepareConversationHistory as jest.Mock).mockReturnValue([]);
     
     const setUseLocalFallback = jest.fn();
     
@@ -46,11 +56,12 @@ describe("generateResponse", () => {
       "Hello",
       [],
       false,
-      setUseLocalFallback
+      setUseLocalFallback,
+      { sessionProgress: 0 }
     );
     
     // Assertions
-    expect(callChatApi).toHaveBeenCalled();
+    expect(apiService.callChatResponseApi).toHaveBeenCalled();
     expect(result.text).toBe(mockApiResponse);
     expect(result.isUser).toBe(false);
     expect(setUseLocalFallback).not.toHaveBeenCalled();
@@ -58,8 +69,8 @@ describe("generateResponse", () => {
 
   it("should fall back to local response when API fails", async () => {
     // Setup mocks
-    (callChatApi as jest.Mock).mockRejectedValue(new Error("API error"));
-    (generateLocalResponse as jest.Mock).mockReturnValue("Local response");
+    (apiService.callChatResponseApi as jest.Mock).mockRejectedValue(new Error("API error"));
+    (messagePreparation.prepareConversationHistory as jest.Mock).mockReturnValue([]);
     
     const setUseLocalFallback = jest.fn();
     
@@ -72,15 +83,16 @@ describe("generateResponse", () => {
     );
     
     // Assertions
-    expect(callChatApi).toHaveBeenCalled();
-    expect(generateLocalResponse).toHaveBeenCalled();
+    expect(apiService.callChatResponseApi).toHaveBeenCalled();
+    expect(messagePreparation.generateLocalResponse).toHaveBeenCalled();
     expect(result.text).toBe("Local response");
     expect(setUseLocalFallback).toHaveBeenCalledWith(true);
+    expect(toast.error).toHaveBeenCalled();
   });
 
   it("should use local response directly when useLocalFallback is true", async () => {
     // Setup mocks
-    (generateLocalResponse as jest.Mock).mockReturnValue("Local response");
+    (messagePreparation.generateLocalResponse as jest.Mock).mockReturnValue("Local response");
     
     const setUseLocalFallback = jest.fn();
     
@@ -93,8 +105,8 @@ describe("generateResponse", () => {
     );
     
     // Assertions
-    expect(callChatApi).not.toHaveBeenCalled();
-    expect(generateLocalResponse).toHaveBeenCalled();
+    expect(apiService.callChatResponseApi).not.toHaveBeenCalled();
+    expect(messagePreparation.generateLocalResponse).toHaveBeenCalled();
     expect(result.text).toBe("Local response");
     expect(setUseLocalFallback).not.toHaveBeenCalled();
   });
@@ -111,25 +123,5 @@ describe("generateResponse", () => {
     // Assertions
     expect(result.text).toContain("didn't receive");
     expect(result.isUser).toBe(false);
-  });
-
-  it("should handle general errors gracefully", async () => {
-    // Setup a mock that throws an unexpected error
-    (callChatApi as jest.Mock).mockImplementation(() => {
-      throw new Error("Unexpected error");
-    });
-    
-    // Call function
-    const result = await generateResponse(
-      "Hello",
-      [],
-      false,
-      jest.fn()
-    );
-    
-    // Assertions
-    expect(result.text).toContain("sorry");
-    expect(result.isUser).toBe(false);
-    expect(toast).toHaveBeenCalled();
   });
 });

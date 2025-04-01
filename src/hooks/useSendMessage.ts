@@ -2,7 +2,7 @@
 import { useState, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { generateResponse } from "@/services/responseGenerator";
-import { createMessageObject } from "@/services/chatApiService";
+import { createMessageObject } from "@/services/messages/messageUtils";
 import { useAuth } from "@/context/AuthContext";
 
 interface UseSendMessageProps {
@@ -12,7 +12,7 @@ interface UseSendMessageProps {
   setUseLocalFallback: React.Dispatch<React.SetStateAction<boolean>>;
   saveMessageToDatabase: (text: string, isUser: boolean) => Promise<any>;
   isSpeechEnabled: boolean;
-  sessionProgress?: number; // New prop for session progress
+  sessionProgress?: number;
 }
 
 export function useSendMessage({
@@ -22,13 +22,13 @@ export function useSendMessage({
   setUseLocalFallback,
   saveMessageToDatabase,
   isSpeechEnabled,
-  sessionProgress = 0 // Default to 0 if not provided
+  sessionProgress = 0
 }: UseSendMessageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
   const handleSendMessage = useCallback(async (text: string) => {
-    if (!text.trim()) return; // Don't send empty messages
+    if (!text.trim()) return;
     
     if (!user) {
       console.error("Authentication required to send messages");
@@ -70,13 +70,13 @@ export function useSendMessage({
         }
       }
       
-      // Generate bot response with session progress
+      // Generate bot response with session progress and context enrichment
       const botResponse = await generateResponse(
         text, 
         messages, 
         useLocalFallback, 
         setUseLocalFallback,
-        sessionProgress // Pass the session progress
+        { sessionProgress }
       );
 
       // Try to save bot response to database if not in local fallback mode
