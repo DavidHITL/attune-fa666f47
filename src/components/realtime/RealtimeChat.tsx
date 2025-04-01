@@ -23,25 +23,25 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex justify-between items-center">
             <span>Voice Chat</span>
-            <Tabs defaultValue="voice-chat" value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid grid-cols-3 w-full">
-                <TabsTrigger value="voice-chat">Voice</TabsTrigger>
-                <TabsTrigger value="connection">Connection</TabsTrigger>
-                <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
-              </TabsList>
-            </Tabs>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <TabsContent value="voice-chat" className="mt-2">
-            <VoiceChat />
-          </TabsContent>
-          <TabsContent value="connection" className="mt-2">
-            <ConnectionTest />
-          </TabsContent>
-          <TabsContent value="diagnostics" className="mt-2">
-            <WebRTCDiagnostics />
-          </TabsContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-3 w-full">
+              <TabsTrigger value="voice-chat">Voice</TabsTrigger>
+              <TabsTrigger value="connection">Connection</TabsTrigger>
+              <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
+            </TabsList>
+            <TabsContent value="voice-chat" className="mt-2">
+              <VoiceChat />
+            </TabsContent>
+            <TabsContent value="connection" className="mt-2">
+              <ConnectionTest />
+            </TabsContent>
+            <TabsContent value="diagnostics" className="mt-2">
+              <WebRTCDiagnostics />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
