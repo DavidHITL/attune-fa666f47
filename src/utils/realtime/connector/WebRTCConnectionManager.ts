@@ -4,6 +4,7 @@ import { ConnectionBase } from "./ConnectionBase";
 import { TextMessageSender } from "./TextMessageSender";
 import { SessionManager } from "./SessionManager";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
+import { AudioSender } from "./AudioSender";
 
 export class WebRTCConnectionManager extends ConnectionBase {
   private pc: RTCPeerConnection | null = null;
@@ -134,15 +135,11 @@ export class WebRTCConnectionManager extends ConnectionBase {
     }
     
     try {
-      // Send a simple commit event to notify the server
       console.log("[WebRTCConnectionManager] Committing audio buffer");
       
-      const commitEvent = {
-        type: 'input_audio_buffer.commit',
-      };
-      
-      this.dc.send(JSON.stringify(commitEvent));
-      return true;
+      // With the direct audio track approach, we now use AudioSender.commitAudioBuffer
+      // which handles the specific event format
+      return AudioSender.commitAudioBuffer(this.dc);
     } catch (error) {
       console.error("[WebRTCConnectionManager] Error committing audio buffer:", error);
       this.handleError(error);
