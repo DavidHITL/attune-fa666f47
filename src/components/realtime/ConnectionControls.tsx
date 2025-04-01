@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Power, PowerOff } from "lucide-react";
+import { Power, PowerOff } from "lucide-react";
 import MicrophoneButton from './MicrophoneButton';
 import ConnectionStatus from './ConnectionStatus';
 

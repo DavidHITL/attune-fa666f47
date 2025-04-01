@@ -2,48 +2,39 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff } from "lucide-react";
-import { toast } from "sonner";
 
 interface MicrophoneButtonProps {
-  isConnected: boolean;
-  isMicrophoneActive: boolean;
-  microphonePermission: PermissionState | null;
-  onToggle: () => Promise<boolean>;
+  isActive: boolean;
+  isDisabled: boolean;
+  onClick: () => Promise<boolean>;
+  className?: string;
 }
 
 const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
-  isConnected,
-  isMicrophoneActive,
-  microphonePermission,
-  onToggle,
+  isActive,
+  isDisabled,
+  onClick,
+  className = ""
 }) => {
-  if (!isConnected) return null;
-  
-  let buttonVariant: "default" | "destructive" | "outline" = "outline";
-  let buttonTitle = "Enable microphone";
-  let buttonIcon = <Mic size={16} />;
-  let isDisabled = false;
-  
-  if (isMicrophoneActive) {
-    buttonVariant = "destructive";
-    buttonTitle = "Disable microphone";
-    buttonIcon = <MicOff size={16} />;
-  } else if (microphonePermission === 'denied') {
-    buttonTitle = "Microphone blocked by browser";
-    isDisabled = true;
-  }
+  const handleClick = async () => {
+    try {
+      await onClick();
+    } catch (error) {
+      console.error("Error toggling microphone:", error);
+    }
+  };
   
   return (
-    <Button
+    <Button 
       size="sm"
-      variant={buttonVariant}
-      onClick={onToggle}
+      variant={isActive ? "destructive" : "outline"}
+      onClick={handleClick}
       disabled={isDisabled}
-      className="flex items-center gap-1"
-      title={buttonTitle}
+      className={`flex items-center gap-1 ${className}`}
+      title={isActive ? "Disable microphone" : "Enable microphone"}
     >
-      {buttonIcon}
-      {isMicrophoneActive ? "Mute" : "Speak"}
+      {isActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+      {isActive ? "Mute" : "Speak"}
     </Button>
   );
 };
