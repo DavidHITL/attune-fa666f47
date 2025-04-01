@@ -5,8 +5,8 @@
  */
 export class SilenceDetector {
   private silenceFrames: number = 0;
-  private readonly silenceThreshold: number;
-  private readonly silenceDurationThreshold: number;
+  private silenceThreshold: number;
+  private silenceDurationThreshold: number;
   private onSilenceDetectedCallback: (() => void) | null = null;
   private lastRmsValue: number = 0;
 
