@@ -1,3 +1,4 @@
+
 import { useCallback, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
@@ -94,14 +95,15 @@ export function useMicrophoneControl(
           return false;
         }
         
-        // Create the recorder with our callback
+        // Create the recorder with our callback to continuously send audio data
         const recorder = new AudioRecorder({
           onAudioData: (audioData) => {
             // Send audio data if connection is active
             if (connectorRef.current) {
               connectorRef.current.sendAudioData(audioData);
             }
-          }
+          },
+          timeslice: 100 // Send audio data every 100ms
         });
         
         // If we already have a stream, try to reuse it
@@ -144,7 +146,7 @@ export function useMicrophoneControl(
         return false;
       }
     }
-  }, [isConnected, isMicrophoneActive, connectorRef, setIsMicrophoneActive]);
+  }, [isConnected, isMicrophoneActive, connectorRef, recorderRef, setIsMicrophoneActive]);
 
   /**
    * Get the current active MediaStream, if available

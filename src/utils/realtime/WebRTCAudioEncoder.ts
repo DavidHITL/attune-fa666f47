@@ -1,6 +1,7 @@
 
 /**
  * Encode audio data for sending to OpenAI
+ * Converts Float32Array to base64-encoded PCM16 data
  */
 export function encodeAudioData(float32Array: Float32Array): string {
   const int16Array = new Int16Array(float32Array.length);

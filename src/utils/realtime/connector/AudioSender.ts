@@ -7,6 +7,9 @@ import { encodeAudioData } from "../WebRTCAudioEncoder";
 export class AudioSender {
   /**
    * Send audio data to OpenAI
+   * @param dc Data channel to send audio through
+   * @param audioData Float32Array of audio samples
+   * @returns Whether the send was successful
    */
   static sendAudioData(dc: RTCDataChannel, audioData: Float32Array): boolean {
     if (dc.readyState !== "open") {
@@ -18,7 +21,8 @@ export class AudioSender {
       // Convert Float32Array to PCM16 format and encode as base64
       const encodedAudio = encodeAudioData(audioData);
       
-      // Send the audio buffer
+      // Send the audio buffer in the format OpenAI expects
+      // This must be a JSON object with type and audio fields
       dc.send(JSON.stringify({
         type: 'input_audio_buffer.append',
         audio: encodedAudio

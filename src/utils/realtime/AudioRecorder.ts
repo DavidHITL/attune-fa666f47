@@ -3,6 +3,7 @@ export interface AudioRecorderOptions {
   onAudioData?: (audioData: Float32Array) => void;
   sampleRate?: number;
   chunkSize?: number;
+  timeslice?: number;
 }
 
 export class AudioRecorder {
@@ -12,11 +13,13 @@ export class AudioRecorder {
   private source: MediaStreamAudioSourceNode | null = null;
   private options: AudioRecorderOptions;
   private isRecording: boolean = false;
+  private processingInterval: number | null = null;
 
   constructor(options: AudioRecorderOptions = {}) {
     this.options = {
       sampleRate: 24000, // OpenAI requires 24kHz
       chunkSize: 4096,
+      timeslice: 100, // Send audio data every 100ms
       ...options
     };
   }
@@ -78,7 +81,7 @@ export class AudioRecorder {
         1  // Output channels
       );
       
-      // Set up the audio processing callback
+      // Set up the audio processing callback to continuously process audio data
       this.processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
         
@@ -110,6 +113,12 @@ export class AudioRecorder {
   stop(releaseStream: boolean = true): void {
     console.log("[AudioRecorder] Stopping recording");
     
+    // Clear processing interval if it exists
+    if (this.processingInterval !== null) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = null;
+    }
+
     // Disconnect and clean up source
     if (this.source) {
       this.source.disconnect();
