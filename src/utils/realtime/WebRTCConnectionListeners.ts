@@ -66,7 +66,26 @@ export function setupPeerConnectionListeners(
       // Track events for the remote audio track
       event.track.onunmute = () => console.log("[WebRTC] Remote audio track unmuted - AI is speaking");
       event.track.onmute = () => console.log("[WebRTC] Remote audio track muted - AI stopped speaking");
-      event.track.onended = () => console.log("[WebRTC] Remote audio track ended");
+      event.track.onended = () => {
+        console.log("[WebRTC] Remote audio track ended");
+        
+        // Check if this was an unexpected ending
+        if (pc.connectionState === 'connected' && pc.iceConnectionState === 'connected') {
+          console.warn("[WebRTC] Remote audio track ended unexpectedly while connection is still active");
+          
+          // Notify about potential issue
+          if (options.onError) {
+            options.onError(new Error("Remote audio track ended unexpectedly"));
+          }
+          
+          // If connection is active but track ended, consider it might need reconnection
+          if (options.onConnectionStateChange) {
+            // We don't change the actual connection state, but we signal a problem
+            // that the application layer can handle
+            options.onConnectionStateChange('disconnected');
+          }
+        }
+      };
     }
     
     if (options.onTrack) {
@@ -121,10 +140,24 @@ export function setupPeerConnectionListeners(
         console.log("[WebRTC] oai-events channel opened and ready for communication");
       };
       
-      // Track channel closing - log only, don't close the connection
+      // Track channel closing - now we handle unexpected closure
       channel.onclose = () => {
-        console.log("[WebRTC] oai-events channel closed");
-        // We only log this event, not taking any action to close the connection
+        console.warn("[WebRTC] oai-events channel closed");
+        
+        // Check if the data channel closed while the connection is still active
+        if (pc.connectionState === 'connected') {
+          console.error("[WebRTC] Data channel closed unexpectedly while connection is active");
+          
+          // Notify about this issue
+          if (options.onError) {
+            options.onError(new Error("Data channel closed unexpectedly"));
+          }
+          
+          // Trigger connection state change to initiate recovery
+          if (options.onConnectionStateChange && pc.connectionState === 'connected') {
+            options.onConnectionStateChange('disconnected');
+          }
+        }
       };
       
       // Enhanced error handling - log detailed error information
@@ -145,7 +178,10 @@ export function setupPeerConnectionListeners(
           console.error("[WebRTC] Error object:", error);
         }
         
-        // We only log errors, not taking any action to close the connection
+        // Propagate the error to the error handler
+        if (options.onError) {
+          options.onError(error instanceof RTCErrorEvent ? error.error : error);
+        }
       };
     }
   };

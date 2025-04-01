@@ -82,7 +82,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
       }
       
       this.connectionStateManager.setPeerConnection(connection.pc);
-      this.dataChannelHandler.setDataChannel(connection.dc);
+      this.dataChannelHandler.setDataChannel(connection.dc, this.handleError.bind(this));
       
       console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
       return true;
@@ -187,6 +187,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.clearConnectionTimeout();
     this.connectionEstablisher.cleanup();
     this.dataChannelHandler.setDataChannelReady(false);
+    this.dataChannelHandler.cleanup();
     
     // Reset session configuration
     if (this.sessionManager) {

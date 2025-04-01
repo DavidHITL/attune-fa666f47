@@ -23,6 +23,15 @@ export function setupDataChannelListeners(
   
   dc.onclose = () => {
     console.log(`[WebRTC] Data channel '${dc.label}' closed, readyState: ${dc.readyState}`);
+    
+    // Report unexpected closures as errors
+    if (dc.readyState === 'closing' || dc.readyState === 'closed') {
+      console.warn(`[WebRTC] Data channel '${dc.label}' was closed unexpectedly`);
+      
+      if (options.onError) {
+        options.onError(new Error(`Data channel '${dc.label}' closed unexpectedly`));
+      }
+    }
   };
   
   dc.onerror = (event) => {
@@ -39,6 +48,11 @@ export function setupDataChannelListeners(
       });
     } else {
       console.error("[WebRTC] Error event:", event);
+    }
+    
+    // Propagate the error
+    if (options.onError) {
+      options.onError(event instanceof RTCErrorEvent ? event.error : new Error("Data channel error"));
     }
   };
   
