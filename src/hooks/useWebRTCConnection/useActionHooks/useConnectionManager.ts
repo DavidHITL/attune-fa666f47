@@ -4,6 +4,7 @@ import { UseWebRTCConnectionOptions, WebRTCMessage } from "../types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
+import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 
 /**
  * Hook to manage WebRTC connection establishment and disconnection
@@ -63,6 +64,14 @@ export function useConnectionManager(
     }
   }, [isConnected, isConnecting, connectorRef, options, setIsConnecting, getActiveAudioTrack]);
 
+  // Set the audio playback manager in the WebRTC connector
+  const setAudioPlaybackManager = useCallback((audioManager: AudioPlaybackManager) => {
+    if (connectorRef.current) {
+      console.log("[useConnectionManager] Setting AudioPlaybackManager in WebRTCConnector");
+      connectorRef.current.setAudioPlaybackManager(audioManager);
+    }
+  }, [connectorRef]);
+
   // Disconnect from the OpenAI Realtime API
   const disconnect = useCallback(() => {
     if (isConnected) {
@@ -110,6 +119,7 @@ export function useConnectionManager(
 
   return {
     connect,
-    disconnect
+    disconnect,
+    setAudioPlaybackManager
   };
 }

@@ -8,6 +8,7 @@ import { ConnectionReconnectionHandler } from "./ConnectionReconnectionHandler";
 import { IConnectionManager } from "./interfaces/IConnectionManager";
 import { SessionConfigurationManager } from "./SessionConfigurationManager";
 import { ConnectionTimeoutManager } from "./ConnectionTimeoutManager";
+import { AudioPlaybackManager } from "../audio/AudioPlaybackManager";
 
 export class WebRTCConnectionManager extends ConnectionBase implements IConnectionManager {
   private sessionConfigManager: SessionConfigurationManager;
@@ -16,6 +17,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   private dataChannelHandler: DataChannelHandler;
   private reconnectionHandler: ConnectionReconnectionHandler;
   private timeoutManager: ConnectionTimeoutManager;
+  private audioPlaybackManager: AudioPlaybackManager | null = null;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -40,6 +42,14 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
         }
       })
     );
+  }
+
+  /**
+   * Set the audio playback manager
+   */
+  setAudioPlaybackManager(manager: AudioPlaybackManager): void {
+    this.audioPlaybackManager = manager;
+    this.sessionConfigManager.setAudioPlaybackManager(manager);
   }
 
   /**

@@ -1,12 +1,26 @@
 
 import { WebRTCOptions } from "../WebRTCTypes";
 import { SessionManager } from "./SessionManager";
+import { AudioPlaybackManager } from "../audio/AudioPlaybackManager";
 
 /**
  * Manages the configuration of WebRTC sessions
  */
 export class SessionConfigurationManager {
   private sessionManager: SessionManager | null = null;
+  private audioPlaybackManager: AudioPlaybackManager | null = null;
+
+  /**
+   * Set the audio playback manager
+   */
+  setAudioPlaybackManager(manager: AudioPlaybackManager): void {
+    this.audioPlaybackManager = manager;
+    
+    // Update existing session manager if it exists
+    if (this.sessionManager) {
+      this.sessionManager.setAudioPlaybackManager(manager);
+    }
+  }
 
   /**
    * Configure the session but only when both the peer connection is connected
@@ -22,7 +36,7 @@ export class SessionConfigurationManager {
     }
     
     if (!this.sessionManager) {
-      this.sessionManager = new SessionManager(pc, dc, options);
+      this.sessionManager = new SessionManager(pc, dc, options, this.audioPlaybackManager || undefined);
     }
     
     return this.sessionManager.configureSessionIfReady();

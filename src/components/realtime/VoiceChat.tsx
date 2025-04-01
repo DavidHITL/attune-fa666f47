@@ -1,5 +1,5 @@
 
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { useAuth } from "@/context/AuthContext";
 import ConnectionControls from "./ConnectionControls";
@@ -10,6 +10,7 @@ import { useVoiceMicrophoneHandler } from "@/hooks/useVoiceMicrophoneHandler";
 import { useVoiceChatEffects } from "@/hooks/useVoiceChatEffects";
 import VoiceChatAudio from "./VoiceChatAudio";
 import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
+import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 
 interface VoiceChatProps {
   systemPrompt?: string;
@@ -24,6 +25,22 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
 }) => {
   const { user } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const audioPlaybackManager = useRef<AudioPlaybackManager | null>(null);
+  
+  // Initialize audio playback manager
+  useEffect(() => {
+    if (!audioPlaybackManager.current) {
+      audioPlaybackManager.current = new AudioPlaybackManager();
+      console.log("[VoiceChat] AudioPlaybackManager initialized");
+    }
+    
+    return () => {
+      if (audioPlaybackManager.current) {
+        audioPlaybackManager.current.cleanup();
+        audioPlaybackManager.current = null;
+      }
+    };
+  }, []);
   
   const {
     isConnected,
@@ -38,7 +55,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     toggleMicrophone,
     sendTextMessage,
     commitAudioBuffer,
-    getActiveMediaStream
+    getActiveMediaStream,
+    setAudioPlaybackManager
   } = useWebRTCConnection({
     instructions: systemPrompt,
     voice,
@@ -47,6 +65,13 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     // Use the VoiceChatAudio component for handling audio tracks
     onTrack: null // We'll handle this in VoiceChatAudio
   });
+
+  // Connect the audio playback manager to the WebRTC connection
+  useEffect(() => {
+    if (audioPlaybackManager.current && setAudioPlaybackManager) {
+      setAudioPlaybackManager(audioPlaybackManager.current);
+    }
+  }, [setAudioPlaybackManager]);
 
   // Extract microphone handling logic
   const {

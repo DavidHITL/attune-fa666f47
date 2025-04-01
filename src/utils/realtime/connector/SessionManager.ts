@@ -1,5 +1,7 @@
+
 import { WebRTCOptions } from "../WebRTCTypes";
 import { configureSession } from "../WebRTCSessionConfig";
+import { AudioPlaybackManager } from "../audio/AudioPlaybackManager";
 
 /**
  * Manages WebRTC session configuration and state
@@ -10,11 +12,13 @@ export class SessionManager {
   private options: WebRTCOptions;
   private sessionConfigured: boolean = false;
   private configurationTimeout: ReturnType<typeof setTimeout> | null = null;
+  private audioPlaybackManager: AudioPlaybackManager | null = null;
   
-  constructor(pc: RTCPeerConnection, dc: RTCDataChannel, options: WebRTCOptions) {
+  constructor(pc: RTCPeerConnection, dc: RTCDataChannel, options: WebRTCOptions, audioPlaybackManager?: AudioPlaybackManager) {
     this.pc = pc;
     this.dc = dc;
     this.options = options;
+    this.audioPlaybackManager = audioPlaybackManager || null;
     
     // Set a timeout to detect if session configuration is taking too long
     this.startConfigurationTimeout();
@@ -32,6 +36,14 @@ export class SessionManager {
     // Set a timeout for session configuration (20 seconds - increased from 8 seconds)
     this.configurationTimeout = setTimeout(() => {
       if (!this.sessionConfigured) {
+        // First check if audio is currently playing - don't time out if it is
+        if (this.audioPlaybackManager && this.audioPlaybackManager.isCurrentlyPlaying()) {
+          console.log("[SessionManager] Audio is currently playing, extending session timeout");
+          // Restart the timeout to check again later
+          this.startConfigurationTimeout();
+          return;
+        }
+        
         console.error("[SessionManager] Session configuration timed out after 20 seconds");
         
         // Report this as an error if the connection still appears to be alive
@@ -102,5 +114,12 @@ export class SessionManager {
       clearTimeout(this.configurationTimeout);
       this.configurationTimeout = null;
     }
+  }
+  
+  /**
+   * Set the audio playback manager
+   */
+  setAudioPlaybackManager(audioPlaybackManager: AudioPlaybackManager): void {
+    this.audioPlaybackManager = audioPlaybackManager;
   }
 }
