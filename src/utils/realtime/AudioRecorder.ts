@@ -14,10 +14,11 @@ export class AudioRecorder {
   private options: AudioRecorderOptions;
   private isRecording: boolean = false;
   private processingInterval: number | null = null;
+  private lastAudioSentTimestamp: number = 0;
 
   constructor(options: AudioRecorderOptions = {}) {
     this.options = {
-      sampleRate: 16000, // Changed from 24kHz to 16kHz for OpenAI compatibility
+      sampleRate: 16000, // OpenAI recommends 16kHz
       chunkSize: 4096,
       timeslice: 100, // Send audio data every 100ms
       ...options
@@ -60,10 +61,23 @@ export class AudioRecorder {
         console.log("[AudioRecorder] New MediaStream created with", 
           this.stream.getAudioTracks().length, 
           "audio tracks");
+          
+        // Verify we actually have audio tracks
+        if (this.stream.getAudioTracks().length === 0) {
+          console.error("[AudioRecorder] No audio tracks found in MediaStream");
+          return false;
+        }
       } else {
         console.log("[AudioRecorder] Reusing existing MediaStream with", 
           this.stream.getAudioTracks().length, 
           "audio tracks");
+          
+        // Verify the existing stream has active audio tracks
+        const activeTracks = this.stream.getAudioTracks().filter(track => track.readyState === 'live');
+        if (activeTracks.length === 0) {
+          console.error("[AudioRecorder] No active audio tracks in the existing MediaStream");
+          return false;
+        }
       }
       
       // Create audio context with the specified sample rate
@@ -87,6 +101,8 @@ export class AudioRecorder {
         
         if (this.options.onAudioData) {
           // Create a copy of the audio data to prevent mutation
+          const now = Date.now();
+          this.lastAudioSentTimestamp = now;
           this.options.onAudioData(new Float32Array(inputData));
         }
       };
@@ -94,6 +110,9 @@ export class AudioRecorder {
       // Connect the nodes
       this.source.connect(this.processor);
       this.processor.connect(this.audioContext.destination);
+      
+      // Ensure audio is flowing by setting up a watchdog timer
+      this.setupAudioFlowWatchdog();
       
       this.isRecording = true;
       console.log("[AudioRecorder] Recording started");
@@ -104,6 +123,30 @@ export class AudioRecorder {
       this.stop(); // Clean up any partially created resources
       return false;
     }
+  }
+
+  /**
+   * Set up a watchdog to monitor if audio is flowing correctly
+   * Will log warnings if no audio data is being processed
+   */
+  private setupAudioFlowWatchdog() {
+    // Clear any existing interval
+    if (this.processingInterval !== null) {
+      clearInterval(this.processingInterval);
+    }
+    
+    this.lastAudioSentTimestamp = Date.now();
+    
+    this.processingInterval = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastAudio = now - this.lastAudioSentTimestamp;
+      
+      // If no audio data has been processed for 1 second, log a warning
+      if (timeSinceLastAudio > 1000) {
+        console.warn("[AudioRecorder] No audio data has been processed for", 
+          timeSinceLastAudio, "ms");
+      }
+    }, 2000);
   }
 
   /**

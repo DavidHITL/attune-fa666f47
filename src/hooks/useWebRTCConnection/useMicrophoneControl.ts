@@ -14,6 +14,29 @@ export function useMicrophoneControl(
   // Store the last MediaStream reference here
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [microphoneReady, setMicrophoneReady] = useState<boolean>(false);
+  const audioSentCounter = useRef<number>(0);
+
+  // Monitor audio data transmission for debugging
+  useEffect(() => {
+    let intervalId: number | null = null;
+    
+    if (isMicrophoneActive && recorderRef.current) {
+      // Reset counter when microphone is activated
+      audioSentCounter.current = 0;
+      
+      // Log audio transmission stats every 5 seconds
+      intervalId = window.setInterval(() => {
+        console.log(`[useMicrophoneControl] Audio chunks sent in last 5s: ${audioSentCounter.current}`);
+        audioSentCounter.current = 0;
+      }, 5000);
+    }
+    
+    return () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isMicrophoneActive, recorderRef]);
 
   // Check microphone permissions on mount
   useEffect(() => {
@@ -100,7 +123,10 @@ export function useMicrophoneControl(
           onAudioData: (audioData) => {
             // Send audio data if connection is active
             if (connectorRef.current) {
-              connectorRef.current.sendAudioData(audioData);
+              const success = connectorRef.current.sendAudioData(audioData);
+              if (success) {
+                audioSentCounter.current++;
+              }
             }
           },
           timeslice: 100, // Send audio data every 100ms
