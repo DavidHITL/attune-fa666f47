@@ -27,6 +27,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   // Connect immediately when component mounts if autoConnect is true
   useEffect(() => {
     if (autoConnect) {
+      console.log("Auto-connect triggered for voice chat");
       connectVoiceChat();
     }
   }, [autoConnect]);
@@ -34,10 +35,12 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   const connectVoiceChat = async () => {
     // Simulate connection process with a delay
     try {
+      console.log("Starting voice chat connection process");
       setIsConnecting(true);
       // In a real implementation, this would be the actual connection logic
       await new Promise(resolve => setTimeout(resolve, 1500));
       setIsConnected(true);
+      console.log("Voice connection established successfully");
       toast.success("Voice connection established");
     } catch (error) {
       console.error("Connection error:", error);
@@ -50,6 +53,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log("RealtimeChat component unmounting, cleaning up");
       setIsConnected(false);
       setIsMicrophoneActive(false);
     };

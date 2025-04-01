@@ -21,6 +21,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [showCallModal, setShowCallModal] = useState(false);
   
   const sessionEndTimeMs = sessionEndTime ? sessionEndTime.getTime() : null;
+  
+  const handleVoiceCallClick = () => {
+    console.log("Voice call button clicked, opening modal");
+    setShowCallModal(true);
+  };
 
   return (
     <header className="bg-white border-b border-gray-200">
@@ -55,7 +60,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                 variant="ghost"
                 size="icon"
                 className="rounded-full"
-                onClick={() => setShowCallModal(true)}
+                onClick={handleVoiceCallClick}
               >
                 <Phone className="h-5 w-5" />
                 <span className="sr-only">Call</span>
