@@ -1,6 +1,7 @@
 
 import { WebRTCOptions } from "./WebRTCTypes";
 import { WebRTCConnectionManager } from "./connector/WebRTCConnectionManager";
+import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
 
 /**
  * Main class for handling WebRTC connections to OpenAI's API
@@ -17,12 +18,25 @@ export class WebRTCConnector {
    * @param audioTrack Optional MediaStreamTrack to add to the peer connection
    */
   async connect(audioTrack?: MediaStreamTrack): Promise<boolean> {
-    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-    if (!apiKey) {
-      console.error("[WebRTCConnector] OpenAI API key is required");
+    try {
+      // Use the ephemeral key service to get a secure API key
+      return await withSecureOpenAI(async (apiKey) => {
+        if (!apiKey) {
+          console.error("[WebRTCConnector] OpenAI API key is required");
+          return false;
+        }
+        
+        console.log("[WebRTCConnector] Connecting with ephemeral API key");
+        return this.connectionManager.connect(apiKey, audioTrack);
+      }, {
+        model: this.connectionManager.getOptions().model,
+        voice: this.connectionManager.getOptions().voice,
+        instructions: this.connectionManager.getOptions().instructions
+      });
+    } catch (error) {
+      console.error("[WebRTCConnector] Error connecting:", error);
       return false;
     }
-    return this.connectionManager.connect(apiKey, audioTrack);
   }
 
   /**

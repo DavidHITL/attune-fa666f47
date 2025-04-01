@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface EphemeralKeyResponse {
   client_secret: {
@@ -80,6 +81,7 @@ export async function getEphemeralKey(options: {
     return data.client_secret.value;
   } catch (error) {
     console.error("[ephemeralKeyService] Exception getting ephemeral key:", error);
+    toast.error(`Authentication error: Please make sure you're signed in and try again.`);
     throw new Error(`Failed to get ephemeral key: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -110,6 +112,7 @@ export async function withSecureOpenAI<T>(
     return await apiCallback(ephemeralKey);
   } catch (error) {
     console.error("[ephemeralKeyService] Error in secure API call:", error);
+    toast.error("Authentication failed. Please sign in again.");
     throw new Error(`Secure API call failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

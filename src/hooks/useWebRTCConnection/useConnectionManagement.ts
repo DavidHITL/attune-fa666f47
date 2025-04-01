@@ -5,6 +5,7 @@ import { UseWebRTCConnectionOptions } from "./types";
 import { useDisconnection } from "./useDisconnection";
 import { useConnectionStateHandler } from "./useConnectionStateHandler";
 import { useConnectionErrorHandler } from "./useConnectionErrorHandler";
+import { toast } from "sonner";
 
 export function useConnectionManagement(
   isConnected: boolean,
@@ -66,6 +67,9 @@ export function useConnectionManagement(
       const connector = await createAndConfigureConnector();
       
       if (!connector) {
+        console.error("[useConnectionManagement] Failed to create connector");
+        setIsConnecting(false);
+        toast.error("Failed to create connection");
         return false;
       }
       
@@ -82,6 +86,7 @@ export function useConnectionManagement(
       
       if (!success) {
         cleanup();
+        toast.error("Connection failed. Please check your API key and try again.");
         return false;
       }
       
