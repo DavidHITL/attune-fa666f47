@@ -138,8 +138,9 @@ export class WebRTCConnectionManager extends ConnectionBase {
       console.log("[WebRTCConnectionManager] Committing audio buffer");
       
       // With the direct audio track approach, we now use AudioSender.commitAudioBuffer
-      // which handles the specific event format
-      return AudioSender.commitAudioBuffer(this.dc);
+      // which handles the specific event format. The force parameter is false by default
+      // so it will only commit if audio was actually flowing.
+      return AudioSender.commitAudioBuffer(this.dc, false);
     } catch (error) {
       console.error("[WebRTCConnectionManager] Error committing audio buffer:", error);
       this.handleError(error);

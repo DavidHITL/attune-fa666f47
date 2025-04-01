@@ -1,6 +1,7 @@
 
 import React, { useEffect } from "react";
 import { toast } from "sonner";
+import { AudioSender } from "@/utils/realtime/connector/AudioSender";
 
 interface VoiceChatAudioProps {
   audioRef: React.RefObject<HTMLAudioElement>;
@@ -16,6 +17,10 @@ const VoiceChatAudio: React.FC<VoiceChatAudioProps> = ({
     // Handle incoming audio track
     if (event.track.kind === 'audio' && event.streams && event.streams.length > 0) {
       console.log("[VoiceChatAudio] Received audio track from WebRTC, connecting to audio element");
+      
+      // Mark that audio is being sent whenever we receive a track
+      AudioSender.markAudioSent();
+      
       if (audioRef.current) {
         audioRef.current.srcObject = event.streams[0];
         
