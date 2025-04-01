@@ -8,6 +8,7 @@ export class SilenceDetector {
   private readonly silenceThreshold: number;
   private readonly silenceDurationThreshold: number;
   private onSilenceDetectedCallback: (() => void) | null = null;
+  private lastRmsValue: number = 0;
 
   /**
    * Create a new SilenceDetector
@@ -40,6 +41,9 @@ export class SilenceDetector {
       sum += audioData[i] * audioData[i];
     }
     const rms = Math.sqrt(sum / audioData.length);
+    
+    // Store the last RMS value for debugging
+    this.lastRmsValue = rms;
     
     // If RMS is below threshold, it's considered silence
     return rms < this.silenceThreshold;
@@ -76,6 +80,14 @@ export class SilenceDetector {
   }
 
   /**
+   * Get the last measured RMS value
+   * @returns Last RMS value from audio processing
+   */
+  getLastRmsValue(): number {
+    return this.lastRmsValue;
+  }
+
+  /**
    * Reset the silence detector state
    */
   reset(): void {
@@ -87,6 +99,7 @@ export class SilenceDetector {
    */
   onSilenceDetected(): void {
     if (this.onSilenceDetectedCallback) {
+      console.log(`[SilenceDetector] Silence detected after ${this.silenceFrames} frames, RMS: ${this.lastRmsValue}`);
       this.onSilenceDetectedCallback();
     }
   }
@@ -97,5 +110,25 @@ export class SilenceDetector {
    */
   setOnSilenceDetected(callback: () => void): void {
     this.onSilenceDetectedCallback = callback;
+  }
+  
+  /**
+   * Adjust the silence threshold
+   * @param newThreshold New threshold value between 0.0 and 1.0
+   */
+  setSilenceThreshold(newThreshold: number): void {
+    if (newThreshold >= 0 && newThreshold <= 1) {
+      this.silenceThreshold = newThreshold;
+    }
+  }
+  
+  /**
+   * Adjust the silence duration threshold
+   * @param newDurationFrames New number of frames for silence duration
+   */
+  setSilenceDurationThreshold(newDurationFrames: number): void {
+    if (newDurationFrames > 0) {
+      this.silenceDurationThreshold = newDurationFrames;
+    }
   }
 }

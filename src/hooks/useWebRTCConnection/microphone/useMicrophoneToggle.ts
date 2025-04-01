@@ -1,3 +1,4 @@
+
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
@@ -14,6 +15,7 @@ interface UseMicrophoneToggleProps {
   setIsMicrophoneActive: (active: boolean) => void;
   setMicrophoneReady: (ready: boolean) => void;
   handleSilenceDetected: () => void;
+  resetSilenceDetection?: () => void;
 }
 
 /**
@@ -29,7 +31,8 @@ export function useMicrophoneToggle({
   setMediaStream,
   setIsMicrophoneActive,
   setMicrophoneReady,
-  handleSilenceDetected
+  handleSilenceDetected,
+  resetSilenceDetection
 }: UseMicrophoneToggleProps) {
   
   // Toggle microphone on/off
@@ -56,7 +59,13 @@ export function useMicrophoneToggle({
       
       // Send a commit signal to let OpenAI know we're done speaking
       if (connectorRef.current) {
+        console.log("[useMicrophoneToggle] Manually committing audio buffer on microphone deactivation");
         connectorRef.current.commitAudioBuffer();
+      }
+      
+      // Reset silence detection if available
+      if (resetSilenceDetection) {
+        resetSilenceDetection();
       }
       
       return true;
@@ -77,7 +86,7 @@ export function useMicrophoneToggle({
           return false;
         }
         
-        // Create the recorder primarily for tracking mic state and showing visual feedback
+        // Create the recorder with silence detection
         const recorder = new AudioRecorder({
           onAudioData: () => {
             // We don't need to manually send audio data anymore
@@ -89,6 +98,11 @@ export function useMicrophoneToggle({
           silenceThreshold: 0.01,
           silenceDuration: 1500
         });
+        
+        // Reset silence detection when starting microphone
+        if (resetSilenceDetection) {
+          resetSilenceDetection();
+        }
         
         // If we already have a stream, try to reuse it
         if (mediaStreamRef.current) {
@@ -139,7 +153,8 @@ export function useMicrophoneToggle({
     setMediaStream,
     setIsMicrophoneActive,
     setMicrophoneReady,
-    handleSilenceDetected
+    handleSilenceDetected,
+    resetSilenceDetection
   ]);
 
   return { toggleMicrophone };

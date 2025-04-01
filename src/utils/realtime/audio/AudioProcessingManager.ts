@@ -1,3 +1,4 @@
+
 import { SilenceDetector } from './SilenceDetector';
 import { AudioContextManager } from './AudioContextManager';
 import { AudioSender } from '../connector/AudioSender';
@@ -10,6 +11,8 @@ export class AudioProcessingManager {
   private scriptProcessor: ScriptProcessorNode | null = null;
   private audioContextManager: AudioContextManager;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
+  private lastAudioSent: number = Date.now();
+  private silenceDetectionEnabled: boolean = true;
 
   constructor(
     chunkSize: number,
@@ -49,19 +52,32 @@ export class AudioProcessingManager {
         // Mark audio as sent
         if (audioData && audioData.length > 0) {
           AudioSender.markAudioSent();
+          this.lastAudioSent = Date.now();
         }
 
-        // Detect silence
-        if (this.silenceDetector.isSilence(audioData)) {
-          this.silenceDetector.incrementSilenceFrames();
-        } else {
-          this.silenceDetector.resetSilenceFrames();
-        }
+        // Only perform silence detection if enabled
+        if (this.silenceDetectionEnabled) {
+          // Detect silence
+          if (this.silenceDetector.isSilence(audioData)) {
+            this.silenceDetector.incrementSilenceFrames();
+            
+            // Log some debugging info about silence detection
+            if (this.silenceDetector.getSilenceFrames() % 5 === 0) {
+              console.log(`[AudioProcessingManager] Silence detected for ${this.silenceDetector.getSilenceFrames()} frames`);
+            }
+          } else {
+            this.silenceDetector.resetSilenceFrames();
+          }
 
-        // Trigger silence detected callback if silence duration is exceeded
-        if (this.silenceDetector.isSilenceDurationExceeded()) {
-          this.silenceDetector.onSilenceDetected();
-          this.silenceDetector.reset();
+          // Trigger silence detected callback if silence duration is exceeded
+          if (this.silenceDetector.isSilenceDurationExceeded()) {
+            console.log("[AudioProcessingManager] Silence duration exceeded, triggering callback");
+            this.silenceDetector.onSilenceDetected();
+            this.silenceDetector.reset();
+            
+            // Temporarily disable silence detection after triggering to prevent multiple triggers
+            this.disableSilenceDetection(2000);
+          }
         }
 
         // Invoke the callback with the audio data
@@ -80,6 +96,20 @@ export class AudioProcessingManager {
       console.error("[AudioProcessingManager] Error setting up audio processing:", error);
       return false;
     }
+  }
+
+  /**
+   * Temporarily disable silence detection, useful after committing audio
+   * to prevent multiple commits in rapid succession.
+   * @param duration How long to disable silence detection for (ms)
+   */
+  disableSilenceDetection(duration: number = 2000): void {
+    this.silenceDetectionEnabled = false;
+    setTimeout(() => {
+      this.silenceDetectionEnabled = true;
+      this.silenceDetector.reset();
+      console.log("[AudioProcessingManager] Re-enabling silence detection");
+    }, duration);
   }
 
   /**
@@ -104,5 +134,14 @@ export class AudioProcessingManager {
     } catch (error) {
       console.error("[AudioProcessingManager] Error during audio processing cleanup:", error);
     }
+  }
+  
+  /**
+   * Check if audio has been silent for longer than the specified duration
+   * @param durationMs Duration in milliseconds
+   * @returns True if no audio has been sent for the specified duration
+   */
+  isAudioInactiveLongerThan(durationMs: number): boolean {
+    return Date.now() - this.lastAudioSent > durationMs;
   }
 }

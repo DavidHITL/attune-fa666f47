@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from "@/components/ui/card";
 import MicrophoneButton from '@/components/realtime/MicrophoneButton';
 import MicrophoneStatus from '@/components/realtime/MicrophoneStatus';
 import { Button } from '@/components/ui/button';
 import { Phone } from 'lucide-react';
 import { toast } from "sonner";
+import { SilenceDetector } from '@/utils/realtime/audio/SilenceDetector';
 
 interface RealtimeChatProps {
   sessionStarted?: boolean;
@@ -24,6 +25,24 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const silenceDetectorRef = useRef<SilenceDetector | null>(null);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Initialize silence detector
+  useEffect(() => {
+    // Create silence detector with appropriate settings
+    silenceDetectorRef.current = new SilenceDetector(
+      0.01, // Silence threshold
+      15,   // Silence duration frames
+      handleSilenceDetected // Callback when silence is detected
+    );
+    
+    return () => {
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+      }
+    };
+  }, []);
   
   // Connect immediately when component mounts
   useEffect(() => {
@@ -33,6 +52,28 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
       connectVoiceChat();
     }
   }, [autoConnect]); // Re-add autoConnect dependency to ensure connection happens when prop changes
+  
+  // Function to handle silence detection
+  const handleSilenceDetected = () => {
+    console.log("Silence detected, committing audio buffer");
+    
+    // Only act if the microphone is active and we're not already processing
+    if (isMicrophoneActive && !silenceTimeoutRef.current) {
+      console.log("Scheduling audio buffer commit after silence");
+      
+      // Set a short delay before committing to avoid premature commits on brief pauses
+      silenceTimeoutRef.current = setTimeout(() => {
+        console.log("Committing audio buffer due to silence");
+        
+        // In a real implementation, this would commit the audio buffer
+        // For now, we'll just simulate by triggering the AI speaking
+        simulateAiResponse();
+        
+        // Clear the timeout reference
+        silenceTimeoutRef.current = null;
+      }, 500);
+    }
+  };
   
   const connectVoiceChat = async () => {
     // Simulate connection process with a delay
@@ -66,8 +107,41 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
       console.log("RealtimeChat component unmounting, cleaning up");
       setIsConnected(false);
       setIsMicrophoneActive(false);
+      
+      // Clear any pending timeouts
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
+      }
     };
   }, []);
+  
+  // Simulate AI response 
+  const simulateAiResponse = () => {
+    // Only proceed if we're connected and microphone is active
+    if (isConnected && isMicrophoneActive) {
+      // First temporarily disable the microphone during AI response
+      setIsMicrophoneActive(false);
+      
+      // Then trigger AI speaking state
+      console.log("AI speaking started");
+      setIsAiSpeaking(true);
+      
+      // Simulate AI response duration
+      setTimeout(() => {
+        console.log("AI speaking ended");
+        setIsAiSpeaking(false);
+        
+        // Re-activate the microphone after AI finishes speaking
+        setTimeout(() => {
+          if (isConnected) {
+            setIsMicrophoneActive(true);
+            console.log("Microphone reactivated after AI response");
+          }
+        }, 300);
+      }, 2000);
+    }
+  };
   
   // Mock function for microphone toggle - will be replaced by actual implementation
   const handleMicrophoneToggle = async () => {
@@ -75,22 +149,41 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
     if (isMicrophoneActive) {
       setIsMicrophoneActive(false);
       console.log("Microphone deactivated");
+      
+      // Clear any pending silence timeouts when manually deactivating
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
+      }
+      
       return true;
     } else {
       setIsMicrophoneActive(true);
       console.log("Microphone activated");
-      // Simulate AI response when microphone is activated
-      setTimeout(() => {
-        console.log("AI speaking started");
-        setIsAiSpeaking(true);
-        setTimeout(() => {
-          setTimeout(() => {
-            console.log("AI speaking ended");
-            setIsAiSpeaking(false);
-          }, 1500);
-        }, 500);
-      }, 1000);
+      
+      // Reset silence detector when starting to listen
+      if (silenceDetectorRef.current) {
+        silenceDetectorRef.current.reset();
+      }
+      
       return true;
+    }
+  };
+  
+  // Process audio data (this would be called by the actual audio processing pipeline)
+  const processAudioData = (audioData: Float32Array) => {
+    if (isMicrophoneActive && silenceDetectorRef.current) {
+      const isSilent = silenceDetectorRef.current.isSilence(audioData);
+      
+      if (isSilent) {
+        silenceDetectorRef.current.incrementSilenceFrames();
+        if (silenceDetectorRef.current.isSilenceDurationExceeded()) {
+          silenceDetectorRef.current.onSilenceDetected();
+          silenceDetectorRef.current.reset();
+        }
+      } else {
+        silenceDetectorRef.current.resetSilenceFrames();
+      }
     }
   };
   
@@ -124,7 +217,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
         <div className="flex justify-center gap-4 mt-2">
           <MicrophoneButton 
             isActive={isMicrophoneActive}
-            isDisabled={!isConnected || isConnecting}
+            isDisabled={!isConnected || isConnecting || isAiSpeaking}
             onClick={handleMicrophoneToggle}
           />
           

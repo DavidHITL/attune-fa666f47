@@ -10,6 +10,9 @@ export class DataChannelHandler {
   private dataChannel: RTCDataChannel | null = null;
   private dataChannelOpenTimeout: ReturnType<typeof setTimeout> | null = null;
   private onError: ((error: any) => void) | null = null;
+  private commitDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
+  private lastCommitTime: number = 0;
+  private readonly MIN_COMMIT_INTERVAL = 1500; // Minimum ms between commits
 
   constructor() {
     this.dataChannelReady = false;
@@ -115,17 +118,49 @@ export class DataChannelHandler {
   
   /**
    * Commit the audio buffer to indicate end of speech
+   * With debounce to prevent rapid commits
    */
   commitAudioBuffer(handleError: (error: any) => void): boolean {
+    // Check if we can commit (channel is ready)
     if (!this.dataChannel || !this.dataChannelReady || this.dataChannel.readyState !== "open") {
       console.error(`[DataChannelHandler] Data channel not ready for committing audio, state: ${this.dataChannel?.readyState || 'null'}`);
       handleError(new Error(`Data channel not ready for committing audio, state: ${this.dataChannel?.readyState || 'null'}`));
       return false;
     }
     
+    const now = Date.now();
+    
+    // Check if we're committing too frequently
+    if (now - this.lastCommitTime < this.MIN_COMMIT_INTERVAL) {
+      console.log(`[DataChannelHandler] Commit attempted too soon after previous commit (${now - this.lastCommitTime}ms), debouncing`);
+      
+      // Clear any existing debounce timeout
+      if (this.commitDebounceTimeout) {
+        clearTimeout(this.commitDebounceTimeout);
+      }
+      
+      // Set a debounce timeout
+      this.commitDebounceTimeout = setTimeout(() => {
+        console.log("[DataChannelHandler] Executing debounced commit");
+        this.executeCommit(handleError);
+        this.commitDebounceTimeout = null;
+      }, this.MIN_COMMIT_INTERVAL - (now - this.lastCommitTime));
+      
+      return true;
+    }
+    
+    // Execute commit immediately if not too frequent
+    return this.executeCommit(handleError);
+  }
+  
+  /**
+   * Actually execute the audio buffer commit
+   */
+  private executeCommit(handleError: (error: any) => void): boolean {
     try {
       console.log("[DataChannelHandler] Committing audio buffer");
-      return AudioSender.commitAudioBuffer(this.dataChannel, false);
+      this.lastCommitTime = Date.now();
+      return AudioSender.commitAudioBuffer(this.dataChannel!, false);
     } catch (error) {
       console.error("[DataChannelHandler] Error committing audio buffer:", error);
       handleError(error);
@@ -140,6 +175,11 @@ export class DataChannelHandler {
     if (this.dataChannelOpenTimeout) {
       clearTimeout(this.dataChannelOpenTimeout);
       this.dataChannelOpenTimeout = null;
+    }
+    
+    if (this.commitDebounceTimeout) {
+      clearTimeout(this.commitDebounceTimeout);
+      this.commitDebounceTimeout = null;
     }
     
     this.dataChannel = null;

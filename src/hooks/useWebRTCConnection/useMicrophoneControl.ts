@@ -31,10 +31,10 @@ export function useMicrophoneControl(
     setMicrophoneReady
   } = useMicrophoneState();
 
-  // Use the silence detection hook
-  const { handleSilenceDetected } = useSilenceDetection(connectorRef, isMicrophoneActive);
+  // Use the silence detection hook with improved sensitivity
+  const { handleSilenceDetected, resetSilenceDetection } = useSilenceDetection(connectorRef, isMicrophoneActive);
 
-  // Use the microphone toggle hook
+  // Use the microphone toggle hook with silence detection integration
   const { toggleMicrophone } = useMicrophoneToggle({
     isConnected,
     isMicrophoneActive,
@@ -45,7 +45,8 @@ export function useMicrophoneControl(
     setMediaStream,
     setIsMicrophoneActive,
     setMicrophoneReady,
-    handleSilenceDetected
+    handleSilenceDetected,
+    resetSilenceDetection
   });
 
   // Use the microphone prewarm hook
@@ -58,9 +59,12 @@ export function useMicrophoneControl(
   // Get a commit function for the audio buffer
   const commitAudioBuffer = useCallback(() => {
     if (connectorRef.current) {
+      console.log("[useMicrophoneControl] Manually committing audio buffer");
       connectorRef.current.commitAudioBuffer();
+      // Reset silence detection after manual commit
+      resetSilenceDetection();
     }
-  }, [connectorRef]);
+  }, [connectorRef, resetSilenceDetection]);
 
   // Use keyboard control hook
   useKeyboardControl({
@@ -76,6 +80,7 @@ export function useMicrophoneControl(
     getActiveAudioTrack,
     prewarmMicrophoneAccess,
     isMicrophoneReady: microphoneReady,
-    microphonePermission
+    microphonePermission,
+    commitAudioBuffer
   };
 }
