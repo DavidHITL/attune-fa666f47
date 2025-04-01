@@ -7,7 +7,6 @@ import {
   DialogTitle,
   DialogClose
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Phone } from "lucide-react";
 import RealtimeChat from "@/components/realtime/RealtimeChat";
 
@@ -38,11 +37,15 @@ const CallModal: React.FC<CallModalProps> = ({
           </DialogTitle>
         </DialogHeader>
         
-        <RealtimeChat 
-          sessionStarted={sessionStarted}
-          sessionEndTime={sessionEndTime}
-          onClose={handleCloseModal}
-        />
+        {/* Voice chat connects automatically when modal is opened */}
+        {open && (
+          <RealtimeChat 
+            sessionStarted={sessionStarted}
+            sessionEndTime={sessionEndTime}
+            onClose={handleCloseModal}
+            autoConnect={true}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

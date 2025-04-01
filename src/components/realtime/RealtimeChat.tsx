@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import MicrophoneButton from '@/components/realtime/MicrophoneButton';
 import MicrophoneStatus from '@/components/realtime/MicrophoneStatus';
-import TranscriptDisplay from '@/components/realtime/TranscriptDisplay';
 import { Button } from '@/components/ui/button';
 import { toast } from "sonner";
 
@@ -11,40 +10,45 @@ interface RealtimeChatProps {
   sessionStarted?: boolean;
   sessionEndTime?: number | null;
   onClose?: () => void;
+  autoConnect?: boolean;
 }
 
 const RealtimeChat: React.FC<RealtimeChatProps> = ({
   sessionStarted = false,
   sessionEndTime = null,
-  onClose
+  onClose,
+  autoConnect = false
 }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  const [currentTranscript, setCurrentTranscript] = useState("");
-  const [isConnecting, setIsConnecting] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
   
-  // Connect immediately when component mounts
+  // Connect immediately when component mounts if autoConnect is true
   useEffect(() => {
-    const initializeConnection = async () => {
-      // Simulate connection process with a delay
-      try {
-        setIsConnecting(true);
-        // In a real implementation, this would be the actual connection logic
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setIsConnected(true);
-        toast.success("Voice connection established");
-      } catch (error) {
-        console.error("Connection error:", error);
-        toast.error("Failed to establish voice connection");
-      } finally {
-        setIsConnecting(false);
-      }
-    };
-    
-    initializeConnection();
-    
-    // Cleanup on unmount
+    if (autoConnect) {
+      connectVoiceChat();
+    }
+  }, [autoConnect]);
+  
+  const connectVoiceChat = async () => {
+    // Simulate connection process with a delay
+    try {
+      setIsConnecting(true);
+      // In a real implementation, this would be the actual connection logic
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      setIsConnected(true);
+      toast.success("Voice connection established");
+    } catch (error) {
+      console.error("Connection error:", error);
+      toast.error("Failed to establish voice connection");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+  
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       setIsConnected(false);
       setIsMicrophoneActive(false);
@@ -62,7 +66,6 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
       setTimeout(() => {
         setIsAiSpeaking(true);
         setTimeout(() => {
-          setCurrentTranscript("How can I help you today?");
           setTimeout(() => {
             setIsAiSpeaking(false);
           }, 1500);
@@ -97,23 +100,15 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
       {/* Microphone Status */}
       <MicrophoneStatus isActive={isMicrophoneActive} />
       
-      {/* Transcript Display */}
-      {isConnected && (
-        <TranscriptDisplay 
-          isConnected={isConnected}
-          isAiSpeaking={isAiSpeaking}
-          isProcessingAudio={false}
-          currentTranscript={currentTranscript}
-        />
-      )}
-      
       {/* Control Buttons */}
       <div className="flex justify-center gap-4 mt-2">
-        <MicrophoneButton 
-          isActive={isMicrophoneActive}
-          isDisabled={!isConnected || isConnecting}
-          onClick={handleMicrophoneToggle}
-        />
+        {isConnected && (
+          <MicrophoneButton 
+            isActive={isMicrophoneActive}
+            isDisabled={!isConnected || isConnecting}
+            onClick={handleMicrophoneToggle}
+          />
+        )}
         
         <Button 
           variant="outline" 
