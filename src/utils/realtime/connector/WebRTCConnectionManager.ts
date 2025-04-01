@@ -1,7 +1,6 @@
 
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
-import { AudioSender } from "./AudioSender";
 import { TextMessageSender } from "./TextMessageSender";
 import { SessionManager } from "./SessionManager";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
@@ -124,25 +123,9 @@ export class WebRTCConnectionManager extends ConnectionBase {
   }
 
   /**
-   * Send audio data to OpenAI
-   */
-  sendAudioData(audioData: Float32Array): boolean {
-    if (!this.dc || !this.dataChannelReady || this.dc.readyState !== "open") {
-      console.error(`[WebRTCConnectionManager] Data channel not ready for sending audio, state: ${this.dc?.readyState || 'null'}`);
-      return false;
-    }
-    
-    try {
-      return AudioSender.sendAudioData(this.dc, audioData);
-    } catch (error) {
-      console.error("[WebRTCConnectionManager] Error sending audio data:", error);
-      this.handleError(error);
-      return false;
-    }
-  }
-  
-  /**
    * Commit the audio buffer to indicate end of speech
+   * Note: With direct audio track approach, this is typically not needed
+   * as the server VAD will detect silence, but we keep it for manual control
    */
   commitAudioBuffer(): boolean {
     if (!this.dc || !this.dataChannelReady || this.dc.readyState !== "open") {
@@ -151,7 +134,15 @@ export class WebRTCConnectionManager extends ConnectionBase {
     }
     
     try {
-      return AudioSender.commitAudioBuffer(this.dc);
+      // Send a simple commit event to notify the server
+      console.log("[WebRTCConnectionManager] Committing audio buffer");
+      
+      const commitEvent = {
+        type: 'input_audio_buffer.commit',
+      };
+      
+      this.dc.send(JSON.stringify(commitEvent));
+      return true;
     } catch (error) {
       console.error("[WebRTCConnectionManager] Error committing audio buffer:", error);
       this.handleError(error);

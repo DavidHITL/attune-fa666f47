@@ -59,7 +59,7 @@ export class WebRTCConnectionEstablisher {
         }
       });
       
-      // Set up direct audio track handling (simplified approach)
+      // Set up direct audio track handling
       if (options.onTrack) {
         console.log("[WebRTCConnectionEstablisher] Setting up ontrack handler for direct audio playback");
         pc.ontrack = (event) => {
@@ -75,8 +75,25 @@ export class WebRTCConnectionEstablisher {
       // Set up event listeners for the data channel
       setupDataChannelListeners(dc, options, onDataChannelOpen);
       
-      // Step 4: Add the audio track to the peer connection
-      await AudioTrackManager.addAudioTrack(pc, audioTrack);
+      // Step 4: Add the audio track to the peer connection - this is the key change
+      // We'll now prioritize directly adding the audio track to the peer connection
+      if (audioTrack) {
+        console.log("[WebRTCConnectionEstablisher] Adding audio track directly to peer connection:", 
+          audioTrack.label || "Unnamed track",
+          "- Enabled:", audioTrack.enabled,
+          "- ID:", audioTrack.id);
+        
+        // Create a MediaStream to hold the track
+        const mediaStream = new MediaStream([audioTrack]);
+        
+        // Add the track to the peer connection
+        pc.addTrack(audioTrack, mediaStream);
+        console.log("[WebRTCConnectionEstablisher] Audio track added to peer connection");
+      } else {
+        // If no audio track provided, we'll try to get one from the microphone
+        console.log("[WebRTCConnectionEstablisher] No audio track provided, attempting to add one");
+        await AudioTrackManager.addAudioTrack(pc);
+      }
       
       // Step 5: Create an offer and set local description
       console.log("[WebRTCConnectionEstablisher] Creating offer");

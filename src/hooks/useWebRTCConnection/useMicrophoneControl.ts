@@ -13,29 +13,6 @@ export function useMicrophoneControl(
   // Store the last MediaStream reference here
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [microphoneReady, setMicrophoneReady] = useState<boolean>(false);
-  const audioSentCounter = useRef<number>(0);
-
-  // Monitor audio data transmission for debugging
-  useEffect(() => {
-    let intervalId: number | null = null;
-    
-    if (isMicrophoneActive && recorderRef.current) {
-      // Reset counter when microphone is activated
-      audioSentCounter.current = 0;
-      
-      // Log audio transmission stats every 5 seconds
-      intervalId = window.setInterval(() => {
-        console.log(`[useMicrophoneControl] Audio chunks sent in last 5s: ${audioSentCounter.current}`);
-        audioSentCounter.current = 0;
-      }, 5000);
-    }
-    
-    return () => {
-      if (intervalId !== null) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [isMicrophoneActive, recorderRef]);
 
   // Check microphone permissions on mount
   useEffect(() => {
@@ -93,7 +70,8 @@ export function useMicrophoneControl(
     }
     
     if (isMicrophoneActive && recorderRef.current) {
-      // Stop recording
+      // Stop recording 
+      // Note: We're not using this for audio sending anymore, but for controlling the mic UI state
       recorderRef.current.stop();
       // Don't clear the mediaStreamRef if we're just pausing - keep it for fast resume
       const shouldPreserveStream = true; // Set to false if you want to release resources immediately
@@ -107,6 +85,12 @@ export function useMicrophoneControl(
       
       recorderRef.current = null;
       setIsMicrophoneActive(false);
+      
+      // Send a commit signal to let OpenAI know we're done speaking
+      if (connectorRef.current) {
+        connectorRef.current.commitAudioBuffer();
+      }
+      
       return true;
     } else {
       // Start recording
@@ -125,22 +109,18 @@ export function useMicrophoneControl(
           return false;
         }
         
-        // Create the recorder with our callback to continuously send audio data
+        // Create the recorder primarily for tracking mic state and showing visual feedback
+        // With direct WebRTC audio track, we don't need to send audio via data channel
         const recorder = new AudioRecorder({
-          onAudioData: (audioData) => {
-            // Send audio data if connection is active
-            if (connectorRef.current) {
-              const success = connectorRef.current.sendAudioData(audioData);
-              if (success) {
-                audioSentCounter.current++;
-              }
-            }
+          onAudioData: () => {
+            // We don't need to manually send audio data anymore
+            // The WebRTC connection will handle this directly
           },
-          onSilenceDetected: handleSilenceDetected, // Add silence detection callback
-          timeslice: 100, // Send audio data every 100ms
-          sampleRate: 16000, // Explicitly set 16kHz sample rate for OpenAI compatibility
-          silenceThreshold: 0.01, // Adjust based on your needs
-          silenceDuration: 1500 // 1.5 seconds of silence before committing
+          onSilenceDetected: handleSilenceDetected,
+          timeslice: 100,
+          sampleRate: 16000,
+          silenceThreshold: 0.01,
+          silenceDuration: 1500
         });
         
         // If we already have a stream, try to reuse it
@@ -223,7 +203,7 @@ export function useMicrophoneControl(
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 16000 // Updated to 16kHz
+          sampleRate: 16000
         } 
       });
       

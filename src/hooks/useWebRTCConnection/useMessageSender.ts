@@ -28,26 +28,6 @@ export function useMessageSender(
     }
   }, [isConnected, connectorRef]);
 
-  // Send audio data to OpenAI
-  const sendAudioData = useCallback((audioData: Float32Array) => {
-    if (!isConnected || !connectorRef.current) {
-      console.error("[useMessageSender] Cannot send audio: not connected");
-      return false;
-    }
-    
-    if (!connectorRef.current.isDataChannelReady()) {
-      console.warn("[useMessageSender] Data channel not ready for audio");
-      return false;
-    }
-    
-    try {
-      return connectorRef.current.sendAudioData(audioData);
-    } catch (error) {
-      console.error("[useMessageSender] Error sending audio data:", error);
-      return false;
-    }
-  }, [isConnected, connectorRef]);
-
   // Commit audio buffer to signal end of utterance
   const commitAudioBuffer = useCallback(() => {
     if (!isConnected || !connectorRef.current) {
@@ -71,7 +51,6 @@ export function useMessageSender(
 
   return {
     sendTextMessage,
-    sendAudioData,
     commitAudioBuffer
   };
 }

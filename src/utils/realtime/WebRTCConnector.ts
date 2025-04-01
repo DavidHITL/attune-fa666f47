@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "./WebRTCTypes";
 import { WebRTCConnectionManager } from "./connector/WebRTCConnectionManager";
 
@@ -53,19 +54,11 @@ export class WebRTCConnector {
   sendTextMessage(text: string): boolean {
     return this.connectionManager.sendTextMessage(text);
   }
-
-  /**
-   * Send audio data to OpenAI
-   * @param audioData Float32Array of audio data
-   * @returns Whether the send was successful
-   */
-  sendAudioData(audioData: Float32Array): boolean {
-    return this.connectionManager.sendAudioData(audioData);
-  }
   
   /**
    * Commit the current audio buffer to signal the end of an utterance
    * This tells OpenAI that the current audio segment is complete and ready for processing
+   * Note: With direct WebRTC audio track, this is usually not needed as server VAD handles it
    * @returns Whether the commit was successful
    */
   commitAudioBuffer(): boolean {
