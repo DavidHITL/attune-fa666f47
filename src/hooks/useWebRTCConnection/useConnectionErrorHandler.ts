@@ -2,6 +2,9 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
 
+/**
+ * Hook to handle WebRTC connection errors
+ */
 export function useConnectionErrorHandler(
   disconnect: () => void,
   setIsConnecting: (isConnecting: boolean) => void
