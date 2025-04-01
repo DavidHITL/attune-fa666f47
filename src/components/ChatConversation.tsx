@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import ChatMessageList from "./ChatMessageList";
 import ChatInput from "./ChatInput";
@@ -10,26 +9,26 @@ import { calculateSessionProgress } from "@/utils/sessionUtils";
 import DatabaseConnectionAlert from "./chat/DatabaseConnectionAlert";
 import ChatLoadingState from "./chat/ChatLoadingState";
 import RealtimeChat from "./realtime/RealtimeChat";
-
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
   sessionStarted?: boolean;
   sessionEndTime?: number | null;
 }
-
-const ChatConversation: React.FC<ChatConversationProps> = ({ 
-  isSpeechEnabled, 
+const ChatConversation: React.FC<ChatConversationProps> = ({
+  isSpeechEnabled,
   sessionStarted = false,
-  sessionEndTime = null 
+  sessionEndTime = null
 }) => {
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const {
+    user,
+    isLoading: isAuthLoading
+  } = useAuth();
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const didInitialFetchRef = useRef(false);
   const [showRealtimeChat, setShowRealtimeChat] = useState(false);
-  
+
   // Calculate session progress using the utility function
   const sessionProgress = calculateSessionProgress(sessionStarted, sessionEndTime);
-  
   const {
     messages,
     setMessages,
@@ -41,7 +40,6 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
     fetchMessages,
     hasError
   } = useChatMessages();
-
   const {
     isLoading: isSendingMessage,
     handleSendMessage
@@ -65,9 +63,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   // Function to retry database connection
   const handleRetryDatabaseConnection = () => {
     if (!user) return;
-    
     console.log("Retrying database connection");
-    
     setUseLocalFallback(false);
     didInitialFetchRef.current = false;
     fetchMessages();
@@ -81,7 +77,6 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       const timer = setTimeout(() => {
         handleRetryDatabaseConnection();
       }, 500);
-      
       return () => clearTimeout(timer);
     }
   }, [user, useLocalFallback]);
@@ -93,7 +88,6 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       console.log("Auth is still loading, waiting before fetching messages");
       return;
     }
-    
     if (!user) {
       // If no user is logged in, just show the welcome message
       if (!initialLoadDone) {
@@ -108,16 +102,15 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       }
       return;
     }
-    
     console.log("ChatConversation effect: User detected:", user.id);
-    
+
     // Only fetch messages once per component mount
     if (!didInitialFetchRef.current) {
       console.log("ChatConversation: Performing initial message fetch");
-      
+
       // Set a flag to prevent duplicate fetches
       didInitialFetchRef.current = true;
-      
+
       // Add a slight delay to ensure auth is fully initialized
       setTimeout(() => {
         fetchMessages();
@@ -132,7 +125,6 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       setInitialLoadDone(false);
     };
   }, [user?.id]);
-
   const isLoading = isLoadingMessages || isSendingMessage || isAuthLoading;
 
   // Function to toggle real-time chat
@@ -144,50 +136,23 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   if (isAuthLoading) {
     return <ChatLoadingState />;
   }
-
-  return (
-    <div className="flex flex-col h-full">
-      {useLocalFallback && (
-        <DatabaseConnectionAlert onRetryConnection={handleRetryDatabaseConnection} />
-      )}
+  return <div className="flex flex-col h-full">
+      {useLocalFallback && <DatabaseConnectionAlert onRetryConnection={handleRetryDatabaseConnection} />}
       
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-        <ChatMessageList
-          messages={messages}
-          isLoading={isLoading}
-          isInitialLoad={isInitialLoad}
-        />
+        <ChatMessageList messages={messages} isLoading={isLoading} isInitialLoad={isInitialLoad} />
       </div>
       <div className="bg-apple-gray-6">
         <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
       
-      {user && (
-        <>
+      {user && <>
           <div className="fixed bottom-20 right-4 z-40">
-            <button
-              onClick={toggleRealtimeChat}
-              className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-2 shadow-lg"
-              title="Toggle Voice Chat"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="22"></line>
-              </svg>
-            </button>
+            
           </div>
           
-          {showRealtimeChat && (
-            <RealtimeChat
-              sessionStarted={sessionStarted}
-              sessionEndTime={sessionEndTime}
-            />
-          )}
-        </>
-      )}
-    </div>
-  );
+          {showRealtimeChat && <RealtimeChat sessionStarted={sessionStarted} sessionEndTime={sessionEndTime} />}
+        </>}
+    </div>;
 };
-
 export default ChatConversation;
