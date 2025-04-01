@@ -1,4 +1,3 @@
-
 import { WebRTCOptions } from "../WebRTCTypes";
 import { configureSession } from "../WebRTCSessionConfig";
 
@@ -30,10 +29,10 @@ export class SessionManager {
       clearTimeout(this.configurationTimeout);
     }
     
-    // Set a timeout for session configuration (8 seconds)
+    // Set a timeout for session configuration (20 seconds - increased from 8 seconds)
     this.configurationTimeout = setTimeout(() => {
       if (!this.sessionConfigured) {
-        console.error("[SessionManager] Session configuration timed out after 8 seconds");
+        console.error("[SessionManager] Session configuration timed out after 20 seconds");
         
         // Report this as an error if the connection still appears to be alive
         if (this.pc?.connectionState === 'connected' && this.options.onError) {
@@ -42,7 +41,7 @@ export class SessionManager {
       }
       
       this.configurationTimeout = null;
-    }, 8000);
+    }, 20000);
   }
 
   /**
