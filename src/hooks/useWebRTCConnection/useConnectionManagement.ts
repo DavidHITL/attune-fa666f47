@@ -129,6 +129,35 @@ export function useConnectionManagement(
       const connector = new WebRTCConnector({
         ...options,
         onMessage: handleMessage,
+        // Add onTrack handler to directly use the WebRTC audio stream
+        onTrack: (event) => {
+          console.log("[useConnectionManagement] Received audio track from WebRTC connection:", 
+            event.track.kind, event.track.readyState);
+          
+          if (event.track.kind === 'audio' && audioProcessorRef.current && audioProcessorRef.current.setAudioStream) {
+            // Use the direct WebRTC media stream for audio playback
+            console.log("[useConnectionManagement] Setting audio stream for playback");
+            audioProcessorRef.current.setAudioStream(event.streams[0]);
+            
+            // Mark AI as speaking when track becomes active
+            event.track.onunmute = () => {
+              console.log("[useConnectionManagement] Audio track unmuted - AI is speaking");
+              setIsAiSpeaking(true);
+            };
+            
+            // Mark AI as not speaking when track becomes inactive
+            event.track.onmute = () => {
+              console.log("[useConnectionManagement] Audio track muted - AI stopped speaking");
+              setTimeout(() => setIsAiSpeaking(false), 250);
+            };
+            
+            // Handle track ending
+            event.track.onended = () => {
+              console.log("[useConnectionManagement] Audio track ended");
+              setIsAiSpeaking(false);
+            };
+          }
+        },
         onConnectionStateChange: (state) => {
           console.log("[useConnectionManagement] Connection state changed:", state);
           
@@ -217,7 +246,7 @@ export function useConnectionManagement(
       setIsConnecting(false);
       return false;
     }
-  }, [handleMessage, isConnected, isConnecting, options, disconnect, setIsConnected, setIsConnecting, toggleMicrophone, getActiveAudioTrack]);
+  }, [handleMessage, isConnected, isConnecting, options, disconnect, setIsConnected, setIsConnecting, toggleMicrophone, getActiveAudioTrack, setIsAiSpeaking, audioProcessorRef]);
 
   return {
     connect,

@@ -59,6 +59,15 @@ export class WebRTCConnectionEstablisher {
         }
       });
       
+      // Set up direct audio track handling (simplified approach)
+      if (options.onTrack) {
+        console.log("[WebRTCConnectionEstablisher] Setting up ontrack handler for direct audio playback");
+        pc.ontrack = (event) => {
+          console.log("[WebRTCConnectionEstablisher] Received track:", event.track.kind, event.track.id);
+          options.onTrack!(event);
+        };
+      }
+      
       // Step 3: Create data channel for sending/receiving events - critical for OpenAI's protocol
       console.log("[WebRTCConnectionEstablisher] Creating data channel 'oai-events'");
       const dc = pc.createDataChannel("oai-events");

@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState, useCallback } from "react";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
@@ -20,8 +19,39 @@ export function useAudioProcessor(
   const [transcriptProgress, setTranscriptProgress] = useState(0);
   const lastAudioTimestampRef = useRef<number>(0);
   const { user } = useAuth();
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
   
-  // Initialize audio processor
+  // Create audio element for WebRTC stream playback
+  useEffect(() => {
+    if (!audioElementRef.current) {
+      const audioEl = new Audio();
+      audioEl.autoplay = true;
+      audioEl.muted = false;
+      audioEl.volume = 1.0;
+      
+      // Attach to DOM to help with autoplay policies
+      document.body.appendChild(audioEl);
+      audioEl.style.display = 'none';
+      
+      // Store reference
+      audioElementRef.current = audioEl;
+      
+      console.log("[useAudioProcessor] Created audio element for WebRTC stream playback");
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (audioElementRef.current && audioElementRef.current.parentNode) {
+        audioElementRef.current.pause();
+        audioElementRef.current.srcObject = null;
+        audioElementRef.current.parentNode.removeChild(audioElementRef.current);
+        audioElementRef.current = null;
+        console.log("[useAudioProcessor] Removed audio element");
+      }
+    };
+  }, []);
+  
+  // Initialize audio processor (keeping for backward compatibility)
   const audioProcessorRef = useRef<AudioProcessor | null>(null);
   if (!audioProcessorRef.current) {
     audioProcessorRef.current = new AudioProcessor();
@@ -43,7 +73,8 @@ export function useAudioProcessor(
   // Initialize message handler with callbacks
   const messageHandler = new WebRTCMessageHandler({
     onAudioData: (base64Audio) => {
-      // Add the audio chunk to the processor's buffer
+      // We'll still add audio data to processor for backward compatibility
+      // but primary playback will come from WebRTC media track
       audioProcessor.addAudioData(base64Audio);
       setIsProcessingAudio(true);
       setIsAiSpeaking(true);
@@ -52,11 +83,8 @@ export function useAudioProcessor(
       lastAudioTimestampRef.current = Date.now();
     },
     onAudioComplete: () => {
-      // Finalize audio when complete signal is received
-      console.log("[useAudioProcessor] Audio complete signal received, finalizing audio");
-      audioProcessor.completeAudioMessage().catch(error => {
-        console.error("[AudioProcessor] Error finalizing audio message:", error);
-      });
+      // Signal that AI has stopped speaking
+      console.log("[useAudioProcessor] Audio complete signal received");
       
       setIsAiSpeaking(false);
       // Give a short delay before considering processing complete
@@ -95,7 +123,46 @@ export function useAudioProcessor(
     }
   });
 
-  // Resume audio context on first user interaction
+  // Method to set the media stream for the audio element
+  const setAudioStream = useCallback((stream: MediaStream) => {
+    if (audioElementRef.current) {
+      console.log("[useAudioProcessor] Setting audio element srcObject to incoming media stream");
+      audioElementRef.current.srcObject = stream;
+      
+      // Ensure audio is not muted
+      audioElementRef.current.muted = false;
+      
+      // Handle autoplay restrictions
+      audioElementRef.current.play()
+        .then(() => {
+          console.log("[useAudioProcessor] Audio playback started automatically");
+        })
+        .catch(err => {
+          console.warn("[useAudioProcessor] Autoplay prevented. Error:", err);
+          // Set up event listener for user interaction to start playback
+          const handleUserInteraction = () => {
+            if (audioElementRef.current) {
+              audioElementRef.current.play()
+                .then(() => {
+                  console.log("[useAudioProcessor] Audio playback started after user interaction");
+                })
+                .catch(playError => {
+                  console.error("[useAudioProcessor] Failed to play audio after interaction:", playError);
+                });
+            }
+            
+            // Remove the event listeners after first interaction
+            document.removeEventListener('click', handleUserInteraction);
+            document.removeEventListener('touchstart', handleUserInteraction);
+          };
+          
+          document.addEventListener('click', handleUserInteraction);
+          document.addEventListener('touchstart', handleUserInteraction);
+        });
+    }
+  }, []);
+
+  // Resume audio context on first user interaction (for backward compatibility)
   useEffect(() => {
     const handleUserInteraction = () => {
       // Resume audio context if it exists
@@ -127,6 +194,9 @@ export function useAudioProcessor(
       }
     };
   }, []);
+
+  // Expose setAudioStream through audioProcessor for compatibility
+  audioProcessor.setAudioStream = setAudioStream;
 
   return { 
     audioProcessor, 

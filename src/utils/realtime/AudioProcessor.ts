@@ -10,6 +10,9 @@ export class AudioProcessor {
   private gainNode: GainNode | null = null;
   private isAudioContextResumed: boolean = false;
   private currentMessageAudioBuffers: Uint8Array[] = [];
+  
+  // New property to support direct WebRTC media track playback
+  setAudioStream: ((stream: MediaStream) => void) | null = null;
 
   constructor() {
     try {
@@ -73,6 +76,9 @@ export class AudioProcessor {
   async addAudioData(base64Audio: string): Promise<void> {
     try {
       await this.ensureAudioContextResumed();
+      
+      // Empty string means we're just testing AudioContext resumption
+      if (!base64Audio) return;
       
       // Convert base64 to binary
       const binaryData = this.decodeBase64Audio(base64Audio);
@@ -178,6 +184,7 @@ export class AudioProcessor {
         // Set up error handling
         const handleError = (err: Event) => {
           console.error("[AudioProcessor] Error playing audio:", err);
+          URL.revokeObjectURL(url);
           this.audioElement?.removeEventListener('error', handleError);
           this.audioElement?.removeEventListener('ended', handleEnded);
           // Continue with next chunk even if this one fails
@@ -199,12 +206,28 @@ export class AudioProcessor {
             console.error("[AudioProcessor] Error playing audio:", err);
             if (err.name === 'NotAllowedError') {
               console.warn("[AudioProcessor] Autoplay prevented by browser policy. User interaction required.");
-              // You might want to show a UI element to notify the user to interact with the page
+              // Set up event listener for user interaction to start playback
+              const handleUserInteraction = () => {
+                if (this.audioElement) {
+                  this.audioElement.play()
+                    .then(() => console.log("[AudioProcessor] Audio playback started after user interaction"))
+                    .catch(e => console.error("[AudioProcessor] Failed to start playback after interaction:", e));
+                }
+                
+                // Remove the event listeners after first interaction
+                document.removeEventListener('click', handleUserInteraction);
+                document.removeEventListener('touchstart', handleUserInteraction);
+              };
+              
+              document.addEventListener('click', handleUserInteraction);
+              document.addEventListener('touchstart', handleUserInteraction);
             }
-            handleEnded(); // Continue with next chunk even if this one fails
+            // Still call handleEnded to process next chunk even if playback fails
+            handleEnded();
           });
       } else {
         console.error("[AudioProcessor] Audio element not available");
+        URL.revokeObjectURL(url);
         this.playNextAudioChunk(); // Try next chunk
       }
     } catch (error) {
