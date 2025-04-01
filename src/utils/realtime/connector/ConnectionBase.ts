@@ -1,7 +1,7 @@
 
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ReconnectionManager } from "./ReconnectionManager";
-import { ConnectionTimeout } from "./ConnectionTimeout";
+import { ConnectionTimeoutManager } from "./ConnectionTimeoutManager";
 
 /**
  * Base class for WebRTC connection management
@@ -10,12 +10,12 @@ export abstract class ConnectionBase {
   protected options: WebRTCOptions;
   protected connectionState: RTCPeerConnectionState = "new";
   protected reconnectionManager: ReconnectionManager;
-  protected connectionTimeout: ConnectionTimeout;
+  protected connectionTimeout: ConnectionTimeoutManager;
   
   constructor(options: WebRTCOptions) {
     this.options = options;
     this.reconnectionManager = new ReconnectionManager();
-    this.connectionTimeout = new ConnectionTimeout(30000); // 30-second timeout for connection establishment
+    this.connectionTimeout = new ConnectionTimeoutManager();
   }
   
   /**
@@ -48,9 +48,6 @@ export abstract class ConnectionBase {
    * Set a connection timeout
    */
   protected setConnectionTimeout(callback: () => void): void {
-    this.connectionTimeout.setTimeout(() => {
-      console.error("[ConnectionBase] Connection timeout reached");
-      callback();
-    });
+    this.connectionTimeout.setTimeout(callback, 30000);
   }
 }

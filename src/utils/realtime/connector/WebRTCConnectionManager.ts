@@ -1,19 +1,21 @@
 
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
-import { SessionManager } from "./SessionManager";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
 import { ConnectionStateManager } from "./ConnectionStateManager";
 import { DataChannelHandler } from "./DataChannelHandler";
 import { ConnectionReconnectionHandler } from "./ConnectionReconnectionHandler";
 import { IConnectionManager } from "./interfaces/IConnectionManager";
+import { SessionConfigurationManager } from "./SessionConfigurationManager";
+import { ConnectionTimeoutManager } from "./ConnectionTimeoutManager";
 
 export class WebRTCConnectionManager extends ConnectionBase implements IConnectionManager {
-  private sessionManager: SessionManager | null = null;
+  private sessionConfigManager: SessionConfigurationManager;
   private connectionEstablisher: WebRTCConnectionEstablisher;
   private connectionStateManager: ConnectionStateManager;
   private dataChannelHandler: DataChannelHandler;
   private reconnectionHandler: ConnectionReconnectionHandler;
+  private timeoutManager: ConnectionTimeoutManager;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -22,6 +24,8 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.connectionStateManager = new ConnectionStateManager();
     this.dataChannelHandler = new DataChannelHandler();
     this.reconnectionHandler = new ConnectionReconnectionHandler(options);
+    this.sessionConfigManager = new SessionConfigurationManager();
+    this.timeoutManager = new ConnectionTimeoutManager();
     
     console.log("[WebRTCConnectionManager] Initialized with options:", 
       JSON.stringify({
@@ -55,7 +59,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Reset disconnecting flag when starting a new connection
     this.reconnectionHandler.setDisconnecting(false);
-    this.clearConnectionTimeout();
+    this.timeoutManager.clearTimeout();
     this.dataChannelHandler.setDataChannelReady(false);
     
     // Store the audio track for potential reconnection
@@ -130,15 +134,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
                 this.connectionStateManager.getPeerConnection()?.createDataChannel("data") : 
                 null;
                 
-    if (!pc || !dc) {
-      return;
-    }
-    
-    if (!this.sessionManager) {
-      this.sessionManager = new SessionManager(pc, dc, this.options);
-    }
-    
-    this.sessionManager.configureSessionIfReady();
+    this.sessionConfigManager.configureSessionWhenReady(pc, dc, this.options);
   }
 
   /**
@@ -184,16 +180,13 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Stop any reconnection attempts
     this.reconnectionHandler.reset();
-    this.clearConnectionTimeout();
+    this.timeoutManager.clearTimeout();
     this.connectionEstablisher.cleanup();
     this.dataChannelHandler.setDataChannelReady(false);
     this.dataChannelHandler.cleanup();
     
     // Reset session configuration
-    if (this.sessionManager) {
-      this.sessionManager.resetSessionConfigured();
-      this.sessionManager = null;
-    }
+    this.sessionConfigManager.resetSessionManager();
     
     // Clean up data channel
     this.dataChannelHandler.setDataChannel(null);
