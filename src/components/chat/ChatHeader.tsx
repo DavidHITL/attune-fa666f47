@@ -21,9 +21,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-3">
           <div className="flex-1">
-            <h1 className="text-lg font-medium">
-              Chat with AI
-            </h1>
+            {sessionStarted && onRequestEndSession && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRequestEndSession}
+                className="ml-2"
+              >
+                End Session
+              </Button>
+            )}
           </div>
           
           <div className="flex-1 text-center">
@@ -37,16 +44,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </div>
 
           <div className="flex-1 flex justify-end">
-            {sessionStarted && onRequestEndSession && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onRequestEndSession}
-                className="ml-2"
-              >
-                End Session
-              </Button>
-            )}
+            {/* Empty div to maintain flex layout */}
           </div>
         </div>
       </div>
