@@ -32,7 +32,7 @@ export class OpenAIRealtimeApiClient {
     
     try {
       // Ensure model is properly URL encoded
-      const modelParam = encodeURIComponent(model);
+      const modelParam = encodeURIComponent(model || "gpt-4o-realtime-preview-2024-12-17");
       const requestUrl = `${this.baseUrl}?model=${modelParam}`;
       
       console.log(`[WebRTC] Using model: ${model}`);
