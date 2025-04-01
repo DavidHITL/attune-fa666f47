@@ -13,7 +13,7 @@ export class AudioRecorder {
   private source: MediaStreamAudioSourceNode | null = null;
   private options: AudioRecorderOptions;
   private isRecording: boolean = false;
-  private processingInterval: number | null = null;
+  private processingInterval: ReturnType<typeof setInterval> | null = null;
   private lastAudioSentTimestamp: number = 0;
 
   constructor(options: AudioRecorderOptions = {}) {
