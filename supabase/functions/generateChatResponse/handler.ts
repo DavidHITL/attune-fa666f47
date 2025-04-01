@@ -16,7 +16,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   // Parse the request body
-  const { message, conversationHistory = [], sessionProgress = 0 } = await req.json() as RequestBody;
+  const { message, conversationHistory = [], sessionProgress = 0, contextData = null } = await req.json() as RequestBody;
 
   if (!message) {
     return createErrorResponse("Message is required", 400);
@@ -25,13 +25,47 @@ export async function handleRequest(req: Request): Promise<Response> {
   console.log("Received message:", message);
   console.log("Conversation history length:", conversationHistory.length);
   console.log("Session progress:", sessionProgress);
+  
+  if (contextData) {
+    console.log("Context data provided:", {
+      therapyConcepts: contextData.therapyConcepts?.length || 0,
+      therapySources: contextData.therapySources?.length || 0,
+      recentMessages: contextData.recentMessages?.length || 0
+    });
+  }
 
   // Determine conversation phase based on sessionProgress
   const { phase, instructions } = determinePhase(sessionProgress);
   console.log("Current conversation phase:", phase);
 
   // Generate system prompt with phase-specific instructions
-  const systemPrompt = generateSystemPrompt(phase, instructions);
+  let systemPrompt = generateSystemPrompt(phase, instructions);
+  
+  // Enhance system prompt with context if provided
+  if (contextData) {
+    if (contextData.therapyConcepts?.length) {
+      const conceptsContext = contextData.therapyConcepts.map(c => 
+        `${c.name}: ${c.description}`
+      ).join('\n\n');
+      
+      systemPrompt += "\n\nTherapy Concepts Reference:\n" + conceptsContext;
+    }
+    
+    if (contextData.therapySources?.length) {
+      const sourcesContext = contextData.therapySources.map(s => 
+        `"${s.title}" by ${s.author} (${s.year}): ${s.description || s.content_summary || ''}`
+      ).join('\n\n');
+      
+      systemPrompt += "\n\nTherapy Sources Reference:\n" + sourcesContext;
+    }
+    
+    if (contextData.recentMessages?.length) {
+      const messagesContext = contextData.recentMessages.join('\n\n');
+      systemPrompt += "\n\nRecent Conversation History:\n" + messagesContext;
+    }
+    
+    console.log("Enhanced system prompt with context data");
+  }
 
   // Prepare messages for OpenAI API
   const messages = prepareMessages(message, conversationHistory);

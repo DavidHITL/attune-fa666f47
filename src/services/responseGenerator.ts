@@ -2,6 +2,8 @@
 import { Message } from "@/components/MessageBubble";
 import { createMessageObject } from "./chatApiService";
 import { withSecureOpenAI } from "./api/ephemeralKeyService";
+import { fetchUserContext } from "./contextEnrichmentService";
+import { TherapyConcept, TherapySource } from "./terryRealKnowledgeService";
 
 /**
  * Generate a response to the user's message
@@ -33,6 +35,17 @@ export const generateResponse = async (
 
     console.log("Generating response with session progress:", sessionProgress);
 
+    // Fetch context data for the AI
+    const contextData = await fetchUserContext();
+    
+    if (contextData) {
+      console.log("Context data fetched:", {
+        historyLength: contextData.recentMessages.length,
+        hasInstructions: !!contextData.userInstructions,
+        knowledgeEntries: contextData.knowledgeEntries?.length || 0
+      });
+    }
+
     // Using ephemeral key service to securely make the API call
     const response = await withSecureOpenAI(async (openaiKey) => {
       try {
@@ -44,7 +57,12 @@ export const generateResponse = async (
           },
           body: JSON.stringify({
             messages,
-            sessionProgress
+            sessionProgress,
+            contextData: contextData ? {
+              recentMessages: contextData.recentMessages,
+              therapyConcepts: contextData.knowledgeEntries?.filter(k => k.type === 'concept'),
+              therapySources: contextData.knowledgeEntries?.filter(k => k.type === 'source')
+            } : null
           })
         });
 

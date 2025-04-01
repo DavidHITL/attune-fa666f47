@@ -1,3 +1,4 @@
+
 export interface WebRTCMessage {
   type: string;
   text?: string;
@@ -25,11 +26,12 @@ export interface UseWebRTCConnectionOptions {
   model?: string;
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
   instructions?: string;
+  userId?: string; // Add userId to options
   autoConnect?: boolean;
   enableMicrophone?: boolean;
   apiKey?: string;
   onMessage?: (message: WebRTCMessage) => void;
-  onTrack?: (event: RTCTrackEvent) => void; // Keep the onTrack property
+  onTrack?: (event: RTCTrackEvent) => void;
 }
 
 /**
@@ -52,7 +54,7 @@ export interface WebRTCConnectionResult {
   commitAudioBuffer: () => boolean;
   getActiveMediaStream: () => MediaStream | null;
   getActiveAudioTrack: () => MediaStreamTrack | null;
-  setAudioPlaybackManager?: (manager: any) => void; // Add this line to fix the first error
+  setAudioPlaybackManager?: (manager: any) => void;
 }
 
 // Add the missing WebRTCConnectionState interface

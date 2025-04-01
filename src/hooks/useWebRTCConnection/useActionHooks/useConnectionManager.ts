@@ -1,20 +1,19 @@
 
 import { useCallback } from "react";
-import { UseWebRTCConnectionOptions, WebRTCMessage } from "../types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
-import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
-import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
+import { UseWebRTCConnectionOptions } from "../types";
+import { useDisconnection } from "../useDisconnection";
+import { useConnectionStateHandler } from "../useConnectionStateHandler";
+import { useConnectionErrorHandler } from "../useConnectionErrorHandler";
+import { toast } from "sonner";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 
-/**
- * Hook to manage WebRTC connection establishment and disconnection
- */
 export function useConnectionManager(
   isConnected: boolean,
   isConnecting: boolean,
   connectorRef: React.MutableRefObject<WebRTCConnector | null>,
-  audioProcessorRef: React.MutableRefObject<AudioProcessor | null>,
-  recorderRef: React.MutableRefObject<AudioRecorder | null>,
+  audioProcessorRef: React.MutableRefObject<any>,
+  recorderRef: React.MutableRefObject<any>,
   handleMessage: (event: MessageEvent) => void,
   options: UseWebRTCConnectionOptions,
   setIsConnected: (isConnected: boolean) => void,
@@ -25,46 +24,170 @@ export function useConnectionManager(
   toggleMicrophone: () => Promise<boolean>,
   getActiveAudioTrack: () => MediaStreamTrack | null
 ) {
-  // Connect to the OpenAI Realtime API
+  // Use the disconnect hook
+  const { disconnect } = useDisconnection(
+    connectorRef,
+    recorderRef,
+    audioProcessorRef,
+    setIsConnected,
+    setIsConnecting,
+    setIsMicrophoneActive,
+    setCurrentTranscript,
+    setIsAiSpeaking
+  );
+
+  // Use the connection error handler hook
+  const { handleConnectionError } = useConnectionErrorHandler(
+    disconnect,
+    setIsConnecting
+  );
+
+  // Use the connection state handler hook
+  const { handleConnectionStateChange } = useConnectionStateHandler(
+    isConnected,
+    connectorRef,
+    options,
+    setIsConnected,
+    setIsConnecting,
+    disconnect,
+    toggleMicrophone
+  );
+
+  // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
-    // Don't reconnect if already connected or connecting
     if (isConnected || isConnecting) {
-      console.log("[useConnectionManager] Already connected or connecting");
-      return true;
-    }
-    
-    setIsConnecting(true);
-    console.log("[useConnectionManager] Connecting to OpenAI Realtime API");
-    
-    try {
-      // Create a new connector if one doesn't exist
-      if (!connectorRef.current) {
-        console.log("[useConnectionManager] Creating new WebRTCConnector");
-        connectorRef.current = new WebRTCConnector(options);
-      }
-      
-      // Get the active audio track if available for the connection
-      const audioTrack = getActiveAudioTrack();
-      
-      // Connect to OpenAI Realtime API with optional audio track
-      const success = await connectorRef.current.connect(audioTrack);
-      
-      if (success) {
-        console.log("[useConnectionManager] Successfully connected to OpenAI Realtime API");
-        return true;
-      } else {
-        console.error("[useConnectionManager] Failed to connect to OpenAI Realtime API");
-        setIsConnecting(false);
-        return false;
-      }
-    } catch (error) {
-      console.error("[useConnectionManager] Error connecting to OpenAI Realtime API:", error);
-      setIsConnecting(false);
+      console.log("[useConnectionManagement] Already connected or connecting, aborting");
       return false;
     }
-  }, [isConnected, isConnecting, connectorRef, options, setIsConnecting, getActiveAudioTrack]);
+    
+    try {
+      console.log("[useConnectionManagement] Starting connection process");
+      setIsConnecting(true);
+      
+      // Create a new WebRTC connector with proper options
+      const connector = await createAndConfigureConnector();
+      
+      if (!connector) {
+        console.error("[useConnectionManagement] Failed to create connector");
+        setIsConnecting(false);
+        toast.error("Failed to create connection");
+        return false;
+      }
+      
+      connectorRef.current = connector;
+      
+      // Attempt to connect with the audio track if available
+      const audioTrack = getActiveAudioTrack();
+      console.log("[useConnectionManagement] Connecting with audio track:", 
+        audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
+      
+      console.time("WebRTC Connection Process");
+      const success = await connector.connect(audioTrack || undefined);
+      console.timeEnd("WebRTC Connection Process");
+      
+      if (!success) {
+        cleanup();
+        toast.error("Connection failed. Please check your API key and try again.");
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("[useConnectionManagement] Connection error:", error);
+      handleConnectionError(error);
+      return false;
+    }
+  }, [
+    isConnected,
+    isConnecting,
+    setIsConnecting,
+    getActiveAudioTrack,
+    handleConnectionError
+  ]);
 
-  // Set the audio playback manager in the WebRTC connector
+  // Helper function to create and configure WebRTC connector
+  const createAndConfigureConnector = useCallback(async () => {
+    try {
+      // Get microphone access if needed but not already available
+      let audioTrack = getActiveAudioTrack();
+      if (!audioTrack && options.enableMicrophone) {
+        audioTrack = await requestMicrophoneAccess();
+      }
+      
+      // Create the connector with all necessary handlers
+      const connector = new WebRTCConnector({
+        ...options,
+        userId: options.userId, // Pass through the userId
+        onMessage: handleMessage,
+        onTrack: handleTrackEvent,
+        onConnectionStateChange: handleConnectionStateChange,
+        onError: handleConnectionError
+      });
+      
+      return connector;
+    } catch (error) {
+      console.error("[useConnectionManagement] Error creating connector:", error);
+      handleConnectionError(error);
+      return null;
+    }
+  }, [
+    options,
+    handleMessage,
+    handleConnectionStateChange,
+    handleConnectionError,
+    getActiveAudioTrack
+  ]);
+
+  // Helper function to request microphone access
+  const requestMicrophoneAccess = useCallback(async () => {
+    try {
+      console.log("[useConnectionManagement] Requesting microphone access");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000, // Using 16 kHz for OpenAI compatibility
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
+      const tracks = stream.getAudioTracks();
+      if (tracks.length > 0) {
+        return tracks[0];
+      }
+      return undefined;
+    } catch (error) {
+      console.warn("[useConnectionManagement] Could not access microphone:", error);
+      return undefined;
+    }
+  }, []);
+
+  // Handle WebRTC track events (for audio playback)
+  const handleTrackEvent = useCallback((event: RTCTrackEvent) => {
+    console.log("[useConnectionManagement] Received track:", 
+      event.track.kind, event.track.readyState);
+    
+    if (event.track.kind === 'audio' && audioProcessorRef.current?.setAudioStream) {
+      console.log("[useConnectionManagement] Setting audio stream for playback");
+      audioProcessorRef.current.setAudioStream(event.streams[0]);
+      
+      // Set up track event handlers
+      event.track.onunmute = () => setIsAiSpeaking(true);
+      event.track.onmute = () => setTimeout(() => setIsAiSpeaking(false), 250);
+      event.track.onended = () => setIsAiSpeaking(false);
+    }
+  }, [audioProcessorRef, setIsAiSpeaking]);
+
+  // Helper for cleaning up after failed connection attempts
+  const cleanup = useCallback(() => {
+    if (connectorRef.current) {
+      connectorRef.current.disconnect();
+      connectorRef.current = null;
+    }
+    setIsConnecting(false);
+  }, [connectorRef, setIsConnecting]);
+
+  // Set audio playback manager
   const setAudioPlaybackManager = useCallback((audioManager: AudioPlaybackManager) => {
     if (connectorRef.current) {
       console.log("[useConnectionManager] Setting AudioPlaybackManager in WebRTCConnector");
@@ -77,51 +200,6 @@ export function useConnectionManager(
       console.warn("[useConnectionManager] Cannot set AudioPlaybackManager: No active connector");
     }
   }, [connectorRef]);
-
-  // Disconnect from the OpenAI Realtime API
-  const disconnect = useCallback(() => {
-    if (isConnected) {
-      console.log("[useConnectionManager] Disconnecting from OpenAI Realtime API");
-    }
-    
-    // Stop microphone if active
-    if (recorderRef.current) {
-      console.log("[useConnectionManager] Stopping microphone");
-      recorderRef.current.stop();
-      recorderRef.current = null;
-    }
-    
-    // Stop audio processor if active
-    if (audioProcessorRef.current) {
-      console.log("[useConnectionManager] Stopping audio processor");
-      audioProcessorRef.current.stop();
-      audioProcessorRef.current = null;
-    }
-    
-    // Disconnect from OpenAI if connected
-    if (connectorRef.current) {
-      console.log("[useConnectionManager] Disconnecting WebRTCConnector");
-      connectorRef.current.disconnect();
-      connectorRef.current = null;
-    }
-    
-    // Reset state
-    setIsConnected(false);
-    setIsConnecting(false);
-    setIsMicrophoneActive(false);
-    setCurrentTranscript("");
-    setIsAiSpeaking(false);
-  }, [
-    isConnected, 
-    connectorRef, 
-    recorderRef, 
-    audioProcessorRef, 
-    setIsConnected, 
-    setIsConnecting, 
-    setIsMicrophoneActive, 
-    setCurrentTranscript, 
-    setIsAiSpeaking
-  ]);
 
   return {
     connect,

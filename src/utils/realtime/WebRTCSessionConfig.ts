@@ -1,10 +1,11 @@
 
 import { WebRTCOptions } from "./WebRTCTypes";
+import { enhanceInstructionsWithContext } from "@/services/contextEnrichmentService";
 
 /**
  * Configure the WebRTC session after connection is established
  */
-export function configureSession(dc: RTCDataChannel, options: WebRTCOptions): void {
+export async function configureSession(dc: RTCDataChannel, options: WebRTCOptions): Promise<void> {
   console.log("[WebRTCSessionConfig] Configuring session");
   
   if (dc.readyState !== "open") {
@@ -13,13 +14,21 @@ export function configureSession(dc: RTCDataChannel, options: WebRTCOptions): vo
   }
   
   try {
+    // Enhance instructions with therapy context
+    const enhancedInstructions = await enhanceInstructionsWithContext(
+      options.instructions || "You are a helpful assistant.",
+      options.userId
+    );
+
+    console.log("[WebRTCSessionConfig] Using enhanced instructions with context");
+    
     // Send session configuration to OpenAI
     const sessionConfig = {
       event_id: `event_${Date.now()}`,
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        instructions: options.instructions || "You are a helpful assistant.",
+        instructions: enhancedInstructions, // Using the enhanced instructions
         voice: options.voice || "alloy",
         // Use 'opus' as input format since we're using the direct WebRTC track
         // which typically uses Opus codec
@@ -38,30 +47,8 @@ export function configureSession(dc: RTCDataChannel, options: WebRTCOptions): vo
       }
     };
     
-    console.log("[WebRTCSessionConfig] Sending session configuration:", JSON.stringify(sessionConfig, null, 2));
-    
+    console.log("[WebRTCSessionConfig] Sending session configuration with enhanced context");
     dc.send(JSON.stringify(sessionConfig));
-    
-    // Configure conversation if instructions provided
-    if (options.instructions) {
-      console.log("[WebRTCSessionConfig] Setting system instructions:", options.instructions);
-      
-      const systemMessage = {
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text: options.instructions
-            }
-          ]
-        }
-      };
-      
-      dc.send(JSON.stringify(systemMessage));
-    }
     
     console.log("[WebRTCSessionConfig] Session configuration completed");
   } catch (error) {

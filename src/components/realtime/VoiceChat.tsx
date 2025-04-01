@@ -60,6 +60,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   } = useWebRTCConnection({
     instructions: systemPrompt,
     voice,
+    userId: user?.id,
     autoConnect: false,
     enableMicrophone: false,
     // Use the VoiceChatAudio component for handling audio tracks
