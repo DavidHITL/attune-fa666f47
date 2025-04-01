@@ -33,7 +33,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
     // Create silence detector with appropriate settings
     silenceDetectorRef.current = new SilenceDetector(
       0.01, // Silence threshold
-      15,   // Silence duration frames
+      30,   // Silence duration frames (increased to correspond to ~3 seconds)
       handleSilenceDetected // Callback when silence is detected
     );
     

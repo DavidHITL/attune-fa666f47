@@ -16,7 +16,7 @@ export class AudioRecorder implements AudioRecorderInterface {
       chunkSize: 4096,
       timeslice: 100, // Send audio data every 100ms
       silenceThreshold: 0.01, // Default silence threshold (very quiet)
-      silenceDuration: 1500, // 1.5 seconds of silence to trigger end of speech
+      silenceDuration: 3000, // 3 seconds of silence to trigger end of speech (updated from 1.5s)
       ...options
     };
 

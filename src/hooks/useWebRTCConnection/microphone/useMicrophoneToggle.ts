@@ -1,4 +1,5 @@
 
+
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
@@ -96,7 +97,7 @@ export function useMicrophoneToggle({
           timeslice: 100,
           sampleRate: 16000,
           silenceThreshold: 0.01,
-          silenceDuration: 1500
+          silenceDuration: 3000  // Updated to 3 seconds (from 1.5s/1500ms)
         });
         
         // Reset silence detection when starting microphone

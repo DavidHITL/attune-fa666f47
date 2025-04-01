@@ -76,7 +76,7 @@ export class AudioProcessingManager {
             this.silenceDetector.reset();
             
             // Temporarily disable silence detection after triggering to prevent multiple triggers
-            this.disableSilenceDetection(2000);
+            this.disableSilenceDetection(3000);  // Updated to 3 seconds (from default 2000ms)
           }
         }
 
@@ -103,7 +103,7 @@ export class AudioProcessingManager {
    * to prevent multiple commits in rapid succession.
    * @param duration How long to disable silence detection for (ms)
    */
-  disableSilenceDetection(duration: number = 2000): void {
+  disableSilenceDetection(duration: number = 3000): void {  // Updated default from 2000ms to 3000ms
     this.silenceDetectionEnabled = false;
     setTimeout(() => {
       this.silenceDetectionEnabled = true;

@@ -1,3 +1,4 @@
+
 import { useCallback, useRef } from "react";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 
@@ -40,7 +41,7 @@ export function useSilenceDetection(
         // Reset the recently committed flag after a delay
         setTimeout(() => {
           recentlyCommittedRef.current = false;
-        }, 1000);
+        }, 3000);  // Updated to 3 seconds (from 1000ms)
         
         // Clear timeout reference
         silenceTimeoutRef.current = null;
