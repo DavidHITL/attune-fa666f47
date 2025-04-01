@@ -1,8 +1,8 @@
 
 import { useCallback } from "react";
+import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
-import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
 
 export function useMicrophoneControl(
   isConnected: boolean,

@@ -44,6 +44,19 @@ export function useConnectionActions(
     setIsMicrophoneActive
   );
 
+  // Monitor data channel readiness first before using it
+  const { isDataChannelReady } = useDataChannelStatus(
+    isConnected,
+    connectorRef
+  );
+  
+  // Initialize message sending hooks
+  const { sendTextMessage, commitAudioBuffer } = useMessageManager(
+    isConnected,
+    connectorRef,
+    isDataChannelReady
+  );
+
   // Then initialize connection management hooks that depend on toggleMicrophone
   const { connect, disconnect } = useConnectionManager(
     isConnected,
@@ -60,19 +73,6 @@ export function useConnectionActions(
     setIsAiSpeaking,
     toggleMicrophone,
     getActiveAudioTrack
-  );
-
-  // Monitor data channel readiness first before using it
-  const { isDataChannelReady } = useDataChannelStatus(
-    isConnected,
-    connectorRef
-  );
-  
-  // Initialize message sending hooks
-  const { sendTextMessage, commitAudioBuffer } = useMessageManager(
-    isConnected,
-    connectorRef,
-    isDataChannelReady
   );
   
   // Initialize microphone prewarming
