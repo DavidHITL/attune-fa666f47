@@ -4,7 +4,9 @@ import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
 import { WebRTCMessageHandlerOptions } from "@/hooks/useWebRTCConnection/types";
 
-// Ensure audio processor can accept a WebRTC audio stream
+/**
+ * Hook to manage audio processing for WebRTC connections
+ */
 export function useAudioProcessor(
   setIsAiSpeaking: (isAiSpeaking: boolean) => void,
   setCurrentTranscript: (transcript: string) => void
