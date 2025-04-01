@@ -3,6 +3,7 @@ import { WebRTCOptions } from "./WebRTCTypes";
 import { WebRTCConnectionManager } from "./connector/WebRTCConnectionManager";
 import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
 import { IConnectionManager } from "./connector/interfaces/IConnectionManager";
+import { AudioPlaybackManager } from "./audio/AudioPlaybackManager";
 
 /**
  * Main class for handling WebRTC connections to OpenAI's API
@@ -86,5 +87,15 @@ export class WebRTCConnector {
    */
   commitAudioBuffer(): boolean {
     return this.connectionManager.commitAudioBuffer();
+  }
+
+  /**
+   * Set the audio playback manager
+   * @param manager AudioPlaybackManager instance
+   */
+  setAudioPlaybackManager(manager: AudioPlaybackManager): void {
+    if (this.connectionManager instanceof WebRTCConnectionManager) {
+      this.connectionManager.setAudioPlaybackManager(manager);
+    }
   }
 }

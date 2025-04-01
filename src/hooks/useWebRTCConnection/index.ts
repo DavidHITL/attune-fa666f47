@@ -7,6 +7,7 @@ import { useConnectionActions } from "./useConnectionActions";
 import { useAudioProcessor } from "./useAudioProcessor";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
+import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 
 // Re-export hooks and types for external use
 export * from "./types";
@@ -91,7 +92,8 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     commitAudioBuffer,
     getActiveMediaStream,
     getActiveAudioTrack,
-    isDataChannelReady
+    isDataChannelReady,
+    setAudioPlaybackManager
   } = useConnectionActions(
     isConnected,
     isConnecting,
@@ -137,6 +139,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     sendTextMessage,
     commitAudioBuffer,
     getActiveMediaStream,
-    getActiveAudioTrack
+    getActiveAudioTrack,
+    setAudioPlaybackManager
   };
 }

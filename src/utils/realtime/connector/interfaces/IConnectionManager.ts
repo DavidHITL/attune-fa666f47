@@ -1,7 +1,6 @@
 
-/**
- * Interface for WebRTC connection management
- */
+import { AudioPlaybackManager } from "../../audio/AudioPlaybackManager";
+
 export interface IConnectionManager {
   connect(apiKey: string, audioTrack?: MediaStreamTrack): Promise<boolean>;
   disconnect(): void;
@@ -9,4 +8,5 @@ export interface IConnectionManager {
   isDataChannelReady(): boolean;
   sendTextMessage(text: string): boolean;
   commitAudioBuffer(): boolean;
+  setAudioPlaybackManager?(manager: AudioPlaybackManager): void;
 }

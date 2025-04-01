@@ -6,6 +6,7 @@ import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
+import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 import { 
   useConnectionInitializer,
   useConnectionManager,
@@ -58,7 +59,7 @@ export function useConnectionActions(
   );
 
   // Then initialize connection management hooks that depend on toggleMicrophone
-  const { connect, disconnect } = useConnectionManager(
+  const { connect, disconnect, setAudioPlaybackManager } = useConnectionManager(
     isConnected,
     isConnecting,
     connectorRef,
@@ -94,6 +95,7 @@ export function useConnectionActions(
     getActiveAudioTrack,
     prewarmMicrophoneAccess,
     isMicrophoneReady,
-    isDataChannelReady
+    isDataChannelReady,
+    setAudioPlaybackManager
   };
 }

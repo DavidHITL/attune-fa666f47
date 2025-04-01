@@ -1,4 +1,3 @@
-
 export interface WebRTCMessage {
   type: string;
   text?: string;
@@ -53,6 +52,7 @@ export interface WebRTCConnectionResult {
   commitAudioBuffer: () => boolean;
   getActiveMediaStream: () => MediaStream | null;
   getActiveAudioTrack: () => MediaStreamTrack | null;
+  setAudioPlaybackManager?: (manager: any) => void; // Add this line to fix the first error
 }
 
 // Add the missing WebRTCConnectionState interface

@@ -68,7 +68,13 @@ export function useConnectionManager(
   const setAudioPlaybackManager = useCallback((audioManager: AudioPlaybackManager) => {
     if (connectorRef.current) {
       console.log("[useConnectionManager] Setting AudioPlaybackManager in WebRTCConnector");
-      connectorRef.current.setAudioPlaybackManager(audioManager);
+      try {
+        connectorRef.current.setAudioPlaybackManager(audioManager);
+      } catch (error) {
+        console.error("[useConnectionManager] Error setting AudioPlaybackManager:", error);
+      }
+    } else {
+      console.warn("[useConnectionManager] Cannot set AudioPlaybackManager: No active connector");
     }
   }, [connectorRef]);
 
