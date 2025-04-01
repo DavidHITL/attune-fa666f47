@@ -14,6 +14,7 @@ export * from "./useConnectionLifecycle";
 export * from "./useConnectionStateHandler";
 export * from "./useConnectionErrorHandler";
 export * from "./useDisconnection";
+export * from "./useDataChannelStatus";
 
 export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): WebRTCConnectionResult {
   // Set default options

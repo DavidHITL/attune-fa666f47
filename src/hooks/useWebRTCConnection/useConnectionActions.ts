@@ -1,12 +1,13 @@
 
+import { useEffect, useState } from "react";
 import { useConnectionManagement } from "./useConnectionManagement";
 import { useMicrophoneControl } from "./useMicrophoneControl";
 import { useMessageSender } from "./useMessageSender";
+import { useDataChannelStatus } from "./useDataChannelStatus";
 import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
-import { useEffect, useState } from "react";
 
 export function useConnectionActions(
   isConnected: boolean,
@@ -24,8 +25,6 @@ export function useConnectionActions(
   setIsAiSpeaking: (isAiSpeaking: boolean) => void,
   setMessages: (message: WebRTCMessage) => void
 ) {
-  const [isDataChannelReady, setIsDataChannelReady] = useState<boolean>(false);
-
   // Initialize microphone control hooks first
   const { 
     toggleMicrophone,
@@ -65,32 +64,12 @@ export function useConnectionActions(
     connectorRef
   );
   
-  // Periodically check if the data channel is ready
-  useEffect(() => {
-    if (!isConnected || !connectorRef.current) {
-      setIsDataChannelReady(false);
-      return;
-    }
-    
-    const checkDataChannelReady = () => {
-      const isReady = connectorRef.current?.isDataChannelReady() || false;
-      if (isReady !== isDataChannelReady) {
-        setIsDataChannelReady(isReady);
-        if (isReady) {
-          console.log("[useConnectionActions] Data channel is now ready for sending data");
-        }
-      }
-    };
-    
-    // Check immediately
-    checkDataChannelReady();
-    
-    // Then check periodically
-    const interval = setInterval(checkDataChannelReady, 1000);
-    
-    return () => clearInterval(interval);
-  }, [isConnected, connectorRef, isDataChannelReady]);
-
+  // Monitor data channel readiness
+  const { isDataChannelReady } = useDataChannelStatus(
+    isConnected,
+    connectorRef
+  );
+  
   // Prewarm microphone access when autoConnect is enabled
   useEffect(() => {
     if (options.autoConnect && !isConnected && !isConnecting) {
