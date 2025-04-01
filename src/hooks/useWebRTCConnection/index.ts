@@ -5,6 +5,8 @@ import { useConnectionState } from "./useConnectionState";
 import { useMessageHandler } from "./useMessageHandler";
 import { useConnectionActions } from "./useConnectionActions";
 import { useAudioProcessor } from "./useAudioProcessor";
+import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
+import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
 
 // Re-export hooks and types for external use
 export * from "./types";
@@ -55,10 +57,15 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     transcriptProgress
   } = useAudioProcessor(setIsAiSpeaking, setCurrentTranscript);
   
-  // Store references
+  // Store references to the created instances
   useEffect(() => {
-    audioProcessorRef.current = audioProcessor;
-    messageHandlerRef.current = messageHandler;
+    if (audioProcessor) {
+      audioProcessorRef.current = audioProcessor;
+    }
+    
+    if (messageHandler) {
+      messageHandlerRef.current = messageHandler as WebRTCMessageHandler;
+    }
     
     return () => {
       if (audioProcessorRef.current) {

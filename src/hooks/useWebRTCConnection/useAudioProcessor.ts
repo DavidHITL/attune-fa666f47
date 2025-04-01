@@ -1,4 +1,6 @@
+
 import { useRef, useEffect } from "react";
+import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 
 // Ensure audio processor can accept a WebRTC audio stream
 export function useAudioProcessor(
@@ -7,14 +9,22 @@ export function useAudioProcessor(
 ) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const audioProcessorRef = useRef<AudioProcessor | null>(null);
   
   useEffect(() => {
     // Create audio context for processing
     audioContextRef.current = new AudioContext();
     
+    // Initialize the AudioProcessor instance
+    audioProcessorRef.current = new AudioProcessor();
+    
     return () => {
       if (audioContextRef.current) {
         audioContextRef.current.close().catch(console.error);
+      }
+      
+      if (audioProcessorRef.current) {
+        audioProcessorRef.current.cleanup();
       }
     };
   }, []);
@@ -35,54 +45,18 @@ export function useAudioProcessor(
       } catch (error) {
         console.error("Error processing WebRTC message:", error);
       }
-    }
-  };
-  
-  // Audio processor interface for WebRTC audio handling
-  const audioProcessor = {
-    // Method to set audio stream received from WebRTC
-    setAudioStream: (stream: MediaStream) => {
-      console.log("[AudioProcessor] Setting audio stream for playback");
-      
-      // If there's an existing audio source, disconnect it
-      if (audioSourceRef.current) {
-        audioSourceRef.current.disconnect();
-      }
-      
-      if (audioContextRef.current) {
-        try {
-          // Create a new audio source from the stream
-          audioSourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
-          
-          // Connect to the audio context destination (speakers)
-          audioSourceRef.current.connect(audioContextRef.current.destination);
-          
-          console.log("[AudioProcessor] Audio stream connected to speakers");
-          setIsAiSpeaking(true); // Indicate AI is now speaking
-          
-        } catch (error) {
-          console.error("[AudioProcessor] Error connecting audio stream:", error);
-        }
-      }
     },
-    
-    // Clean up audio processing resources
-    cleanup: () => {
-      console.log("[AudioProcessor] Cleaning up audio resources");
-      
-      if (audioSourceRef.current) {
-        audioSourceRef.current.disconnect();
-        audioSourceRef.current = null;
-      }
-      
-      setIsAiSpeaking(false);
-    }
+    // Add required properties to match WebRTCMessageHandler interface
+    options: {},
+    currentTranscript: '',
+    saveTranscriptToDatabase: () => {} 
   };
   
+  // Return the processor instance with proper type
   return {
-    audioProcessor,
+    audioProcessor: audioProcessorRef.current,
     messageHandler,
-    isProcessingAudio: false, // This would be updated based on audio processing state
-    transcriptProgress: 0 // This would be updated based on transcript progress
+    isProcessingAudio: false,
+    transcriptProgress: 0
   };
 }

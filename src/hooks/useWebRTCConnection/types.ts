@@ -1,4 +1,3 @@
-
 export interface WebRTCMessage {
   type: string;
   text?: string;
@@ -20,6 +19,7 @@ export interface UseWebRTCConnectionOptions {
   enableMicrophone?: boolean;
   apiKey?: string;
   onMessage?: (message: WebRTCMessage) => void;
+  onTrack?: (event: RTCTrackEvent) => void; // Add missing onTrack property
 }
 
 /**

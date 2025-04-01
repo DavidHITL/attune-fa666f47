@@ -44,6 +44,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     voice,
     autoConnect: false,
     enableMicrophone: false,
+    // Pass in our own track handler function
     onTrack: (event) => {
       // Handle incoming audio track
       if (event.track.kind === 'audio' && event.streams && event.streams.length > 0) {
