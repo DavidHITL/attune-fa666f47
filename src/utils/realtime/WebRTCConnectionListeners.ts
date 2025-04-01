@@ -37,7 +37,7 @@ export function setupPeerConnectionListeners(
   
   // Handle incoming tracks (audio)
   pc.ontrack = (event) => {
-    console.log("[WebRTC] Received track:", event.track.kind, event.track.id);
+    console.log("[WebRTC] Received track:", event.track.kind, event.track.id, "- Ready state:", event.track.readyState);
     
     // Handle audio track from OpenAI for playback
     if (event.track.kind === 'audio' && event.streams && event.streams[0]) {
@@ -62,6 +62,11 @@ export function setupPeerConnectionListeners(
       audioElement.play()
         .then(() => console.log("[WebRTC] Audio playback started successfully"))
         .catch(err => console.error("[WebRTC] Audio playback failed:", err));
+
+      // Track events for the remote audio track
+      event.track.onunmute = () => console.log("[WebRTC] Remote audio track unmuted - AI is speaking");
+      event.track.onmute = () => console.log("[WebRTC] Remote audio track muted - AI stopped speaking");
+      event.track.onended = () => console.log("[WebRTC] Remote audio track ended");
     }
     
     if (options.onTrack) {
@@ -79,7 +84,19 @@ export function setupPeerConnectionListeners(
       
       // Set up message handler for the events channel
       channel.onmessage = (e) => {
-        console.log("[WebRTC] Event message:", e.data);
+        // Parse and log the message data
+        let messageData;
+        try {
+          messageData = JSON.parse(e.data);
+          console.log("[WebRTC] Event message:", messageData);
+          
+          // Specifically log audio buffer commits
+          if (messageData.type === 'input_audio_buffer.commit') {
+            console.log("[WebRTC] Voice activity detected end - Audio buffer committed");
+          }
+        } catch (err) {
+          console.log("[WebRTC] Raw event message (not JSON):", e.data);
+        }
         
         // Pass the message to any registered callbacks but don't attempt to send anything back
         if (options.onMessage) {
@@ -96,6 +113,18 @@ export function setupPeerConnectionListeners(
       // Track channel errors - log only, don't close the connection
       channel.onerror = (error) => {
         console.error("[WebRTC] oai-events channel error:", error);
+        
+        // Extract more details from RTCErrorEvent if available
+        if (error instanceof RTCErrorEvent) {
+          console.error("[WebRTC] Error details:", {
+            errorType: error.error.errorDetail,
+            message: error.error.message,
+            receivedAlert: error.error.receivedAlert,
+            sctpCauseCode: error.error.sctpCauseCode,
+            sdpLineNumber: error.error.sdpLineNumber
+          });
+        }
+        
         // We only log errors, not taking any action to close the connection
       };
       

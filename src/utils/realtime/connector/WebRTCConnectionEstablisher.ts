@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "../WebRTCTypes";
 import { SDPParser } from "../SDPParser"; 
 import { AudioSender } from './AudioSender';
@@ -47,7 +48,10 @@ export class WebRTCConnectionEstablisher {
 
       // 2. Add Transceiver for Audio if audioTrack is provided
       if (audioTrack) {
-        console.log("[WebRTCConnectionEstablisher] Adding audio track to peer connection");
+        console.log("[WebRTCConnectionEstablisher] Adding audio track to peer connection:", 
+          audioTrack.label || "Unnamed track", 
+          "- Enabled:", audioTrack.enabled, 
+          "- ID:", audioTrack.id);
         
         // Reset the audio state before adding the track
         AudioSender.resetAudioState();
@@ -60,6 +64,9 @@ export class WebRTCConnectionEstablisher {
         const audioTransceiver = transceivers.find(t => t.sender === sender);
         if (audioTransceiver) {
           audioTransceiver.direction = "sendonly";
+          console.log("[WebRTCConnectionEstablisher] Audio transceiver direction set to:", audioTransceiver.direction);
+        } else {
+          console.warn("[WebRTCConnectionEstablisher] Could not find audio transceiver");
         }
       }
 

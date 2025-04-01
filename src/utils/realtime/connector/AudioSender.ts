@@ -25,7 +25,8 @@ export class AudioSender {
    */
   static commitAudioBuffer(dc: RTCDataChannel | null, forceCommit: boolean = false): boolean {
     if (!dc || dc.readyState !== "open") {
-      console.error("[AudioSender] Data channel not open for committing audio buffer");
+      console.error("[AudioSender] Data channel not open for committing audio buffer", 
+        dc ? `(state: ${dc.readyState})` : "(channel is null)");
       return false;
     }
     
@@ -39,7 +40,7 @@ export class AudioSender {
         };
         
         dc.send(JSON.stringify(commitEvent));
-        console.log("[AudioSender] Audio buffer commit signal sent");
+        console.log("[AudioSender] Audio buffer commit signal sent", forceCommit ? "(forced)" : "(natural end detected)");
         
         // Reset the flag after committing
         AudioSender.audioHasBeenSent = false;
@@ -57,5 +58,6 @@ export class AudioSender {
   // Reset the audio tracking state (useful for new connections)
   static resetAudioState(): void {
     AudioSender.audioHasBeenSent = false;
+    console.log("[AudioSender] Audio state reset");
   }
 }
