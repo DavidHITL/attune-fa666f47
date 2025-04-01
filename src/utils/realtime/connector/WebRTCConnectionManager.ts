@@ -1,24 +1,27 @@
 
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
-import { TextMessageSender } from "./TextMessageSender";
 import { SessionManager } from "./SessionManager";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
-import { AudioSender } from "./AudioSender";
-import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
+import { ConnectionStateManager } from "./ConnectionStateManager";
+import { DataChannelHandler } from "./DataChannelHandler";
+import { ConnectionReconnectionHandler } from "./ConnectionReconnectionHandler";
+import { IConnectionManager } from "./interfaces/IConnectionManager";
 
-export class WebRTCConnectionManager extends ConnectionBase {
-  private pc: RTCPeerConnection | null = null;
-  private dc: RTCDataChannel | null = null;
+export class WebRTCConnectionManager extends ConnectionBase implements IConnectionManager {
   private sessionManager: SessionManager | null = null;
   private connectionEstablisher: WebRTCConnectionEstablisher;
-  private dataChannelReady: boolean = false;
-  private lastAudioTrack: MediaStreamTrack | null = null;
-  private isDisconnecting: boolean = false;
+  private connectionStateManager: ConnectionStateManager;
+  private dataChannelHandler: DataChannelHandler;
+  private reconnectionHandler: ConnectionReconnectionHandler;
   
   constructor(options: WebRTCOptions) {
     super(options);
+    
     this.connectionEstablisher = new WebRTCConnectionEstablisher();
+    this.connectionStateManager = new ConnectionStateManager();
+    this.dataChannelHandler = new DataChannelHandler();
+    this.reconnectionHandler = new ConnectionReconnectionHandler(options);
     
     console.log("[WebRTCConnectionManager] Initialized with options:", 
       JSON.stringify({
@@ -51,14 +54,12 @@ export class WebRTCConnectionManager extends ConnectionBase {
     console.log("[WebRTCConnectionManager] Starting connection process");
     
     // Reset disconnecting flag when starting a new connection
-    this.isDisconnecting = false;
+    this.reconnectionHandler.setDisconnecting(false);
     this.clearConnectionTimeout();
-    this.dataChannelReady = false;
+    this.dataChannelHandler.setDataChannelReady(false);
     
     // Store the audio track for potential reconnection
-    if (audioTrack) {
-      this.lastAudioTrack = audioTrack;
-    }
+    this.reconnectionHandler.setAudioTrack(audioTrack);
     
     try {
       const connection = await this.connectionEstablisher.establish(
@@ -68,7 +69,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
         () => {
           // This will be called when the data channel opens
           console.log("[WebRTCConnectionManager] Data channel is open and ready");
-          this.dataChannelReady = true;
+          this.dataChannelHandler.setDataChannelReady(true);
           this.configureSessionWhenReady();
         },
         this.handleError.bind(this),
@@ -80,8 +81,8 @@ export class WebRTCConnectionManager extends ConnectionBase {
         return false;
       }
       
-      this.pc = connection.pc;
-      this.dc = connection.dc;
+      this.connectionStateManager.setPeerConnection(connection.pc);
+      this.dataChannelHandler.setDataChannel(connection.dc);
       
       console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
       return true;
@@ -98,7 +99,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
    */
   private handleConnectionStateChange(state: RTCPeerConnectionState): void {
     console.log("[WebRTCConnectionManager] Connection state changed:", state);
-    this.connectionState = state;
+    this.connectionStateManager.setConnectionState(state);
     
     // Notify the state change through callback
     if (this.options.onConnectionStateChange) {
@@ -109,90 +110,14 @@ export class WebRTCConnectionManager extends ConnectionBase {
     if (state === "connected") {
       this.configureSessionWhenReady();
       // Reset reconnection manager on successful connection
-      this.reconnectionManager.reset();
+      this.reconnectionHandler.reset();
     }
     
     // Handle disconnection or failure with automatic reconnection
-    if (state === "disconnected" || state === "failed") {
-      console.log(`[WebRTCConnectionManager] Connection ${state}, attempting reconnection...`);
-      
-      // If we're already in the process of disconnecting, don't try to reconnect
-      if (this.isDisconnecting) {
-        console.log("[WebRTCConnectionManager] Already disconnecting, skipping reconnection");
-        return;
-      }
-      
-      this.reconnectionManager.scheduleReconnect(async () => {
-        // Obtain a new ephemeral token and reconnect
-        return await this.attemptReconnection();
-      });
-    }
-  }
-
-  /**
-   * Attempt to reconnect with a new ephemeral token
-   * @returns Promise<boolean> indicating if reconnection was successful
-   */
-  private async attemptReconnection(): Promise<boolean> {
-    console.log("[WebRTCConnectionManager] Attempting reconnection with a new ephemeral token");
-    
-    try {
-      // We're attempting a reconnection, but not a full disconnect
-      // Don't set isDisconnecting to true, as we want to try again if this fails
-      
-      // Clean up existing connection resources
-      this.cleanupConnectionResources();
-      
-      // Reset session state
-      if (this.sessionManager) {
-        this.sessionManager.resetSessionConfigured();
-      }
-      
-      this.dataChannelReady = false;
-      
-      // Get a new ephemeral key and reconnect
-      return await withSecureOpenAI(async (apiKey) => {
-        if (!apiKey) {
-          console.error("[WebRTCConnectionManager] Failed to get ephemeral key for reconnection");
-          return false;
-        }
-        
-        console.log("[WebRTCConnectionManager] Reconnecting with fresh ephemeral API key");
-        return this.connect(apiKey, this.lastAudioTrack || undefined);
-      }, {
-        model: this.options.model,
-        voice: this.options.voice,
-        instructions: this.options.instructions
-      });
-    } catch (error) {
-      console.error("[WebRTCConnectionManager] Error during reconnection:", error);
-      return false;
-    }
-  }
-
-  /**
-   * Clean up connection resources without affecting the reconnection logic
-   */
-  private cleanupConnectionResources(): void {
-    // Close the data channel if it exists
-    if (this.dc) {
-      try {
-        this.dc.close();
-      } catch (err) {
-        console.warn("[WebRTCConnectionManager] Error closing data channel:", err);
-      }
-      this.dc = null;
-    }
-    
-    // Close the peer connection if it exists
-    if (this.pc) {
-      try {
-        this.pc.close();
-      } catch (err) {
-        console.warn("[WebRTCConnectionManager] Error closing peer connection:", err);
-      }
-      this.pc = null;
-    }
+    this.reconnectionHandler.handleConnectionStateChange(
+      state, 
+      (apiKey, audioTrack) => this.connect(apiKey, audioTrack)
+    );
   }
 
   /**
@@ -200,12 +125,17 @@ export class WebRTCConnectionManager extends ConnectionBase {
    * and the data channel is open
    */
   private configureSessionWhenReady() {
-    if (!this.pc || !this.dc) {
+    const pc = this.connectionStateManager.getPeerConnection();
+    const dc = this.dataChannelHandler.isDataChannelReady() ? 
+                this.connectionStateManager.getPeerConnection()?.createDataChannel("data") : 
+                null;
+                
+    if (!pc || !dc) {
       return;
     }
     
     if (!this.sessionManager) {
-      this.sessionManager = new SessionManager(this.pc, this.dc, this.options);
+      this.sessionManager = new SessionManager(pc, dc, this.options);
     }
     
     this.sessionManager.configureSessionIfReady();
@@ -215,50 +145,28 @@ export class WebRTCConnectionManager extends ConnectionBase {
    * Send a text message to OpenAI
    */
   sendTextMessage(text: string): boolean {
-    if (!this.dc || !this.dataChannelReady || this.dc.readyState !== "open") {
-      console.error(`[WebRTCConnectionManager] Data channel not ready for sending text, state: ${this.dc?.readyState || 'null'}`);
-      return false;
-    }
-    
-    try {
-      return TextMessageSender.sendTextMessage(this.dc, text);
-    } catch (error) {
-      console.error("[WebRTCConnectionManager] Error sending message:", error);
-      this.handleError(error);
-      return false;
-    }
+    return this.dataChannelHandler.sendTextMessage(text, this.handleError.bind(this));
   }
 
   /**
    * Commit the audio buffer to indicate end of speech
-   * Note: With direct audio track approach, this is typically not needed
-   * as the server VAD will detect silence, but we keep it for manual control
    */
   commitAudioBuffer(): boolean {
-    if (!this.dc || !this.dataChannelReady || this.dc.readyState !== "open") {
-      console.error(`[WebRTCConnectionManager] Data channel not ready for committing audio, state: ${this.dc?.readyState || 'null'}`);
-      return false;
-    }
-    
-    try {
-      console.log("[WebRTCConnectionManager] Committing audio buffer");
-      
-      // With the direct audio track approach, we now use AudioSender.commitAudioBuffer
-      // which handles the specific event format. The force parameter is false by default
-      // so it will only commit if audio was actually flowing.
-      return AudioSender.commitAudioBuffer(this.dc, false);
-    } catch (error) {
-      console.error("[WebRTCConnectionManager] Error committing audio buffer:", error);
-      this.handleError(error);
-      return false;
-    }
+    return this.dataChannelHandler.commitAudioBuffer(this.handleError.bind(this));
   }
   
   /**
    * Check if the data channel is ready for sending
    */
   isDataChannelReady(): boolean {
-    return this.dataChannelReady && !!this.dc && this.dc.readyState === "open";
+    return this.dataChannelHandler.isDataChannelReady();
+  }
+
+  /**
+   * Get the current connection state
+   */
+  getConnectionState(): RTCPeerConnectionState {
+    return this.connectionStateManager.getConnectionState();
   }
 
   /**
@@ -266,19 +174,19 @@ export class WebRTCConnectionManager extends ConnectionBase {
    */
   disconnect(): void {
     // If already disconnecting, don't repeat the process
-    if (this.isDisconnecting) {
+    if (this.reconnectionHandler.isCurrentlyDisconnecting()) {
       console.log("[WebRTCConnectionManager] Already disconnecting, ignoring repeat call");
       return;
     }
     
     console.log("[WebRTCConnectionManager] Disconnecting");
-    this.isDisconnecting = true;
+    this.reconnectionHandler.setDisconnecting(true);
     
     // Stop any reconnection attempts
-    this.reconnectionManager.reset();
+    this.reconnectionHandler.reset();
     this.clearConnectionTimeout();
     this.connectionEstablisher.cleanup();
-    this.dataChannelReady = false;
+    this.dataChannelHandler.setDataChannelReady(false);
     
     // Reset session configuration
     if (this.sessionManager) {
@@ -286,13 +194,17 @@ export class WebRTCConnectionManager extends ConnectionBase {
       this.sessionManager = null;
     }
     
-    this.cleanupConnectionResources();
-    this.connectionState = "closed";
+    // Clean up data channel
+    this.dataChannelHandler.setDataChannel(null);
+    
+    // Clean up connection resources
+    this.connectionStateManager.cleanupConnectionResources();
+    this.connectionStateManager.setConnectionState("closed");
     
     // Reset the disconnecting flag after a short delay
     // to avoid race conditions if reconnect is called immediately after disconnect
     setTimeout(() => {
-      this.isDisconnecting = false;
+      this.reconnectionHandler.setDisconnecting(false);
     }, 500);
   }
 }

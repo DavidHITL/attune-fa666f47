@@ -2,12 +2,13 @@
 import { WebRTCOptions } from "./WebRTCTypes";
 import { WebRTCConnectionManager } from "./connector/WebRTCConnectionManager";
 import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
+import { IConnectionManager } from "./connector/interfaces/IConnectionManager";
 
 /**
  * Main class for handling WebRTC connections to OpenAI's API
  */
 export class WebRTCConnector {
-  private connectionManager: WebRTCConnectionManager;
+  private connectionManager: IConnectionManager;
 
   constructor(options: WebRTCOptions) {
     this.connectionManager = new WebRTCConnectionManager(options);
@@ -29,14 +30,22 @@ export class WebRTCConnector {
         console.log("[WebRTCConnector] Connecting with ephemeral API key");
         return this.connectionManager.connect(apiKey, audioTrack);
       }, {
-        model: this.connectionManager.getOptions().model,
-        voice: this.connectionManager.getOptions().voice,
-        instructions: this.connectionManager.getOptions().instructions
+        model: this.getOptions().model,
+        voice: this.getOptions().voice,
+        instructions: this.getOptions().instructions
       });
     } catch (error) {
       console.error("[WebRTCConnector] Error connecting:", error);
       return false;
     }
+  }
+
+  /**
+   * Get the options used to initialize this connector
+   */
+  getOptions(): WebRTCOptions {
+    // Type assertion to access the getOptions method on WebRTCConnectionManager
+    return (this.connectionManager as WebRTCConnectionManager).getOptions();
   }
 
   /**
