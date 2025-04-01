@@ -31,4 +31,7 @@ export class AudioSender {
       return false;
     }
   }
+
+  // Remove the sendAudioData method as we're now using media tracks directly
+  // and don't need to manually send audio chunks
 }
