@@ -74,34 +74,51 @@ export function setupPeerConnectionListeners(
     }
   };
   
-  // Handle incoming data channels
+  // Handle incoming data channels with improved error handling and logging
   pc.ondatachannel = (event) => {
     const channel = event.channel;
     console.log("[WebRTC] Received data channel:", channel.label);
     
+    // Special handling for the oai-events channel from OpenAI
     if (channel.label === "oai-events") {
-      console.log("[WebRTC] Found oai-events channel");
+      console.log("[WebRTC] Found oai-events channel - Setting up event handlers");
       
       // Set up message handler for the events channel
       channel.onmessage = (e) => {
         // Parse and log the message data
-        let messageData;
         try {
-          messageData = JSON.parse(e.data);
-          console.log("[WebRTC] Event message:", messageData);
+          const messageData = JSON.parse(e.data);
+          console.log("[WebRTC] Event received:", messageData.type || "unknown type");
           
-          // Specifically log audio buffer commits
+          // Log specific event types with more detail
           if (messageData.type === 'input_audio_buffer.commit') {
             console.log("[WebRTC] Voice activity detected end - Audio buffer committed");
+          } else if (messageData.type === 'session.created') {
+            console.log("[WebRTC] Session created successfully:", messageData.session?.id);
+          } else if (messageData.type === 'response.created') {
+            console.log("[WebRTC] AI response started");
+          } else if (messageData.type === 'response.done') {
+            console.log("[WebRTC] AI response completed");
+          }
+          
+          // Pass the message to any registered callbacks but don't attempt to send anything back
+          if (options.onMessage) {
+            options.onMessage(e);
           }
         } catch (err) {
-          console.log("[WebRTC] Raw event message (not JSON):", e.data);
+          console.warn("[WebRTC] Could not parse message as JSON:", e.data);
+          console.log("[WebRTC] Raw event message:", e.data);
+          
+          // Still try to pass the raw message to callbacks
+          if (options.onMessage) {
+            options.onMessage(e);
+          }
         }
-        
-        // Pass the message to any registered callbacks but don't attempt to send anything back
-        if (options.onMessage) {
-          options.onMessage(e);
-        }
+      };
+      
+      // Track channel opening
+      channel.onopen = () => {
+        console.log("[WebRTC] oai-events channel opened and ready for communication");
       };
       
       // Track channel closing - log only, don't close the connection
@@ -110,27 +127,25 @@ export function setupPeerConnectionListeners(
         // We only log this event, not taking any action to close the connection
       };
       
-      // Track channel errors - log only, don't close the connection
+      // Enhanced error handling - log detailed error information
       channel.onerror = (error) => {
-        console.error("[WebRTC] oai-events channel error:", error);
+        console.error("[WebRTC] oai-events channel error occurred");
         
         // Extract more details from RTCErrorEvent if available
         if (error instanceof RTCErrorEvent) {
           console.error("[WebRTC] Error details:", {
             errorType: error.error.errorDetail,
-            message: error.error.message,
+            message: error.error.message || "No message provided",
             receivedAlert: error.error.receivedAlert,
             sctpCauseCode: error.error.sctpCauseCode,
             sdpLineNumber: error.error.sdpLineNumber
           });
+        } else {
+          // Log generic error
+          console.error("[WebRTC] Error object:", error);
         }
         
         // We only log errors, not taking any action to close the connection
-      };
-      
-      // Track channel open state
-      channel.onopen = () => {
-        console.log("[WebRTC] oai-events channel opened");
       };
     }
   };

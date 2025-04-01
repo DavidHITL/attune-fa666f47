@@ -3,6 +3,7 @@ import { SDPParser } from "../SDPParser";
 import { AudioSender } from './AudioSender';
 import { AudioTrackManager } from './AudioTrackManager';
 import { OpenAIRealtimeApiClient } from './OpenAIRealtimeApiClient';
+import { setupDataChannelListeners } from "../WebRTCDataChannelHandler";
 
 interface RTCPeerConnectionWithNewTracks extends RTCPeerConnection {
   addTrack(track: MediaStreamTrack, stream: MediaStream): RTCRtpSender;
@@ -187,28 +188,14 @@ export class WebRTCConnectionEstablisher {
    */
   private createDataChannel(pc: RTCPeerConnection): RTCDataChannel | null {
     try {
+      console.log("[WebRTCConnectionEstablisher] Creating main data channel");
+      
       const dc = pc.createDataChannel("data", {
         ordered: true,
-        negotiated: false,
       });
 
-      dc.onopen = () => {
-        console.log("[WebRTCConnectionEstablisher] Data channel is now open");
-        this.onDataChannelOpen?.();
-      };
-
-      dc.onclose = () => {
-        console.log("[WebRTCConnectionEstablisher] Data channel is now closed");
-      };
-
-      dc.onerror = (error) => {
-        console.error("[WebRTCConnectionEstablisher] Data channel error:", error);
-        this.onError?.(error);
-      };
-
-      dc.onmessage = (event) => {
-        console.log("[WebRTCConnectionEstablisher] Received message:", event.data);
-      };
+      // Set up enhanced event listeners for the data channel
+      setupDataChannelListeners(dc, this.options || {}, this.onDataChannelOpen || undefined);
 
       return dc;
     } catch (error) {
