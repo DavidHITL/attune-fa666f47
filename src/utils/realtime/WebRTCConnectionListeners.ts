@@ -1,4 +1,5 @@
 
+
 import { WebRTCOptions } from "./WebRTCTypes";
 
 /**
@@ -43,6 +44,36 @@ export function setupPeerConnectionListeners(
     }
   };
   
+  // Handle incoming data channels
+  pc.ondatachannel = (event) => {
+    const channel = event.channel;
+    console.log("[WebRTC] Received data channel:", channel.label);
+    
+    if (channel.label === "oai-events") {
+      console.log("[WebRTC] Found oai-events channel");
+      
+      // Set up message handler for testing
+      channel.onmessage = (e) => {
+        console.log("[WebRTC] Event message:", e.data);
+      };
+      
+      // Track channel closing
+      channel.onclose = () => {
+        console.log("[WebRTC] oai-events channel closed");
+      };
+      
+      // Track channel errors
+      channel.onerror = (error) => {
+        console.error("[WebRTC] oai-events channel error:", error);
+      };
+      
+      // Track channel open state
+      channel.onopen = () => {
+        console.log("[WebRTC] oai-events channel opened");
+      };
+    }
+  };
+  
   // Handle connection state changes
   pc.onconnectionstatechange = () => {
     const connectionState = pc.connectionState;
@@ -72,3 +103,4 @@ export function setupPeerConnectionListeners(
     console.log("[WebRTC] Signaling state changed:", pc.signalingState);
   };
 }
+
