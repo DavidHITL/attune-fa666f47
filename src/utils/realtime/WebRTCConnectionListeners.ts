@@ -178,9 +178,22 @@ export function setupPeerConnectionListeners(
           console.error("[WebRTC] Error object:", error);
         }
         
-        // Propagate the error to the error handler
+        // Propagate the error to the error handler - FIX: Ensure we're sending an Error object
         if (options.onError) {
-          options.onError(error instanceof RTCErrorEvent ? error.error : error);
+          // Convert Event to Error if needed
+          if (error instanceof Event && !(error instanceof ErrorEvent)) {
+            // Create a new Error object with a descriptive message
+            options.onError(new Error(`Data channel error: ${error.type || 'Unknown event'}`));
+          } else if (error instanceof RTCErrorEvent) {
+            // Use the RTCError from the RTCErrorEvent
+            options.onError(error.error);
+          } else if (error instanceof Error) {
+            // Pass through existing Error objects
+            options.onError(error);
+          } else {
+            // For any other types, create a new Error with string representation
+            options.onError(new Error(`WebRTC error: ${String(error)}`));
+          }
         }
       };
     }
@@ -215,3 +228,4 @@ export function setupPeerConnectionListeners(
     console.log("[WebRTC] Signaling state changed:", pc.signalingState);
   };
 }
+
