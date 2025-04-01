@@ -9,6 +9,7 @@ import MessageInput from "./MessageInput";
 import { useVoiceMicrophoneHandler } from "@/hooks/useVoiceMicrophoneHandler";
 import { useVoiceChatEffects } from "@/hooks/useVoiceChatEffects";
 import VoiceChatAudio from "./VoiceChatAudio";
+import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
 
 interface VoiceChatProps {
   systemPrompt?: string;
