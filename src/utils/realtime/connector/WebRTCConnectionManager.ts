@@ -1,10 +1,10 @@
-
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { TextMessageSender } from "./TextMessageSender";
 import { SessionManager } from "./SessionManager";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
 import { AudioSender } from "./AudioSender";
+import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
 
 export class WebRTCConnectionManager extends ConnectionBase {
   private pc: RTCPeerConnection | null = null;
@@ -12,6 +12,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
   private sessionManager: SessionManager | null = null;
   private connectionEstablisher: WebRTCConnectionEstablisher;
   private dataChannelReady: boolean = false;
+  private lastAudioTrack: MediaStreamTrack | null = null;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -50,18 +51,16 @@ export class WebRTCConnectionManager extends ConnectionBase {
     this.clearConnectionTimeout();
     this.dataChannelReady = false;
     
+    // Store the audio track for potential reconnection
+    if (audioTrack) {
+      this.lastAudioTrack = audioTrack;
+    }
+    
     try {
       const connection = await this.connectionEstablisher.establish(
         apiKey,
         this.options,
-        (state) => {
-          this.connectionState = state;
-          
-          // Configure the session after connection is established if data channel is ready
-          if (state === "connected") {
-            this.configureSessionWhenReady();
-          }
-        },
+        (state) => this.handleConnectionStateChange(state),
         () => {
           // This will be called when the data channel opens
           console.log("[WebRTCConnectionManager] Data channel is open and ready");
@@ -85,6 +84,81 @@ export class WebRTCConnectionManager extends ConnectionBase {
     } catch (error) {
       console.error("[WebRTCConnectionManager] Error connecting to OpenAI:", error);
       this.handleError(error);
+      return false;
+    }
+  }
+
+  /**
+   * Handle connection state changes and trigger reconnection if needed
+   * @param state The new connection state
+   */
+  private handleConnectionStateChange(state: RTCPeerConnectionState): void {
+    console.log("[WebRTCConnectionManager] Connection state changed:", state);
+    this.connectionState = state;
+    
+    // Notify the state change through callback
+    if (this.options.onConnectionStateChange) {
+      this.options.onConnectionStateChange(state);
+    }
+    
+    // Configure the session when connected
+    if (state === "connected") {
+      this.configureSessionWhenReady();
+      // Reset reconnection manager on successful connection
+      this.reconnectionManager.reset();
+    }
+    
+    // Handle disconnection or failure with automatic reconnection
+    if (this.reconnectionManager.shouldReconnect(state)) {
+      console.log(`[WebRTCConnectionManager] Connection ${state}, attempting reconnection...`);
+      this.reconnectionManager.scheduleReconnect(async () => {
+        // Obtain a new ephemeral token and reconnect
+        return await this.attemptReconnection();
+      });
+    }
+  }
+
+  /**
+   * Attempt to reconnect with a new ephemeral token
+   * @returns Promise<boolean> indicating if reconnection was successful
+   */
+  private async attemptReconnection(): Promise<boolean> {
+    console.log("[WebRTCConnectionManager] Attempting reconnection with a new ephemeral token");
+    
+    try {
+      // Clean up existing connection resources
+      if (this.pc) {
+        this.pc.close();
+        this.pc = null;
+      }
+      if (this.dc) {
+        this.dc.close();
+        this.dc = null;
+      }
+      
+      // Reset session state
+      if (this.sessionManager) {
+        this.sessionManager.resetSessionConfigured();
+      }
+      
+      this.dataChannelReady = false;
+      
+      // Get a new ephemeral key and reconnect
+      return await withSecureOpenAI(async (apiKey) => {
+        if (!apiKey) {
+          console.error("[WebRTCConnectionManager] Failed to get ephemeral key for reconnection");
+          return false;
+        }
+        
+        console.log("[WebRTCConnectionManager] Reconnecting with fresh ephemeral API key");
+        return this.connect(apiKey, this.lastAudioTrack || undefined);
+      }, {
+        model: this.options.model,
+        voice: this.options.voice,
+        instructions: this.options.instructions
+      });
+    } catch (error) {
+      console.error("[WebRTCConnectionManager] Error during reconnection:", error);
       return false;
     }
   }
@@ -160,6 +234,9 @@ export class WebRTCConnectionManager extends ConnectionBase {
    */
   disconnect(): void {
     console.log("[WebRTCConnectionManager] Disconnecting");
+    
+    // Stop any reconnection attempts
+    this.reconnectionManager.reset();
     
     this.clearConnectionTimeout();
     this.connectionEstablisher.cleanup();

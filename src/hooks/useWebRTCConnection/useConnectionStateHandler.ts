@@ -34,21 +34,17 @@ export function useConnectionStateHandler(
     }
     else if (state === "failed") {
       console.error("[useConnectionStateHandler] WebRTC connection failed");
-      toast.error("Connection failed. Please try again.");
-      disconnect();
-      setIsConnecting(false);
+      // We don't automatically disconnect here, as our reconnection system will try to recover
+      toast.warning("Connection issues detected, attempting to recover...");
+      setIsConnecting(true);
     }
     else if (state === "disconnected") {
       console.warn("[useConnectionStateHandler] WebRTC connection disconnected");
-      // Give a brief period for potential auto-recovery
-      const recoveryTimer = setTimeout(() => {
-        if (connectorRef.current?.getConnectionState() !== "connected") {
-          toast.error("Connection lost. Please reconnect.");
-          disconnect();
-        }
-      }, 5000); // 5 second grace period for auto-recovery
+      toast.warning("Connection temporarily lost, attempting to recover...");
+      setIsConnecting(true);
       
-      return () => clearTimeout(recoveryTimer);
+      // The auto-reconnection logic in WebRTCConnectionManager will handle this
+      // We don't immediately disconnect as the connection might recover automatically
     }
     else if (state === "closed") {
       console.warn("[useConnectionStateHandler] WebRTC connection closed");
@@ -57,7 +53,7 @@ export function useConnectionStateHandler(
         disconnect();
       }
     }
-  }, [isConnected, options.enableMicrophone, setIsConnected, setIsConnecting, disconnect, toggleMicrophone, connectorRef]);
+  }, [isConnected, options.enableMicrophone, setIsConnected, setIsConnecting, disconnect, toggleMicrophone]);
 
   return {
     handleConnectionStateChange
