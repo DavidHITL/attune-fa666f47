@@ -81,6 +81,8 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     disconnect,
     toggleMicrophone,
     sendTextMessage,
+    sendAudioData,
+    commitAudioBuffer,
     getActiveMediaStream,
     getActiveAudioTrack,
     isDataChannelReady
@@ -127,6 +129,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     disconnect,
     toggleMicrophone,
     sendTextMessage,
+    commitAudioBuffer,
     getActiveMediaStream,
     getActiveAudioTrack
   };

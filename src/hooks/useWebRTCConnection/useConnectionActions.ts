@@ -59,7 +59,7 @@ export function useConnectionActions(
   );
 
   // Initialize message sending hooks
-  const { sendTextMessage } = useMessageSender(
+  const { sendTextMessage, sendAudioData, commitAudioBuffer } = useMessageSender(
     isConnected,
     connectorRef
   );
@@ -85,6 +85,8 @@ export function useConnectionActions(
     disconnect,
     toggleMicrophone,
     sendTextMessage,
+    sendAudioData,
+    commitAudioBuffer,
     getActiveMediaStream,
     getActiveAudioTrack,
     prewarmMicrophoneAccess,

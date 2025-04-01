@@ -142,6 +142,24 @@ export class WebRTCConnectionManager extends ConnectionBase {
   }
   
   /**
+   * Commit the audio buffer to indicate end of speech
+   */
+  commitAudioBuffer(): boolean {
+    if (!this.dc || !this.dataChannelReady || this.dc.readyState !== "open") {
+      console.error(`[WebRTCConnectionManager] Data channel not ready for committing audio, state: ${this.dc?.readyState || 'null'}`);
+      return false;
+    }
+    
+    try {
+      return AudioSender.commitAudioBuffer(this.dc);
+    } catch (error) {
+      console.error("[WebRTCConnectionManager] Error committing audio buffer:", error);
+      this.handleError(error);
+      return false;
+    }
+  }
+  
+  /**
    * Check if the data channel is ready for sending
    */
   isDataChannelReady(): boolean {

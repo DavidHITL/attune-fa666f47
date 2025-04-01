@@ -1,4 +1,3 @@
-
 import { useCallback, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
@@ -78,6 +77,14 @@ export function useMicrophoneControl(
     };
   }, [isMicrophoneActive]);
 
+  // Function to handle silence detection and commit audio buffer
+  const handleSilenceDetected = useCallback(() => {
+    if (connectorRef.current && isMicrophoneActive) {
+      console.log("[useMicrophoneControl] Silence detected, committing audio buffer");
+      connectorRef.current.commitAudioBuffer();
+    }
+  }, [connectorRef, isMicrophoneActive]);
+
   // Toggle microphone on/off
   const toggleMicrophone = useCallback(async () => {
     if (!isConnected || !connectorRef.current) {
@@ -129,8 +136,11 @@ export function useMicrophoneControl(
               }
             }
           },
+          onSilenceDetected: handleSilenceDetected, // Add silence detection callback
           timeslice: 100, // Send audio data every 100ms
-          sampleRate: 16000 // Explicitly set 16kHz sample rate for OpenAI compatibility
+          sampleRate: 16000, // Explicitly set 16kHz sample rate for OpenAI compatibility
+          silenceThreshold: 0.01, // Adjust based on your needs
+          silenceDuration: 1500 // 1.5 seconds of silence before committing
         });
         
         // If we already have a stream, try to reuse it
@@ -173,7 +183,7 @@ export function useMicrophoneControl(
         return false;
       }
     }
-  }, [isConnected, isMicrophoneActive, connectorRef, recorderRef, setIsMicrophoneActive]);
+  }, [isConnected, isMicrophoneActive, connectorRef, recorderRef, setIsMicrophoneActive, handleSilenceDetected]);
 
   /**
    * Get the current active MediaStream, if available

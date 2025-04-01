@@ -1,9 +1,12 @@
 
 export interface AudioRecorderOptions {
   onAudioData?: (audioData: Float32Array) => void;
+  onSilenceDetected?: () => void;
   sampleRate?: number;
   chunkSize?: number;
   timeslice?: number;
+  silenceThreshold?: number;
+  silenceDuration?: number;
 }
 
 export class AudioRecorder {
@@ -15,12 +18,19 @@ export class AudioRecorder {
   private isRecording: boolean = false;
   private processingInterval: ReturnType<typeof setInterval> | null = null;
   private lastAudioSentTimestamp: number = 0;
+  
+  // Silence detection properties
+  private silenceStart: number | null = null;
+  private isSilent: boolean = false;
+  private lastVolume: number = 0;
 
   constructor(options: AudioRecorderOptions = {}) {
     this.options = {
       sampleRate: 16000, // OpenAI recommends 16kHz
       chunkSize: 4096,
       timeslice: 100, // Send audio data every 100ms
+      silenceThreshold: 0.01, // Default silence threshold (very quiet)
+      silenceDuration: 1500, // 1.5 seconds of silence to trigger end of speech
       ...options
     };
   }
@@ -95,9 +105,16 @@ export class AudioRecorder {
         1  // Output channels
       );
       
+      // Reset silence detection state
+      this.silenceStart = null;
+      this.isSilent = false;
+      
       // Set up the audio processing callback to continuously process audio data
       this.processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
+        
+        // Check for silence
+        this.detectSilence(inputData);
         
         if (this.options.onAudioData) {
           // Create a copy of the audio data to prevent mutation
@@ -126,6 +143,46 @@ export class AudioRecorder {
   }
 
   /**
+   * Detect silence in audio data and trigger callback when silence duration threshold is met
+   * @param audioData Float32Array of audio samples
+   */
+  private detectSilence(audioData: Float32Array): void {
+    // Calculate RMS volume of the audio chunk
+    let sum = 0;
+    for (let i = 0; i < audioData.length; i++) {
+      sum += audioData[i] * audioData[i];
+    }
+    const rmsVolume = Math.sqrt(sum / audioData.length);
+    this.lastVolume = rmsVolume;
+    
+    const now = Date.now();
+    const isSilentNow = rmsVolume < (this.options.silenceThreshold || 0.01);
+    
+    // Handle transition to silence
+    if (!this.isSilent && isSilentNow) {
+      this.isSilent = true;
+      this.silenceStart = now;
+      console.debug(`[AudioRecorder] Silence detected, volume: ${rmsVolume.toFixed(5)}`);
+    }
+    // Handle transition to sound
+    else if (this.isSilent && !isSilentNow) {
+      this.isSilent = false;
+      this.silenceStart = null;
+      console.debug(`[AudioRecorder] Sound detected, volume: ${rmsVolume.toFixed(5)}`);
+    }
+    
+    // Check if silence has lasted long enough to trigger the callback
+    if (this.isSilent && this.silenceStart && 
+        (now - this.silenceStart) > (this.options.silenceDuration || 1500) && 
+        this.options.onSilenceDetected) {
+      console.log(`[AudioRecorder] Prolonged silence detected (${now - this.silenceStart}ms)`);
+      this.options.onSilenceDetected();
+      // Reset silence start to prevent multiple triggers
+      this.silenceStart = null;
+    }
+  }
+
+  /**
    * Set up a watchdog to monitor if audio is flowing correctly
    * Will log warnings if no audio data is being processed
    */
@@ -146,6 +203,11 @@ export class AudioRecorder {
         console.warn("[AudioRecorder] No audio data has been processed for", 
           timeSinceLastAudio, "ms");
       }
+      
+      // Log volume level periodically
+      console.debug(`[AudioRecorder] Current volume level: ${this.lastVolume.toFixed(5)}, ` +
+        `silence: ${this.isSilent}, ` +
+        `silence duration: ${this.silenceStart ? now - this.silenceStart : 0}ms`);
     }, 2000);
   }
 

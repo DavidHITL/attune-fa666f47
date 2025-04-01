@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { toast } from "sonner";
@@ -33,7 +34,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     connect,
     disconnect,
     toggleMicrophone,
-    sendTextMessage
+    sendTextMessage,
+    commitAudioBuffer
   } = useWebRTCConnection({
     instructions: systemPrompt,
     voice,
@@ -70,6 +72,11 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   const handleMicrophoneToggle = async (): Promise<boolean> => {
     // If already active, just toggle off
     if (isMicrophoneActive) {
+      // When turning off the mic, make sure to commit the audio buffer
+      // to signal the end of the utterance
+      if (isConnected) {
+        commitAudioBuffer();
+      }
       const success = await toggleMicrophone();
       return success;
     }
@@ -90,6 +97,25 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     
     return success;
   };
+
+  // Listen for keypress events to stop recording
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (isMicrophoneActive && (e.key === ' ' || e.key === 'Escape')) {
+        // If space bar or escape is pressed while mic is active, stop recording
+        if (isConnected) {
+          console.log("Key pressed to stop recording, committing audio buffer");
+          commitAudioBuffer();
+          setTimeout(() => {
+            toggleMicrophone().catch(console.error);
+          }, 100);
+        }
+      }
+    };
+    
+    window.addEventListener('keyup', handleKeyPress);
+    return () => window.removeEventListener('keyup', handleKeyPress);
+  }, [isMicrophoneActive, isConnected, toggleMicrophone, commitAudioBuffer]);
 
   // Handle form submission for text input
   const handleSubmit = async (text: string) => {
@@ -171,6 +197,13 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
         isConnected={isConnected} 
         onSubmit={handleSubmit} 
       />
+      
+      {/* Helper text for keyboard controls */}
+      {isMicrophoneActive && (
+        <div className="text-xs text-gray-500 text-center mt-1">
+          Press <span className="px-1 py-0.5 bg-gray-200 rounded">Space</span> or <span className="px-1 py-0.5 bg-gray-200 rounded">Esc</span> to stop recording
+        </div>
+      )}
     </div>
   );
 };

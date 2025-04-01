@@ -48,8 +48,30 @@ export function useMessageSender(
     }
   }, [isConnected, connectorRef]);
 
+  // Commit audio buffer to signal end of utterance
+  const commitAudioBuffer = useCallback(() => {
+    if (!isConnected || !connectorRef.current) {
+      console.error("[useMessageSender] Cannot commit audio: not connected");
+      return false;
+    }
+    
+    if (!connectorRef.current.isDataChannelReady()) {
+      console.warn("[useMessageSender] Data channel not ready for audio commit");
+      return false;
+    }
+    
+    try {
+      console.log("[useMessageSender] Committing audio buffer to signal end of speech");
+      return connectorRef.current.commitAudioBuffer();
+    } catch (error) {
+      console.error("[useMessageSender] Error committing audio buffer:", error);
+      return false;
+    }
+  }, [isConnected, connectorRef]);
+
   return {
     sendTextMessage,
-    sendAudioData
+    sendAudioData,
+    commitAudioBuffer
   };
 }
