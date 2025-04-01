@@ -10,6 +10,7 @@ export interface WebRTCMessageHandlerOptions {
   onMessageReceived?: (message: WebRTCMessage) => void;
   onFinalTranscript?: (transcript: string) => void;
   instructions?: string;
+  knowledgeEntries?: any[];
 }
 
 /**
@@ -18,6 +19,7 @@ export interface WebRTCMessageHandlerOptions {
 export class WebRTCMessageHandler {
   private options: WebRTCMessageHandlerOptions;
   private currentTranscript: string = "";
+  private userDetails: Record<string, string> = {};
   
   constructor(options: WebRTCMessageHandlerOptions = {}) {
     this.options = options;
@@ -37,6 +39,9 @@ export class WebRTCMessageHandler {
       if (this.options.onMessageReceived) {
         this.options.onMessageReceived(message);
       }
+      
+      // Parse message for potential user details to maintain context
+      this.extractUserDetailsFromMessage(message);
       
       // Handle different message types
       if (message.type === "response.audio.delta") {
@@ -90,6 +95,31 @@ export class WebRTCMessageHandler {
   }
   
   /**
+   * Extract user details from messages to maintain context
+   */
+  private extractUserDetailsFromMessage(message: WebRTCMessage): void {
+    if (message.type === "response.audio_transcript.delta" && message.delta) {
+      const text = message.delta;
+      
+      // Extract name mentions
+      const namePattern = /my name is ([A-Za-z]+)|I'm ([A-Za-z]+)|I am ([A-Za-z]+)|call me ([A-Za-z]+)/i;
+      const nameMatch = text.match(namePattern);
+      if (nameMatch) {
+        const name = nameMatch[1] || nameMatch[2] || nameMatch[3] || nameMatch[4];
+        if (name && name.length > 1) this.userDetails.userName = name;
+      }
+      
+      // Extract partner mentions
+      const partnerPattern = /my partner('s| is) ([A-Za-z]+)|partner named ([A-Za-z]+)/i;
+      const partnerMatch = text.match(partnerPattern);
+      if (partnerMatch) {
+        const partnerName = partnerMatch[2] || partnerMatch[3];
+        if (partnerName && partnerName.length > 1) this.userDetails.partnerName = partnerName;
+      }
+    }
+  }
+  
+  /**
    * Save transcript to database
    */
   private saveTranscriptToDatabase(): void {
@@ -98,12 +128,34 @@ export class WebRTCMessageHandler {
       return;
     }
     
+    // Create knowledge entries with user details for context preservation
+    const knowledgeEntries = [
+      ...(this.options.knowledgeEntries || [])
+    ];
+    
+    // Add user details as a knowledge entry if available
+    if (Object.keys(this.userDetails).length > 0) {
+      knowledgeEntries.push({
+        type: 'user_details',
+        content: JSON.stringify(this.userDetails),
+        description: 'User details detected in conversation'
+      });
+    }
+    
     // Save the transcript to the database with metadata
     saveMessage(this.currentTranscript, false, { 
       messageType: 'voice',
       instructions: this.options.instructions,
+      knowledgeEntries: knowledgeEntries.length > 0 ? knowledgeEntries : undefined
     }).catch(error => {
       console.error("[WebRTCMessageHandler] Error saving transcript:", error);
     });
+  }
+  
+  /**
+   * Update handler options
+   */
+  updateOptions(newOptions: Partial<WebRTCMessageHandlerOptions>): void {
+    this.options = { ...this.options, ...newOptions };
   }
 }

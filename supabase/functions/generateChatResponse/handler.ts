@@ -30,7 +30,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     console.log("Context data provided:", {
       therapyConcepts: contextData.therapyConcepts?.length || 0,
       therapySources: contextData.therapySources?.length || 0,
-      recentMessages: contextData.recentMessages?.length || 0
+      recentMessages: contextData.recentMessages?.length || 0,
+      userDetails: contextData.userDetails ? Object.keys(contextData.userDetails).length : 0,
+      criticalInformation: contextData.criticalInformation?.length || 0
     });
   }
 
@@ -43,6 +45,19 @@ export async function handleRequest(req: Request): Promise<Response> {
   
   // Enhance system prompt with context if provided
   if (contextData) {
+    // Add user details and critical information at the beginning for highest priority
+    if (contextData.userDetails) {
+      const userDetailsText = Object.entries(contextData.userDetails)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\n');
+      
+      systemPrompt = `IMPORTANT USER DETAILS (always remember these):\n${userDetailsText}\n\n${systemPrompt}`;
+    }
+    
+    if (contextData.criticalInformation?.length) {
+      systemPrompt = `CRITICAL THERAPEUTIC INSIGHTS (maintain awareness of these):\n${contextData.criticalInformation.join('\n')}\n\n${systemPrompt}`;
+    }
+    
     if (contextData.therapyConcepts?.length) {
       const conceptsContext = contextData.therapyConcepts.map(c => 
         `${c.name}: ${c.description}`

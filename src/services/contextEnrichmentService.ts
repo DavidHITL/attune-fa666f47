@@ -10,12 +10,15 @@ export interface ContextData {
   recentMessages: string[];
   userInstructions?: string;
   knowledgeEntries?: any[];
+  userDetails?: Record<string, string>; // For consistent personal details like names
+  criticalInformation?: string[]; // For important therapeutic insights that must be retained
 }
 
 /**
  * Maximum number of messages to include in context
+ * Increased from 15 to 25 for better continuity
  */
-const MAX_MESSAGE_COUNT = 15;
+const MAX_MESSAGE_COUNT = 25;
 
 /**
  * Format chat history for the AI context window
@@ -46,6 +49,55 @@ export const formatKnowledgeEntries = (entries: any[]): string => {
   return `RELEVANT KNOWLEDGE:\n${entries.map((entry, index) => 
     `[${index + 1}] ${entry.title || 'Untitled'}: ${entry.content || entry.description || 'No content'}`
   ).join('\n\n')}`;
+};
+
+/**
+ * Extract key user information from conversation history
+ * This helps maintain awareness of important user details across sessions
+ */
+const extractUserDetails = (messages: any[]): Record<string, string> => {
+  const userDetails: Record<string, string> = {};
+  const namePattern = /my name is ([A-Za-z]+)|I'm ([A-Za-z]+)|I am ([A-Za-z]+)|call me ([A-Za-z]+)/i;
+  const partnerPattern = /my partner('s| is) ([A-Za-z]+)|partner named ([A-Za-z]+)/i;
+
+  for (const msg of messages) {
+    if (msg.sender_type !== 'user') continue;
+    
+    // Extract user's name
+    const nameMatch = msg.content.match(namePattern);
+    if (nameMatch) {
+      const name = nameMatch[1] || nameMatch[2] || nameMatch[3] || nameMatch[4];
+      if (name && name.length > 1) userDetails.userName = name;
+    }
+    
+    // Extract partner's name
+    const partnerMatch = msg.content.match(partnerPattern);
+    if (partnerMatch) {
+      const partnerName = partnerMatch[2] || partnerMatch[3];
+      if (partnerName && partnerName.length > 1) userDetails.partnerName = partnerName;
+    }
+    
+    // Could add more patterns for other critical information
+  }
+  
+  return userDetails;
+};
+
+/**
+ * Identify critical information from therapist insights
+ * This helps ensure therapeutic insights are preserved
+ */
+const extractCriticalInformation = (messages: any[]): string[] => {
+  const criticalInfo: string[] = [];
+  
+  for (const msg of messages) {
+    if (msg.sender_type === 'bot' && msg.knowledge_entries?.length > 0) {
+      // Extract insights from AI responses that referenced knowledge entries
+      criticalInfo.push(`Therapist insight: ${msg.content.slice(0, 120)}...`);
+    }
+  }
+  
+  return criticalInfo.slice(-5); // Keep the 5 most recent critical insights
 };
 
 /**
@@ -97,6 +149,12 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
     // Format the chat history
     const formattedHistory = formatChatContext(messages);
     
+    // Extract user details for continuity
+    const userDetails = extractUserDetails(messages);
+    
+    // Extract critical information
+    const criticalInformation = extractCriticalInformation(messages);
+    
     // Create a summary
     const historySummary = messages.length > 0 
       ? `User has ${messages.length} previous messages in conversation history.` 
@@ -106,7 +164,9 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
       historySummary,
       recentMessages: formattedHistory.split('\n\n'),
       userInstructions: customInstructions || undefined,
-      knowledgeEntries: knowledgeEntries.length > 0 ? knowledgeEntries : undefined
+      knowledgeEntries: knowledgeEntries.length > 0 ? knowledgeEntries : undefined,
+      userDetails: Object.keys(userDetails).length > 0 ? userDetails : undefined,
+      criticalInformation: criticalInformation.length > 0 ? criticalInformation : undefined
     };
   } catch (error) {
     console.error("Error fetching user context:", error);
@@ -130,6 +190,20 @@ export const enhanceInstructionsWithContext = async (
   
   // Build enriched instructions
   let enrichedInstructions = baseInstructions;
+  
+  // Add critical user details first for highest priority
+  if (userContext.userDetails) {
+    const detailsText = Object.entries(userContext.userDetails)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join('\n');
+    
+    enrichedInstructions += `\n\nIMPORTANT USER DETAILS (always remember these):\n${detailsText}`;
+  }
+  
+  // Add critical information that should be remembered across sessions
+  if (userContext.criticalInformation?.length) {
+    enrichedInstructions += `\n\nCRITICAL THERAPEUTIC INSIGHTS (maintain awareness of these):\n${userContext.criticalInformation.join('\n')}`;
+  }
   
   // Add user instructions if available
   if (userContext.userInstructions) {

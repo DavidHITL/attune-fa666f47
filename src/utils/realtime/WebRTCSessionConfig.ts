@@ -43,7 +43,14 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
           prefix_padding_ms: 300,
           silence_duration_ms: 1000
         },
-        temperature: 0.7
+        // Increase temperature slightly to ensure personality consistency
+        temperature: 0.75,
+        // Add priority directive for context maintenance
+        priority_hints: [
+          "Maintain consistent awareness of user details across the conversation",
+          "Remember important personal details like names and relationship history",
+          "Provide continuous therapeutic support without forgetting previously discussed topics"
+        ]
       }
     };
     

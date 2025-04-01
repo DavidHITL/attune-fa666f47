@@ -42,7 +42,9 @@ export const generateResponse = async (
       console.log("Context data fetched:", {
         historyLength: contextData.recentMessages.length,
         hasInstructions: !!contextData.userInstructions,
-        knowledgeEntries: contextData.knowledgeEntries?.length || 0
+        knowledgeEntries: contextData.knowledgeEntries?.length || 0,
+        userDetails: contextData.userDetails ? Object.keys(contextData.userDetails).length : 0,
+        criticalInformation: contextData.criticalInformation?.length || 0
       });
     }
 
@@ -61,7 +63,9 @@ export const generateResponse = async (
             contextData: contextData ? {
               recentMessages: contextData.recentMessages,
               therapyConcepts: contextData.knowledgeEntries?.filter(k => k.type === 'concept'),
-              therapySources: contextData.knowledgeEntries?.filter(k => k.type === 'source')
+              therapySources: contextData.knowledgeEntries?.filter(k => k.type === 'source'),
+              userDetails: contextData.userDetails,
+              criticalInformation: contextData.criticalInformation
             } : null
           })
         });
