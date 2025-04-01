@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import MicrophoneButton from '@/components/realtime/MicrophoneButton';
 import MicrophoneStatus from '@/components/realtime/MicrophoneStatus';
 import { Button } from '@/components/ui/button';
+import { Phone } from 'lucide-react';
 import { toast } from "sonner";
 
 interface RealtimeChatProps {
@@ -24,13 +25,14 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   
-  // Connect immediately when component mounts if autoConnect is true
+  // Connect immediately when component mounts
   useEffect(() => {
+    console.log("RealtimeChat mounted, autoConnect:", autoConnect);
     if (autoConnect) {
       console.log("Auto-connect triggered for voice chat");
       connectVoiceChat();
     }
-  }, [autoConnect]);
+  }, []);
   
   const connectVoiceChat = async () => {
     // Simulate connection process with a delay
@@ -104,26 +106,34 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
       {/* Microphone Status */}
       <MicrophoneStatus isActive={isMicrophoneActive} />
       
-      {/* Control Buttons */}
-      <div className="flex justify-center gap-4 mt-2">
-        {isConnected && (
+      {/* Only show control buttons when connected */}
+      {isConnected && (
+        <div className="flex justify-center gap-4 mt-2">
           <MicrophoneButton 
             isActive={isMicrophoneActive}
             isDisabled={!isConnected || isConnecting}
             onClick={handleMicrophoneToggle}
           />
-        )}
-        
-        <Button 
-          variant="outline" 
-          size="sm"
-          className="flex items-center gap-1"
-          onClick={onClose}
-          disabled={isConnecting}
-        >
-          End Call
-        </Button>
-      </div>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={onClose}
+            disabled={isConnecting}
+          >
+            <Phone className="h-4 w-4" />
+            End Call
+          </Button>
+        </div>
+      )}
+      
+      {/* Show loading indicator while connecting */}
+      {isConnecting && (
+        <div className="flex justify-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+        </div>
+      )}
     </div>
   );
 };

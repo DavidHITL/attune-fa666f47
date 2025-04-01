@@ -27,6 +27,10 @@ const CallModal: React.FC<CallModalProps> = ({
     onOpenChange(false);
   };
   
+  // Use a key based on the open state to ensure the component is remounted
+  // when the modal is reopened, which guarantees the useEffect runs again
+  const componentKey = `realtime-chat-${open ? 'open' : 'closed'}`;
+  
   return (
     <Dialog open={open} onOpenChange={handleCloseModal}>
       <DialogContent className="sm:max-w-md">
@@ -40,10 +44,11 @@ const CallModal: React.FC<CallModalProps> = ({
         {/* Voice chat connects automatically when modal is opened */}
         {open && (
           <RealtimeChat 
+            key={componentKey}
             sessionStarted={sessionStarted}
             sessionEndTime={sessionEndTime}
             onClose={handleCloseModal}
-            autoConnect={true}
+            autoConnect={true} // Always auto-connect
           />
         )}
       </DialogContent>
