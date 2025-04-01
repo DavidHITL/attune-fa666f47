@@ -1,6 +1,5 @@
 
 import React, { useEffect } from 'react';
-import { Card } from "@/components/ui/card";
 import VoiceStatusIndicator from './VoiceStatusIndicator';
 import MicrophoneControlGroup from './MicrophoneControlGroup';
 import ConnectionLoadingIndicator from './ConnectionLoadingIndicator';
@@ -19,7 +18,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   sessionStarted = false,
   sessionEndTime = null,
   onClose,
-  autoConnect = false
+  autoConnect = true // Default changed to true
 }) => {
   // Set up connection handlers
   const {
@@ -60,9 +59,17 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
     console.log("RealtimeChat mounted, autoConnect:", shouldAutoConnect);
     if (shouldAutoConnect) {
       console.log("Auto-connect triggered for voice chat");
-      connectVoiceChat();
+      connectVoiceChat().then(success => {
+        console.log("Voice chat connection attempt result:", success);
+        
+        // Automatically activate microphone after successful connection
+        if (success && !isMicrophoneActive) {
+          console.log("Auto-activating microphone");
+          handleMicrophoneToggle();
+        }
+      });
     }
-  }, [shouldAutoConnect, connectVoiceChat]);
+  }, [shouldAutoConnect, connectVoiceChat, isMicrophoneActive, handleMicrophoneToggle]);
   
   // Cleanup on unmount
   useEffect(() => {

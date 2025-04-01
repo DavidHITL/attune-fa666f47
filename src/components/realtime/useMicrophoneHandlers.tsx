@@ -45,7 +45,7 @@ export function useMicrophoneHandlers({
   // Simulate AI response 
   const simulateAiResponse = useCallback(() => {
     // Only proceed if we're connected and microphone is active
-    if (isConnected && isMicrophoneActive) {
+    if (isConnected) {
       // First temporarily disable the microphone during AI response
       setIsMicrophoneActive(false);
       
@@ -69,11 +69,17 @@ export function useMicrophoneHandlers({
         }, 300);
       }, 2000);
     }
-  }, [isConnected, isMicrophoneActive, onAiSpeaking]);
+  }, [isConnected, onAiSpeaking]);
   
   // Handle microphone toggle
   const handleMicrophoneToggle = useCallback(async () => {
     console.log("Microphone toggle requested, current state:", isMicrophoneActive);
+    
+    // Only allow toggling if connected
+    if (!isConnected) {
+      console.log("Cannot toggle microphone: not connected");
+      return false;
+    }
     
     if (isMicrophoneActive) {
       setIsMicrophoneActive(false);
@@ -97,7 +103,7 @@ export function useMicrophoneHandlers({
       
       return true;
     }
-  }, [isMicrophoneActive, silenceTimeoutRef, silenceDetectorRef]);
+  }, [isConnected, isMicrophoneActive, silenceTimeoutRef, silenceDetectorRef]);
   
   // Process audio data
   const processAudioData = useCallback((audioData: Float32Array) => {

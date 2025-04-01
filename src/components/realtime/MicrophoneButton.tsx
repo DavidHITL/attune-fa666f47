@@ -27,13 +27,13 @@ const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
   return (
     <Button 
       size="sm"
-      variant={isActive ? "destructive" : "outline"}
+      variant={isActive ? "default" : "outline"}
       onClick={handleClick}
       disabled={isDisabled}
       className={`flex items-center gap-1 ${className}`}
-      title={isActive ? "Disable microphone" : "Enable microphone"}
+      title={isActive ? "Mute microphone" : "Unmute microphone"}
     >
-      {isActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+      {isActive ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
       {isActive ? "Mute" : "Speak"}
     </Button>
   );
