@@ -1,5 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMessagesWithMetadata } from "@/services/messages/messageStorage";
+import { LosingStrategyFlags } from "@/utils/strategyUtils";
 
 /**
  * Interface for context enrichment data
@@ -14,13 +16,7 @@ export interface ContextData {
   analysisResults?: {
     summary?: string;
     keywords?: string[];
-    losingStrategies?: {
-      beingRight: number;
-      unbridledSelfExpression: number;
-      controlling: number;
-      retaliation: number;
-      withdrawal: number;
-    };
+    losingStrategies?: LosingStrategyFlags;
   }; // New field for analysis results
 }
 
@@ -128,10 +124,22 @@ const fetchAnalysisResults = async (userId: string) => {
       return null;
     }
     
+    // Type assertion and validation to ensure proper structure
+    const losingStrategiesData = data.losing_strategy_flags as LosingStrategyFlags | null;
+    
+    // Check if losing strategies data is properly structured
+    const validatedLosingStrategies = losingStrategiesData ? {
+      beingRight: typeof losingStrategiesData.beingRight === 'number' ? losingStrategiesData.beingRight : undefined,
+      unbridledSelfExpression: typeof losingStrategiesData.unbridledSelfExpression === 'number' ? losingStrategiesData.unbridledSelfExpression : undefined,
+      controlling: typeof losingStrategiesData.controlling === 'number' ? losingStrategiesData.controlling : undefined,
+      retaliation: typeof losingStrategiesData.retaliation === 'number' ? losingStrategiesData.retaliation : undefined,
+      withdrawal: typeof losingStrategiesData.withdrawal === 'number' ? losingStrategiesData.withdrawal : undefined
+    } : undefined;
+    
     return {
       summary: data.summary_text,
       keywords: data.keywords,
-      losingStrategies: data.losing_strategy_flags
+      losingStrategies: validatedLosingStrategies
     };
   } catch (err) {
     console.error("Error fetching analysis results:", err);
