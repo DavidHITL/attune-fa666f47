@@ -1,6 +1,6 @@
 
 import { useConnectionManagement } from "./useConnectionManagement";
-import { useMicrophoneControl } from "./useMicrophoneControl";
+import { useMicrophoneControl } from "./useActionHooks/useMicrophoneControl";
 import { useDataChannelStatus } from "./useDataChannelStatus";
 import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
