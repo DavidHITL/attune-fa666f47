@@ -29,15 +29,16 @@ const MicrophoneControlGroup: React.FC<MicrophoneControlGroupProps> = ({
       {/* Microphone Status */}
       <MicrophoneStatus isActive={isMicrophoneActive} />
       
-      {/* Connection controls - now uses the updated version with mic control */}
-      <ConnectionControls 
-        isConnected={isConnected}
-        isConnecting={isConnecting}
-        isMicrophoneActive={isMicrophoneActive}
-        isAiSpeaking={isAiSpeaking}
-        onToggleMicrophone={onToggleMicrophone}
-        onClose={onClose}
-      />
+      {/* Microphone Button - only show if connected */}
+      {isConnected && (
+        <div className="flex justify-center">
+          <MicrophoneButton 
+            isActive={isMicrophoneActive} 
+            isDisabled={isConnecting || isAiSpeaking} 
+            onClick={onToggleMicrophone}
+          />
+        </div>
+      )}
     </div>
   );
 };
