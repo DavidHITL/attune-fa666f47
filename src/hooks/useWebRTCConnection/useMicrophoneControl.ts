@@ -1,3 +1,4 @@
+
 import { useCallback, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
@@ -112,6 +113,7 @@ export function useMicrophoneControl(
         // Create the recorder primarily for tracking mic state and showing visual feedback
         // With direct WebRTC audio track, we don't need to send audio via data channel
         const recorder = new AudioRecorder({
+          // This is now empty as we don't need to manually send audio data
           onAudioData: () => {
             // We don't need to manually send audio data anymore
             // The WebRTC connection will handle this directly

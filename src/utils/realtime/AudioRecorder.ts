@@ -109,15 +109,17 @@ export class AudioRecorder {
       this.silenceStart = null;
       this.isSilent = false;
       
-      // Set up the audio processing callback to continuously process audio data
+      // Set up the audio processing callback to detect silence only, not sending audio data
       this.processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
         
         // Check for silence
         this.detectSilence(inputData);
         
+        // We no longer send audio data via the data channel
+        // The WebRTC connection handles this directly through the audio track
         if (this.options.onAudioData) {
-          // Create a copy of the audio data to prevent mutation
+          // Only call this for compatibility, but not needed for audio sending anymore
           const now = Date.now();
           this.lastAudioSentTimestamp = now;
           this.options.onAudioData(new Float32Array(inputData));
