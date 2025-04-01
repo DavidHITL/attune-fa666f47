@@ -11,7 +11,7 @@ export function useConnectionInitializer(
   isConnected: boolean,
   isConnecting: boolean,
   connectorRef: React.MutableRefObject<WebRTCConnector | null>,
-  prewarmMicrophoneAccess: () => Promise<void>
+  prewarmMicrophoneAccess: () => Promise<boolean>  // Changed return type from void to boolean
 ) {
   // Auto-connect if enabled or prewarm microphone
   useEffect(() => {
