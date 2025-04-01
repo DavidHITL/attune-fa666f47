@@ -6,7 +6,14 @@ import { useMessageHandler } from "./useMessageHandler";
 import { useConnectionActions } from "./useConnectionActions";
 import { useAudioProcessor } from "./useAudioProcessor";
 
+// Re-export hooks and types for external use
 export * from "./types";
+export * from "./useConnectionState";
+export * from "./useConnectionManagement";
+export * from "./useConnectionLifecycle";
+export * from "./useConnectionStateHandler";
+export * from "./useConnectionErrorHandler";
+export * from "./useDisconnection";
 
 export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): WebRTCConnectionResult {
   // Set default options
@@ -57,7 +64,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
         audioProcessorRef.current.cleanup();
       }
     };
-  }, [audioProcessor, messageHandler]);
+  }, [audioProcessor, messageHandler, audioProcessorRef, messageHandlerRef]);
   
   // Set up message handler
   const { handleMessage } = useMessageHandler(messageHandlerRef, setMessages);
