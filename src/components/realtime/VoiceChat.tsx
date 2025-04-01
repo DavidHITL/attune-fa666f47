@@ -72,7 +72,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     enableMicrophone: false,
     // Use the VoiceChatAudio component for handling audio tracks
     onTrack: null, // We'll handle this in VoiceChatAudio
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error("[VoiceChat] WebRTC error:", error);
       toast.error(`Connection error: ${error.message || "Unknown error"}`);
     }

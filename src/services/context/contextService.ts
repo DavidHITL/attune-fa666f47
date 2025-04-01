@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { fetchMessagesWithMetadata } from "@/services/messages/messageStorage";
+import { fetchMessagesWithMetadata as fetchMessagesFromStorage } from "@/services/messages/messageStorage";
 import { ContextData } from "./types";
 import { formatChatContext, formatKnowledgeEntries } from "./formatters";
 import { extractUserDetails, extractCriticalInformation } from "./extractors";
@@ -21,7 +21,7 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
     console.log(`[Context] Fetching context for user: ${userId}`);
     
     // Fetch messages with metadata
-    const messages = await fetchMessagesWithMetadata(userId);
+    const messages = await fetchMessagesFromStorage(userId);
     
     if (!messages || messages.length === 0) {
       console.log("[Context] No messages found for context enrichment");
@@ -119,9 +119,10 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
 };
 
 /**
- * Fetch messages with metadata for a specific user
+ * Internal function to fetch messages with metadata for a specific user
+ * This is a local implementation specifically for the context service
  */
-export const fetchMessagesWithMetadata = async (userId: string) => {
+const fetchLocalMessagesWithMetadata = async (userId: string) => {
   try {
     const { data, error } = await supabase
       .from('messages')
@@ -137,7 +138,7 @@ export const fetchMessagesWithMetadata = async (userId: string) => {
     
     return data;
   } catch (error) {
-    console.error("[Context] Error in fetchMessagesWithMetadata:", error);
+    console.error("[Context] Error in fetchLocalMessagesWithMetadata:", error);
     return null;
   }
 };

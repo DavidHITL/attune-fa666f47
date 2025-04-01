@@ -1,20 +1,33 @@
 
 import { ContextData, fetchUserContext } from "@/services/context";
 import { ApiContextData } from "./types";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Prepare context data for the API request
  */
-export const prepareContextData = async (): Promise<ApiContextData | null> => {
-  // Fetch context data for the AI
-  const contextData = await fetchUserContext();
+export const prepareContextData = async (userId?: string): Promise<ApiContextData | null> => {
+  // If no userId is provided, try to get it from the current session
+  if (!userId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    userId = session?.user?.id;
+    
+    if (!userId) {
+      console.log("[contextPreparation] No user ID available");
+      return null;
+    }
+  }
+  
+  // Fetch context data for the AI using the userId
+  const contextData = await fetchUserContext(userId);
   
   if (!contextData) {
     return null;
   }
   
   // Log context data being used (helpful for debugging)
-  console.log("Context data prepared:", {
+  console.log("[contextPreparation] Context data prepared:", {
     historyLength: contextData.recentMessages.length,
     hasInstructions: !!contextData.userInstructions,
     knowledgeEntries: contextData.knowledgeEntries?.length || 0,

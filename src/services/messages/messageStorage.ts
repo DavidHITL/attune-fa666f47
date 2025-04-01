@@ -98,6 +98,7 @@ export const convertToMessageObjects = (messages: any[]): Message[] => {
 
 /**
  * Fetch messages with metadata for context enrichment
+ * @param userId Optional user ID, will try to get from session if not provided
  */
 export const fetchMessagesWithMetadata = async (userId?: string) => {
   try {
