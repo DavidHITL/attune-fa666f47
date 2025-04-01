@@ -1,4 +1,6 @@
 
+import { MAX_MESSAGE_COUNT } from './types';
+
 /**
  * Format chat history for the AI context window
  */
@@ -8,7 +10,6 @@ export const formatChatContext = (messages: any[]): string => {
   }
   
   // Extract only the most recent messages up to MAX_MESSAGE_COUNT
-  import { MAX_MESSAGE_COUNT } from './types';
   const recentMessages = messages.slice(-MAX_MESSAGE_COUNT);
   
   return recentMessages.map(msg => {

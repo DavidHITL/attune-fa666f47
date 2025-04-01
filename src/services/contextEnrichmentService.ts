@@ -5,6 +5,8 @@ export {
   fetchUserContext, 
   enhanceInstructionsWithContext,
   formatChatContext,
-  formatKnowledgeEntries,
-  ContextData
+  formatKnowledgeEntries
 } from './context';
+
+// Re-export types using the proper syntax for isolated modules
+export type { ContextData } from './context';
