@@ -1,5 +1,4 @@
 
-
 import { WebRTCOptions } from "./WebRTCTypes";
 
 /**
@@ -39,6 +38,32 @@ export function setupPeerConnectionListeners(
   // Handle incoming tracks (audio)
   pc.ontrack = (event) => {
     console.log("[WebRTC] Received track:", event.track.kind, event.track.id);
+    
+    // Handle audio track from OpenAI for playback
+    if (event.track.kind === 'audio' && event.streams && event.streams[0]) {
+      console.log("[WebRTC] Setting up audio playback for incoming audio stream");
+      
+      // Create an audio element if it doesn't exist
+      let audioElement = document.getElementById('openai-audio') as HTMLAudioElement;
+      
+      if (!audioElement) {
+        console.log("[WebRTC] Creating new audio element for playback");
+        audioElement = document.createElement('audio');
+        audioElement.id = 'openai-audio';
+        audioElement.autoplay = true;
+        audioElement.style.display = 'none';
+        document.body.appendChild(audioElement);
+      }
+      
+      // Set the stream as the source for the audio element
+      audioElement.srcObject = event.streams[0];
+      
+      // Start playback (modern browsers require user interaction before autoplay)
+      audioElement.play()
+        .then(() => console.log("[WebRTC] Audio playback started successfully"))
+        .catch(err => console.error("[WebRTC] Audio playback failed:", err));
+    }
+    
     if (options.onTrack) {
       options.onTrack(event);
     }
@@ -103,4 +128,3 @@ export function setupPeerConnectionListeners(
     console.log("[WebRTC] Signaling state changed:", pc.signalingState);
   };
 }
-

@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { toast } from "sonner";
 import { saveMessage } from "@/services/messages/messageStorage";
@@ -23,6 +23,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   onClose
 }) => {
   const { user } = useAuth();
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   const {
     isConnected,
@@ -36,12 +37,32 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     disconnect,
     toggleMicrophone,
     sendTextMessage,
-    commitAudioBuffer
+    commitAudioBuffer,
+    getActiveMediaStream
   } = useWebRTCConnection({
     instructions: systemPrompt,
     voice,
     autoConnect: false,
-    enableMicrophone: false
+    enableMicrophone: false,
+    onTrack: (event) => {
+      // Handle incoming audio track
+      if (event.track.kind === 'audio' && event.streams && event.streams.length > 0) {
+        console.log("[VoiceChat] Received audio track from WebRTC, connecting to audio element");
+        if (audioRef.current) {
+          audioRef.current.srcObject = event.streams[0];
+          
+          audioRef.current.onloadedmetadata = () => {
+            console.log("[VoiceChat] Audio metadata loaded, attempting playback");
+            audioRef.current?.play()
+              .then(() => console.log("[VoiceChat] Audio playback started"))
+              .catch(err => {
+                console.error("[VoiceChat] Audio playback failed:", err);
+                toast.error("Audio playback failed. Please check your audio settings.");
+              });
+          };
+        }
+      }
+    }
   });
 
   // Extract microphone handling logic
@@ -89,8 +110,37 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     }
   };
 
+  // Ensure audio context is resumed after user interaction
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      if (audioRef.current && audioRef.current.paused) {
+        console.log("[VoiceChat] User interaction detected, attempting to resume audio context");
+        audioRef.current.play()
+          .catch(err => console.log("[VoiceChat] Could not auto-play audio after interaction:", err));
+      }
+    };
+
+    // Add interaction listeners
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+    
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col space-y-4 w-full max-w-xl mx-auto p-4 bg-white rounded-lg shadow-md">
+      {/* Hidden audio element for playing assistant's voice */}
+      <audio 
+        ref={audioRef} 
+        autoPlay 
+        playsInline
+        style={{ display: 'none' }}
+        id="voice-chat-audio"
+      />
+      
       {/* Connection Status & Controls */}
       <ConnectionControls 
         isConnected={isConnected}
