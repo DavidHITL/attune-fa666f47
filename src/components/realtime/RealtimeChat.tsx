@@ -32,7 +32,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
       console.log("Auto-connect triggered for voice chat");
       connectVoiceChat();
     }
-  }, []);
+  }, [autoConnect]); // Re-add autoConnect dependency to ensure connection happens when prop changes
   
   const connectVoiceChat = async () => {
     // Simulate connection process with a delay
@@ -44,6 +44,14 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
       setIsConnected(true);
       console.log("Voice connection established successfully");
       toast.success("Voice connection established");
+      
+      // Auto-activate microphone after connection is established
+      console.log("Auto-activating microphone");
+      setTimeout(() => {
+        handleMicrophoneToggle().catch(err => {
+          console.error("Failed to auto-activate microphone:", err);
+        });
+      }, 500);
     } catch (error) {
       console.error("Connection error:", error);
       toast.error("Failed to establish voice connection");
@@ -63,16 +71,21 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   
   // Mock function for microphone toggle - will be replaced by actual implementation
   const handleMicrophoneToggle = async () => {
+    console.log("Microphone toggle requested, current state:", isMicrophoneActive);
     if (isMicrophoneActive) {
       setIsMicrophoneActive(false);
+      console.log("Microphone deactivated");
       return true;
     } else {
       setIsMicrophoneActive(true);
+      console.log("Microphone activated");
       // Simulate AI response when microphone is activated
       setTimeout(() => {
+        console.log("AI speaking started");
         setIsAiSpeaking(true);
         setTimeout(() => {
           setTimeout(() => {
+            console.log("AI speaking ended");
             setIsAiSpeaking(false);
           }, 1500);
         }, 500);

@@ -24,12 +24,15 @@ const CallModal: React.FC<CallModalProps> = ({
   sessionEndTime = null 
 }) => {
   const handleCloseModal = () => {
+    console.log("CallModal: closing modal");
     onOpenChange(false);
   };
   
   // Use a key based on the open state to ensure the component is remounted
   // when the modal is reopened, which guarantees the useEffect runs again
-  const componentKey = `realtime-chat-${open ? 'open' : 'closed'}`;
+  const componentKey = `realtime-chat-${open ? 'open' : 'closed'}-${Date.now()}`;
+  
+  console.log("CallModal rendered, open state:", open, "with key:", componentKey);
   
   return (
     <Dialog open={open} onOpenChange={handleCloseModal}>
