@@ -1,9 +1,11 @@
+
 import { WebRTCOptions } from "@/utils/realtime/WebRTCTypes";
 
 export interface WebRTCMessage {
   type: string;
   content: string;
   isUser: boolean;
+  delta?: string; // Add delta property for audio and transcript fragments
 }
 
 export interface UseWebRTCConnectionOptions extends WebRTCOptions {
@@ -27,4 +29,21 @@ export interface WebRTCConnectionResult {
   sendTextMessage: (text: string) => boolean;
   getActiveMediaStream: () => MediaStream | null;
   getActiveAudioTrack: () => MediaStreamTrack | null;
+}
+
+// Add the WebRTCConnectionState interface
+export interface WebRTCConnectionState {
+  isConnected: boolean;
+  isConnecting: boolean;
+  isMicrophoneActive: boolean;
+  isAiSpeaking: boolean;
+  currentTranscript: string;
+  messages: WebRTCMessage[];
+}
+
+// Add MessageMetadata interface
+export interface MessageMetadata {
+  messageType: 'text' | 'voice';
+  instructions?: string;
+  knowledgeEntries?: string[];
 }
