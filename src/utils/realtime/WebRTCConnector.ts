@@ -109,6 +109,13 @@ export class WebRTCConnector {
   getConnectionState(): RTCPeerConnectionState {
     return this.connectionManager.getConnectionState();
   }
+  
+  /**
+   * Check if the data channel is ready for sending
+   */
+  isDataChannelReady(): boolean {
+    return this.connectionManager.isDataChannelReady();
+  }
 
   /**
    * Disconnect from the OpenAI Realtime API

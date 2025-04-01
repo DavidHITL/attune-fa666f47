@@ -11,6 +11,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
   private dc: RTCDataChannel | null = null;
   private sessionManager: SessionManager | null = null;
   private connectionEstablisher: WebRTCConnectionEstablisher;
+  private dataChannelReady: boolean = false;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -47,6 +48,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
     console.log("[WebRTCConnectionManager] Starting connection process");
     
     this.clearConnectionTimeout();
+    this.dataChannelReady = false;
     
     try {
       const connection = await this.connectionEstablisher.establish(
@@ -63,6 +65,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
         () => {
           // This will be called when the data channel opens
           console.log("[WebRTCConnectionManager] Data channel is open and ready");
+          this.dataChannelReady = true;
           this.configureSessionWhenReady();
         },
         this.handleError.bind(this),
@@ -106,8 +109,8 @@ export class WebRTCConnectionManager extends ConnectionBase {
    * Send a text message to OpenAI
    */
   sendTextMessage(text: string): boolean {
-    if (!this.dc) {
-      console.error("[WebRTCConnectionManager] Data channel not available for sending text");
+    if (!this.dc || !this.dataChannelReady || this.dc.readyState !== "open") {
+      console.error(`[WebRTCConnectionManager] Data channel not ready for sending text, state: ${this.dc?.readyState || 'null'}`);
       return false;
     }
     
@@ -124,8 +127,8 @@ export class WebRTCConnectionManager extends ConnectionBase {
    * Send audio data to OpenAI
    */
   sendAudioData(audioData: Float32Array): boolean {
-    if (!this.dc) {
-      console.error("[WebRTCConnectionManager] Data channel not available for sending audio");
+    if (!this.dc || !this.dataChannelReady || this.dc.readyState !== "open") {
+      console.error(`[WebRTCConnectionManager] Data channel not ready for sending audio, state: ${this.dc?.readyState || 'null'}`);
       return false;
     }
     
@@ -137,6 +140,13 @@ export class WebRTCConnectionManager extends ConnectionBase {
       return false;
     }
   }
+  
+  /**
+   * Check if the data channel is ready for sending
+   */
+  isDataChannelReady(): boolean {
+    return this.dataChannelReady && !!this.dc && this.dc.readyState === "open";
+  }
 
   /**
    * Disconnect from the OpenAI Realtime API
@@ -146,6 +156,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
     
     this.clearConnectionTimeout();
     this.connectionEstablisher.cleanup();
+    this.dataChannelReady = false;
     
     // Reset session configuration
     if (this.sessionManager) {

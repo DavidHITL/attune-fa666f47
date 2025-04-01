@@ -14,6 +14,11 @@ export function useMessageSender(
       return false;
     }
     
+    if (!connectorRef.current.isDataChannelReady()) {
+      toast.error("Data channel is not ready yet. Please wait a moment and try again.");
+      return false;
+    }
+    
     try {
       return connectorRef.current.sendTextMessage(text);
     } catch (error) {
@@ -27,6 +32,11 @@ export function useMessageSender(
   const sendAudioData = useCallback((audioData: Float32Array) => {
     if (!isConnected || !connectorRef.current) {
       console.error("[useMessageSender] Cannot send audio: not connected");
+      return false;
+    }
+    
+    if (!connectorRef.current.isDataChannelReady()) {
+      console.warn("[useMessageSender] Data channel not ready for audio");
       return false;
     }
     

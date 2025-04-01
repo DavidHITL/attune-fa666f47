@@ -74,7 +74,8 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     toggleMicrophone,
     sendTextMessage,
     getActiveMediaStream,
-    getActiveAudioTrack
+    getActiveAudioTrack,
+    isDataChannelReady
   } = useConnectionActions(
     isConnected,
     isConnecting,
@@ -113,6 +114,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     currentTranscript,
     transcriptProgress,
     messages,
+    isDataChannelReady,
     connect,
     disconnect,
     toggleMicrophone,
