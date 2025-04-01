@@ -10,35 +10,28 @@ import { fetchAnalysisResults } from "./analysisService";
  * Fetch user context data from Supabase
  */
 export const fetchUserContext = async (userId?: string): Promise<ContextData | null> => {
+  console.log("[Context] Fetching context for user:", userId);
+  
   if (!userId) {
-    console.log("No user ID provided for context enrichment");
+    console.log("[Context] No user ID provided for context enrichment");
     return null;
   }
 
   try {
-    // Get current user session if no userId provided
-    if (!userId) {
-      const { data: { session } } = await supabase.auth.getSession();
-      userId = session?.user?.id;
-      
-      if (!userId) {
-        console.log("No active user session found");
-        return null;
-      }
-    }
-
-    console.log(`Fetching context for user: ${userId}`);
+    console.log(`[Context] Fetching context for user: ${userId}`);
     
     // Fetch messages with metadata
-    const messages = await fetchMessagesWithMetadata();
+    const messages = await fetchMessagesWithMetadata(userId);
     
-    if (!messages) {
-      console.log("No messages found for context enrichment");
+    if (!messages || messages.length === 0) {
+      console.log("[Context] No messages found for context enrichment");
       return {
         historySummary: "No previous conversation history found.",
         recentMessages: []
       };
     }
+    
+    console.log(`[Context] Found ${messages.length} messages for context enrichment`);
     
     // Extract custom instructions from the most recent messages
     const customInstructions = messages
@@ -64,22 +57,87 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
     // Fetch analysis results
     const analysisResults = await fetchAnalysisResults(userId);
     
+    // Fetch therapy concepts from database
+    const { data: therapyConcepts } = await supabase
+      .from('therapy_concepts')
+      .select('*')
+      .limit(10);
+    
+    // Fetch therapy sources from database
+    const { data: therapySources } = await supabase
+      .from('therapy_sources')
+      .select('*')
+      .limit(10);
+      
     // Create a summary
     const historySummary = messages.length > 0 
       ? `User has ${messages.length} previous messages in conversation history.` 
       : "This is a new conversation with no previous history.";
     
-    return {
+    const contextData = {
       historySummary,
       recentMessages: formattedHistory.split('\n\n'),
       userInstructions: customInstructions || undefined,
-      knowledgeEntries: knowledgeEntries.length > 0 ? knowledgeEntries : undefined,
+      knowledgeEntries: [
+        ...(knowledgeEntries.length > 0 ? knowledgeEntries : []),
+        ...(therapyConcepts || []).map(concept => ({
+          type: 'concept',
+          name: concept.name,
+          description: concept.description,
+          category: concept.category
+        })),
+        ...(therapySources || []).map(source => ({
+          type: 'source',
+          title: source.title,
+          author: source.author,
+          year: source.year,
+          description: source.description,
+          content_summary: source.content_summary
+        }))
+      ],
       userDetails: Object.keys(userDetails).length > 0 ? userDetails : undefined,
       criticalInformation: criticalInformation.length > 0 ? criticalInformation : undefined,
       analysisResults: analysisResults || undefined
     };
+    
+    console.log("[Context] Context data prepared successfully:", {
+      messageCount: messages.length,
+      hasInstructions: !!contextData.userInstructions,
+      knowledgeEntryCount: contextData.knowledgeEntries?.length || 0,
+      therapyConcepts: therapyConcepts?.length || 0,
+      therapySources: therapySources?.length || 0,
+      userDetailsCount: contextData.userDetails ? Object.keys(contextData.userDetails).length : 0,
+      criticalInfoCount: contextData.criticalInformation?.length || 0,
+      hasAnalysisResults: !!contextData.analysisResults
+    });
+    
+    return contextData;
   } catch (error) {
-    console.error("Error fetching user context:", error);
+    console.error("[Context] Error fetching user context:", error);
+    return null;
+  }
+};
+
+/**
+ * Fetch messages with metadata for a specific user
+ */
+export const fetchMessagesWithMetadata = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+      
+    if (error) {
+      console.error("[Context] Error fetching messages:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("[Context] Error in fetchMessagesWithMetadata:", error);
     return null;
   }
 };

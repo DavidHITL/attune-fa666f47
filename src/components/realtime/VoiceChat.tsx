@@ -12,6 +12,7 @@ import VoiceChatAudio from "./VoiceChatAudio";
 import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 import MicrophoneControlGroup from "./MicrophoneControlGroup";
+import { toast } from "sonner";
 
 interface VoiceChatProps {
   systemPrompt?: string;
@@ -20,7 +21,7 @@ interface VoiceChatProps {
 }
 
 const VoiceChat: React.FC<VoiceChatProps> = ({
-  systemPrompt = "You are a helpful AI assistant. Be concise in your responses.",
+  systemPrompt,
   voice = "alloy",
   onClose
 }) => {
@@ -42,6 +43,11 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
       }
     };
   }, []);
+
+  // Log user state for debugging
+  useEffect(() => {
+    console.log("[VoiceChat] User state:", user ? { id: user.id } : "No user");
+  }, [user]);
   
   const {
     isConnected,
@@ -59,13 +65,17 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     getActiveMediaStream,
     setAudioPlaybackManager
   } = useWebRTCConnection({
-    instructions: systemPrompt,
+    instructions: systemPrompt, // This will be overridden by the config from database
     voice,
     userId: user?.id,
     autoConnect: true, // Auto connect when component mounts
     enableMicrophone: false,
     // Use the VoiceChatAudio component for handling audio tracks
-    onTrack: null // We'll handle this in VoiceChatAudio
+    onTrack: null, // We'll handle this in VoiceChatAudio
+    onError: (error) => {
+      console.error("[VoiceChat] WebRTC error:", error);
+      toast.error(`Connection error: ${error.message || "Unknown error"}`);
+    }
   });
 
   // Connect the audio playback manager to the WebRTC connection

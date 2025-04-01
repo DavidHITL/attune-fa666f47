@@ -1,78 +1,65 @@
 
-import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
-import { testDatabaseAccess } from "../api/chatService";
-import { MessageMetadata } from "@/hooks/useWebRTCConnection/types";
+import { Message } from "@/components/MessageBubble";
+import { createMessageObject } from "./messageUtils";
 
-// Save message to database with explicit error handling for RLS policy issues
-export const saveMessage = async (
-  text: string, 
-  isUser: boolean, 
-  metadata: Partial<MessageMetadata> = { messageType: 'text' }
-): Promise<string | null> => {
+/**
+ * Save a message to the database
+ */
+export const saveMessage = async (text: string, isUser: boolean, metadata: any = {}) => {
   try {
-    // Check if the user is logged in
+    // Get current user session
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session || !session.user || !session.user.id) {
-      console.error("No valid session found when saving message");
+    
+    if (!session?.user) {
+      console.error("Cannot save message: No authenticated user");
       return null;
     }
     
-    // First check if we can access the messages table
-    const hasAccess = await testDatabaseAccess();
-    if (!hasAccess) {
-      // Log error about RLS issues
-      console.error("Database access issue: Could not save message due to permissions");
-      return null;
-    }
+    const { messageType = 'text', instructions, knowledgeEntries } = metadata;
     
-    // Try to insert the message with explicit user_id set to current user
+    const newMessage = {
+      user_id: session.user.id,
+      content: text,
+      sender_type: isUser ? 'user' : 'assistant',
+      message_type: messageType,
+      instructions,
+      knowledge_entries: knowledgeEntries
+    };
+    
+    // Insert the message
     const { data, error } = await supabase
       .from('messages')
-      .insert({
-        content: text,
-        user_id: session.user.id,
-        sender_type: isUser ? 'user' : 'bot',
-        message_type: metadata.messageType === 'voice' ? 'voice' : 'text', // Ensure it's either 'voice' or 'text'
-        instructions: metadata.instructions,
-        knowledge_entries: metadata.knowledgeEntries || null
-      })
-      .select('id')
+      .insert(newMessage)
+      .select()
       .single();
     
     if (error) {
-      console.error("Error saving message to database:", error);
-      if (error.code === '42501' || error.message.includes('policy')) {
-        console.error("Row Level Security (RLS) policy issue detected:", error.message);
-      }
+      console.error("Error saving message:", error);
       return null;
     }
     
-    console.log("Message saved successfully with ID:", data?.id);
-    return data?.id?.toString() || null;
+    return data.id;
   } catch (error) {
-    console.error("Failed to save message:", error);
+    console.error("Error in saveMessage:", error);
     return null;
   }
 };
 
-// Fetch messages directly from the database
-export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => {
+/**
+ * Fetch messages for the current user from the database
+ */
+export const fetchMessages = async () => {
   try {
-    // Check if the user is logged in
+    // Get current user session
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session || !session.user) {
-      console.error("No valid session found when fetching messages");
+    
+    if (!session?.user) {
+      console.error("Cannot fetch messages: No authenticated user");
       return null;
     }
-
-    // First test if we can access the messages table
-    const hasAccess = await testDatabaseAccess();
-    if (!hasAccess) {
-      console.error("Database access issue: Could not fetch chat history");
-      return null;
-    }
-
+    
+    // Get messages for this user
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -81,58 +68,68 @@ export const fetchMessagesFromDatabase = async (): Promise<Message[] | null> => 
     
     if (error) {
       console.error("Error fetching messages:", error);
-      if (error.code === '42501' || error.message.includes('policy')) {
-        console.error("Row Level Security (RLS) policy issue detected:", error.message);
-      }
       return null;
     }
     
-    if (!data || data.length === 0) {
-      console.log("No messages found in database");
-      return null;
-    }
-    
-    // Transform database messages to our app format
-    const formattedMessages: Message[] = data.map(dbMessage => ({
-      id: dbMessage.id.toString(),
-      text: dbMessage.content || '',
-      isUser: dbMessage.sender_type === 'user',
-      timestamp: new Date(dbMessage.created_at),
-      messageType: (dbMessage.message_type === 'voice' ? 'voice' : 'text') as 'text' | 'voice' // Ensure correct type
-    }));
-    
-    console.log(`Fetched ${formattedMessages.length} messages from database`);
-    return formattedMessages;
+    return data;
   } catch (error) {
-    console.error("Failed to fetch messages:", error);
+    console.error("Error in fetchMessages:", error);
     return null;
   }
 };
 
-// Fetch messages with additional metadata for context enrichment
-export const fetchMessagesWithMetadata = async (): Promise<any[] | null> => {
-  try {
-    // Check if the user is logged in
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session || !session.user) {
-      console.error("No valid session found when fetching messages with metadata");
-      return null;
-    }
+/**
+ * Convert database messages to UI message format
+ */
+export const convertToMessageObjects = (messages: any[]): Message[] => {
+  if (!messages || !Array.isArray(messages)) {
+    return [];
+  }
+  
+  return messages.map(msg => {
+    return createMessageObject(
+      msg.content,
+      msg.sender_type === 'user',
+      new Date(msg.created_at),
+      msg.id.toString()
+    );
+  });
+};
 
+/**
+ * Fetch messages with metadata for context enrichment
+ */
+export const fetchMessagesWithMetadata = async (userId?: string) => {
+  try {
+    // If no userId provided, try to get from session
+    if (!userId) {
+      const { data: { session } } = await supabase.auth.getSession();
+      userId = session?.user?.id;
+      
+      if (!userId) {
+        console.log("No active user session found");
+        return null;
+      }
+    }
+    
+    console.log(`[messageStorage] Fetching messages with metadata for user: ${userId}`);
+    
     const { data, error } = await supabase
       .from('messages')
-      .select('id, content, sender_type, created_at, message_type, instructions, knowledge_entries')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: true });
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30);
     
     if (error) {
-      console.error("Error fetching messages with metadata:", error);
+      console.error("[messageStorage] Error fetching messages with metadata:", error);
       return null;
     }
     
-    return data || null;
+    console.log(`[messageStorage] Fetched ${data.length} messages with metadata`);
+    return data;
   } catch (error) {
-    console.error("Failed to fetch messages with metadata:", error);
+    console.error("[messageStorage] Error in fetchMessagesWithMetadata:", error);
     return null;
   }
 };

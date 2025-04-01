@@ -1,6 +1,32 @@
 
 import { WebRTCOptions } from "./WebRTCTypes";
 import { enhanceInstructionsWithContext } from "@/services/context";
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * Get base instructions from AI configuration table
+ */
+async function getBaseInstructions(): Promise<string> {
+  try {
+    // Fetch base system prompt from AI configuration table
+    const { data, error } = await supabase
+      .from('ai_configuration')
+      .select('value')
+      .eq('id', 'system_prompt')
+      .single();
+    
+    if (error || !data) {
+      console.warn("[WebRTCSessionConfig] Could not load AI configuration:", error);
+      return "You are a helpful assistant. Be conversational yet concise in your responses.";
+    }
+    
+    console.log("[WebRTCSessionConfig] Loaded AI configuration from database");
+    return data.value;
+  } catch (err) {
+    console.error("[WebRTCSessionConfig] Error fetching AI configuration:", err);
+    return "You are a helpful assistant. Be conversational yet concise in your responses.";
+  }
+}
 
 /**
  * Configure the WebRTC session after connection is established
@@ -14,9 +40,12 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
   }
   
   try {
+    // Get base instructions from configuration
+    const baseInstructions = await getBaseInstructions();
+    
     // Enhance instructions with therapy context
     const enhancedInstructions = await enhanceInstructionsWithContext(
-      options.instructions || "You are a helpful assistant.",
+      options.instructions || baseInstructions,
       options.userId
     );
 

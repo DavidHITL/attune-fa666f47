@@ -1,6 +1,7 @@
 
 import { fetchUserContext } from "./contextService";
 import { formatKnowledgeEntries } from "./formatters";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Enhance the system prompt with user context
@@ -9,12 +10,24 @@ export const enhanceInstructionsWithContext = async (
   baseInstructions: string, 
   userId?: string
 ): Promise<string> => {
+  console.log("[Context] Enhancing instructions with context for userId:", userId);
+  
   // Fetch user context
   const userContext = await fetchUserContext(userId);
   
   if (!userContext) {
+    console.warn("[Context] No user context available for enhancement");
     return baseInstructions;
   }
+  
+  console.log("[Context] User context loaded:", {
+    hasMessages: userContext.recentMessages?.length > 0,
+    hasAnalysis: !!userContext.analysisResults,
+    hasUserDetails: !!userContext.userDetails,
+    hasCriticalInfo: userContext.criticalInformation?.length > 0,
+    hasUserInstructions: !!userContext.userInstructions,
+    hasKnowledgeEntries: userContext.knowledgeEntries?.length > 0
+  });
   
   // Build enriched instructions
   let enrichedInstructions = baseInstructions;
@@ -70,6 +83,15 @@ export const enhanceInstructionsWithContext = async (
   if (userContext.recentMessages.length > 0) {
     enrichedInstructions += `\n\nRECENT CONVERSATION HISTORY:\n${userContext.recentMessages.join('\n\n')}`;
   }
+  
+  console.log("[Context] Instructions enhanced successfully. Added context categories:", {
+    userDetails: !!userContext.userDetails,
+    criticalInfo: userContext.criticalInformation?.length > 0,
+    analysisResults: !!userContext.analysisResults,
+    userInstructions: !!userContext.userInstructions,
+    knowledgeEntries: userContext.knowledgeEntries?.length > 0,
+    recentMessages: userContext.recentMessages.length > 0
+  });
   
   return enrichedInstructions;
 };
