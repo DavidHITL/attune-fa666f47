@@ -17,7 +17,7 @@ export class AudioRecorder {
 
   constructor(options: AudioRecorderOptions = {}) {
     this.options = {
-      sampleRate: 24000, // OpenAI requires 24kHz
+      sampleRate: 16000, // Changed from 24kHz to 16kHz for OpenAI compatibility
       chunkSize: 4096,
       timeslice: 100, // Send audio data every 100ms
       ...options

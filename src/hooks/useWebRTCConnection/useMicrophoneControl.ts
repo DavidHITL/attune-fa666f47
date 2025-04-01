@@ -29,7 +29,7 @@ export function useMicrophoneControl(
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
-                sampleRate: 24000
+                sampleRate: 16000 // Updated to 16kHz for OpenAI compatibility
               }
             });
             mediaStreamRef.current = stream;
@@ -103,7 +103,8 @@ export function useMicrophoneControl(
               connectorRef.current.sendAudioData(audioData);
             }
           },
-          timeslice: 100 // Send audio data every 100ms
+          timeslice: 100, // Send audio data every 100ms
+          sampleRate: 16000 // Explicitly set 16kHz sample rate for OpenAI compatibility
         });
         
         // If we already have a stream, try to reuse it
@@ -186,7 +187,7 @@ export function useMicrophoneControl(
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 24000
+          sampleRate: 16000 // Updated to 16kHz
         } 
       });
       

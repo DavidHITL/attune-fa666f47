@@ -21,7 +21,7 @@ export function configureSession(dc: RTCDataChannel, options: WebRTCOptions): vo
         modalities: ["text", "audio"],
         instructions: options.instructions || "You are a helpful assistant.",
         voice: options.voice || "alloy",
-        input_audio_format: "pcm16",
+        input_audio_format: "pcm16", // Explicitly set PCM16 format
         output_audio_format: "pcm16", 
         input_audio_transcription: {
           model: "whisper-1"
