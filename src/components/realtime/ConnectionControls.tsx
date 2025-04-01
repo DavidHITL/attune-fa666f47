@@ -9,7 +9,6 @@ interface ConnectionControlsProps {
   isMicrophoneActive?: boolean;
   microphonePermission?: PermissionState | null;
   isAiSpeaking?: boolean;
-  onToggleMicrophone?: () => Promise<boolean>;
   onDisconnect?: () => void;
   onClose?: () => void;
 }
@@ -22,7 +21,6 @@ const ConnectionControls: React.FC<ConnectionControlsProps> = ({
   isConnecting,
   isMicrophoneActive = false,
   isAiSpeaking = false,
-  onToggleMicrophone,
   onDisconnect,
   onClose
 }) => {

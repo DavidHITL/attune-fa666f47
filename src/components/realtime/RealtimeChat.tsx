@@ -20,14 +20,17 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   onClose,
   autoConnect = true // Default is true for automatic connection
 }) => {
-  // Set up connection handlers
+  // Set up connection handlers with session end time
   const {
     isConnected,
     isConnecting,
     connectVoiceChat,
     disconnectVoiceChat,
     autoConnect: shouldAutoConnect
-  } = useConnectionHandlers({ autoConnect });
+  } = useConnectionHandlers({ 
+    autoConnect,
+    sessionEndTime 
+  });
   
   // Set up silence detection
   const { silenceDetectorRef, silenceTimeoutRef } = useSilenceDetectorSetup({
@@ -69,10 +72,8 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
         }
       });
     }
-  }, [shouldAutoConnect, connectVoiceChat, isMicrophoneActive, handleMicrophoneToggle]);
-  
-  // Cleanup on unmount
-  useEffect(() => {
+    
+    // Cleanup on unmount
     return () => {
       console.log("RealtimeChat component unmounting, cleaning up");
       disconnectVoiceChat();
@@ -83,7 +84,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
         silenceTimeoutRef.current = null;
       }
     };
-  }, [disconnectVoiceChat]);
+  }, [shouldAutoConnect, connectVoiceChat, disconnectVoiceChat, isMicrophoneActive, handleMicrophoneToggle, silenceTimeoutRef]);
   
   return (
     <div className="flex flex-col gap-4">
