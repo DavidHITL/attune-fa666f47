@@ -59,7 +59,6 @@ export class OpenAIRealtimeApiClient {
       });
       
       console.timeEnd("[WebRTC] SDP Exchange Request Time");
-      console.log(`[WebRTC] Edge Function response status: ${response.status}`);
       
       // Check for errors from the Edge Function
       if (response.error) {
