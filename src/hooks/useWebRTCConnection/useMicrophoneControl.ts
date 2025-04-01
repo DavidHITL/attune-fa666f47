@@ -2,6 +2,8 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
+import { useSilenceDetection } from "./useSilenceDetection";
+import { useMediaStreamManager } from "./useMediaStreamManager";
 
 export function useMicrophoneControl(
   isConnected: boolean,
@@ -10,9 +12,18 @@ export function useMicrophoneControl(
   recorderRef: React.MutableRefObject<AudioRecorder | null>,
   setIsMicrophoneActive: (isMicrophoneActive: boolean) => void
 ) {
-  // Store the last MediaStream reference here
-  const mediaStreamRef = useRef<MediaStream | null>(null);
+  // Use the media stream manager hook
+  const { 
+    mediaStreamRef, 
+    getActiveMediaStream, 
+    getActiveAudioTrack, 
+    setMediaStream 
+  } = useMediaStreamManager();
+  
   const [microphoneReady, setMicrophoneReady] = useState<boolean>(false);
+
+  // Use the silence detection hook
+  const { handleSilenceDetected } = useSilenceDetection(connectorRef, isMicrophoneActive);
 
   // Check microphone permissions on mount
   useEffect(() => {
@@ -31,7 +42,7 @@ export function useMicrophoneControl(
                 sampleRate: 16000 // Updated to 16kHz for OpenAI compatibility
               }
             });
-            mediaStreamRef.current = stream;
+            setMediaStream(stream);
             setMicrophoneReady(true);
             console.log("[useMicrophoneControl] Pre-initialized microphone access");
           } catch (err) {
@@ -49,18 +60,10 @@ export function useMicrophoneControl(
       // Clean up any pre-initialized stream when component unmounts
       if (mediaStreamRef.current && !isMicrophoneActive) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
-        mediaStreamRef.current = null;
+        setMediaStream(null);
       }
     };
-  }, [isMicrophoneActive]);
-
-  // Function to handle silence detection and commit audio buffer
-  const handleSilenceDetected = useCallback(() => {
-    if (connectorRef.current && isMicrophoneActive) {
-      console.log("[useMicrophoneControl] Silence detected, committing audio buffer");
-      connectorRef.current.commitAudioBuffer();
-    }
-  }, [connectorRef, isMicrophoneActive]);
+  }, [isMicrophoneActive, mediaStreamRef, setMediaStream]);
 
   // Toggle microphone on/off
   const toggleMicrophone = useCallback(async () => {
@@ -71,7 +74,6 @@ export function useMicrophoneControl(
     
     if (isMicrophoneActive && recorderRef.current) {
       // Stop recording 
-      // Note: We're not using this for audio sending anymore, but for controlling the mic UI state
       recorderRef.current.stop();
       
       // Don't clear the mediaStreamRef if we're just pausing - keep it for fast resume
@@ -79,11 +81,9 @@ export function useMicrophoneControl(
       // when just toggling the mic off
       const shouldPreserveStream = true; // Keep the stream for fast resume
       
-      if (!shouldPreserveStream) {
-        if (mediaStreamRef.current) {
-          mediaStreamRef.current.getTracks().forEach(track => track.stop());
-          mediaStreamRef.current = null;
-        }
+      if (!shouldPreserveStream && mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        setMediaStream(null);
       }
       
       recorderRef.current = null;
@@ -114,7 +114,6 @@ export function useMicrophoneControl(
         }
         
         // Create the recorder primarily for tracking mic state and showing visual feedback
-        // With direct WebRTC audio track, we don't need to send audio via data channel
         const recorder = new AudioRecorder({
           // This is now empty as we don't need to manually send audio data
           onAudioData: () => {
@@ -153,7 +152,7 @@ export function useMicrophoneControl(
         if (success) {
           recorderRef.current = recorder;
           // Store the MediaStream reference when starting
-          mediaStreamRef.current = recorder.getMediaStream();
+          setMediaStream(recorder.getMediaStream());
           setMicrophoneReady(true);
           setIsMicrophoneActive(true);
           toast.success("Microphone activated");
@@ -168,25 +167,7 @@ export function useMicrophoneControl(
         return false;
       }
     }
-  }, [isConnected, isMicrophoneActive, connectorRef, recorderRef, setIsMicrophoneActive, handleSilenceDetected]);
-
-  /**
-   * Get the current active MediaStream, if available
-   */
-  const getActiveMediaStream = useCallback(() => {
-    return mediaStreamRef.current || (recorderRef.current?.getMediaStream() || null);
-  }, [recorderRef]);
-
-  /**
-   * Get the current active audio track, if available
-   */
-  const getActiveAudioTrack = useCallback(() => {
-    const stream = getActiveMediaStream();
-    if (!stream) return null;
-    
-    const tracks = stream.getAudioTracks();
-    return tracks.length > 0 ? tracks[0] : null;
-  }, [getActiveMediaStream]);
+  }, [isConnected, isMicrophoneActive, connectorRef, recorderRef, setIsMicrophoneActive, handleSilenceDetected, mediaStreamRef, setMediaStream]);
 
   /**
    * Explicitly request microphone access without activating recording
@@ -194,8 +175,9 @@ export function useMicrophoneControl(
    */
   const prewarmMicrophoneAccess = useCallback(async (): Promise<boolean> => {
     try {
-      if (mediaStreamRef.current) {
-        const tracks = mediaStreamRef.current.getAudioTracks();
+      const currentStream = getActiveMediaStream();
+      if (currentStream) {
+        const tracks = currentStream.getAudioTracks();
         if (tracks.length > 0 && tracks[0].readyState === 'live') {
           console.log("[useMicrophoneControl] Microphone already prewarmed");
           return true;
@@ -212,14 +194,14 @@ export function useMicrophoneControl(
         } 
       });
       
-      mediaStreamRef.current = stream;
+      setMediaStream(stream);
       setMicrophoneReady(true);
       return true;
     } catch (error) {
       console.error("[useMicrophoneControl] Failed to prewarm microphone:", error);
       return false;
     }
-  }, []);
+  }, [getActiveMediaStream, setMediaStream]);
 
   return {
     toggleMicrophone,
