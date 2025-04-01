@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { toast } from "sonner";
@@ -72,8 +71,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   const handleMicrophoneToggle = async (): Promise<boolean> => {
     // If already active, just toggle off
     if (isMicrophoneActive) {
-      // When turning off the mic, make sure to commit the audio buffer
-      // to signal the end of the utterance
+      // When turning off the mic, commit the audio buffer to signal the end of the utterance
       if (isConnected) {
         commitAudioBuffer();
       }
