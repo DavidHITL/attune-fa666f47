@@ -1,52 +1,56 @@
 
 import { WebRTCOptions } from "../WebRTCTypes";
-import { ConnectionTimeout } from "./ConnectionTimeout";
 import { ReconnectionManager } from "./ReconnectionManager";
+import { ConnectionTimeout } from "./ConnectionTimeout";
 
 /**
- * Base class for WebRTC connection management providing common functionality
+ * Base class for WebRTC connection management
  */
-export class ConnectionBase {
+export abstract class ConnectionBase {
   protected options: WebRTCOptions;
   protected connectionState: RTCPeerConnectionState = "new";
-  private connectionTimeout: ConnectionTimeout;
   protected reconnectionManager: ReconnectionManager;
+  protected connectionTimeout: ConnectionTimeout;
   
   constructor(options: WebRTCOptions) {
     this.options = options;
-    this.connectionTimeout = new ConnectionTimeout();
     this.reconnectionManager = new ReconnectionManager();
+    this.connectionTimeout = new ConnectionTimeout(30000); // 30-second timeout for connection establishment
   }
   
   /**
-   * Get the current connection state of the WebRTC peer connection
+   * Get the current connection state
    */
   getConnectionState(): RTCPeerConnectionState {
     return this.connectionState;
   }
   
   /**
-   * Clear the connection timeout
+   * Handle errors in the connection process
+   */
+  protected handleError(error: any): void {
+    console.error("[ConnectionBase] Error in WebRTC connection:", error);
+    
+    // Call the error callback if provided
+    if (this.options.onError) {
+      this.options.onError(error);
+    }
+  }
+  
+  /**
+   * Clear any pending connection timeout
    */
   protected clearConnectionTimeout(): void {
     this.connectionTimeout.clearTimeout();
   }
   
   /**
-   * Set a connection timeout that will fire if connection takes too long
+   * Set a connection timeout
    */
-  protected setConnectionTimeout(timeoutCallback: () => void, timeoutMs: number = 15000): void {
-    this.connectionTimeout.setTimeout(timeoutCallback, timeoutMs);
-  }
-  
-  /**
-   * Handle errors in the connection process
-   */
-  protected handleError(error: any): void {
-    console.error("[ConnectionBase] WebRTC error:", error);
-    
-    if (this.options.onError) {
-      this.options.onError(error);
-    }
+  protected setConnectionTimeout(callback: () => void): void {
+    this.connectionTimeout.setTimeout(() => {
+      console.error("[ConnectionBase] Connection timeout reached");
+      callback();
+    });
   }
 }

@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { TextMessageSender } from "./TextMessageSender";
@@ -13,6 +14,7 @@ export class WebRTCConnectionManager extends ConnectionBase {
   private connectionEstablisher: WebRTCConnectionEstablisher;
   private dataChannelReady: boolean = false;
   private lastAudioTrack: MediaStreamTrack | null = null;
+  private isDisconnecting: boolean = false;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -48,6 +50,8 @@ export class WebRTCConnectionManager extends ConnectionBase {
   async connect(apiKey: string, audioTrack?: MediaStreamTrack): Promise<boolean> {
     console.log("[WebRTCConnectionManager] Starting connection process");
     
+    // Reset disconnecting flag when starting a new connection
+    this.isDisconnecting = false;
     this.clearConnectionTimeout();
     this.dataChannelReady = false;
     
@@ -109,8 +113,15 @@ export class WebRTCConnectionManager extends ConnectionBase {
     }
     
     // Handle disconnection or failure with automatic reconnection
-    if (this.reconnectionManager.shouldReconnect(state)) {
+    if (state === "disconnected" || state === "failed") {
       console.log(`[WebRTCConnectionManager] Connection ${state}, attempting reconnection...`);
+      
+      // If we're already in the process of disconnecting, don't try to reconnect
+      if (this.isDisconnecting) {
+        console.log("[WebRTCConnectionManager] Already disconnecting, skipping reconnection");
+        return;
+      }
+      
       this.reconnectionManager.scheduleReconnect(async () => {
         // Obtain a new ephemeral token and reconnect
         return await this.attemptReconnection();
@@ -126,15 +137,11 @@ export class WebRTCConnectionManager extends ConnectionBase {
     console.log("[WebRTCConnectionManager] Attempting reconnection with a new ephemeral token");
     
     try {
+      // We're attempting a reconnection, but not a full disconnect
+      // Don't set isDisconnecting to true, as we want to try again if this fails
+      
       // Clean up existing connection resources
-      if (this.pc) {
-        this.pc.close();
-        this.pc = null;
-      }
-      if (this.dc) {
-        this.dc.close();
-        this.dc = null;
-      }
+      this.cleanupConnectionResources();
       
       // Reset session state
       if (this.sessionManager) {
@@ -160,6 +167,31 @@ export class WebRTCConnectionManager extends ConnectionBase {
     } catch (error) {
       console.error("[WebRTCConnectionManager] Error during reconnection:", error);
       return false;
+    }
+  }
+
+  /**
+   * Clean up connection resources without affecting the reconnection logic
+   */
+  private cleanupConnectionResources(): void {
+    // Close the data channel if it exists
+    if (this.dc) {
+      try {
+        this.dc.close();
+      } catch (err) {
+        console.warn("[WebRTCConnectionManager] Error closing data channel:", err);
+      }
+      this.dc = null;
+    }
+    
+    // Close the peer connection if it exists
+    if (this.pc) {
+      try {
+        this.pc.close();
+      } catch (err) {
+        console.warn("[WebRTCConnectionManager] Error closing peer connection:", err);
+      }
+      this.pc = null;
     }
   }
 
@@ -233,11 +265,17 @@ export class WebRTCConnectionManager extends ConnectionBase {
    * Disconnect from the OpenAI Realtime API
    */
   disconnect(): void {
+    // If already disconnecting, don't repeat the process
+    if (this.isDisconnecting) {
+      console.log("[WebRTCConnectionManager] Already disconnecting, ignoring repeat call");
+      return;
+    }
+    
     console.log("[WebRTCConnectionManager] Disconnecting");
+    this.isDisconnecting = true;
     
     // Stop any reconnection attempts
     this.reconnectionManager.reset();
-    
     this.clearConnectionTimeout();
     this.connectionEstablisher.cleanup();
     this.dataChannelReady = false;
@@ -248,18 +286,13 @@ export class WebRTCConnectionManager extends ConnectionBase {
       this.sessionManager = null;
     }
     
-    // Close the data channel if it exists
-    if (this.dc) {
-      this.dc.close();
-      this.dc = null;
-    }
-    
-    // Close the peer connection if it exists
-    if (this.pc) {
-      this.pc.close();
-      this.pc = null;
-    }
-    
+    this.cleanupConnectionResources();
     this.connectionState = "closed";
+    
+    // Reset the disconnecting flag after a short delay
+    // to avoid race conditions if reconnect is called immediately after disconnect
+    setTimeout(() => {
+      this.isDisconnecting = false;
+    }, 500);
   }
 }

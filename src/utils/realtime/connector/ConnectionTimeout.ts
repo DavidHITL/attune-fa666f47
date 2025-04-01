@@ -1,53 +1,46 @@
 
 /**
- * Manages connection timeout logic for WebRTC connections
+ * Manages connection timeout for WebRTC operations
  */
 export class ConnectionTimeout {
-  private timeoutId: number | null = null;
+  private timeout: ReturnType<typeof setTimeout> | null = null;
+  private timeoutDuration: number;
   
   /**
-   * Set a timeout for connection establishment
-   * @param onTimeout Callback to execute when timeout occurs
-   * @param timeoutMs Timeout in milliseconds
-   * @returns The timeout ID
+   * Create a new ConnectionTimeout instance
+   * @param timeoutDuration Timeout duration in milliseconds
    */
-  setTimeout(onTimeout: () => void, timeoutMs: number = 15000): number {
-    this.clearTimeout();
-    console.log(`[ConnectionTimeout] Setting connection timeout for ${timeoutMs}ms`);
-    
-    this.timeoutId = setTimeout(() => {
-      console.error(`[ConnectionTimeout] Connection timeout after ${timeoutMs}ms`);
-      onTimeout();
-    }, timeoutMs) as unknown as number;
-    
-    return this.timeoutId;
+  constructor(timeoutDuration: number) {
+    this.timeoutDuration = timeoutDuration;
   }
   
   /**
-   * Clear the current timeout if it exists
+   * Set a timeout for a connection operation
+   * @param callback The function to call when the timeout is reached
+   */
+  setTimeout(callback: () => void): void {
+    this.clearTimeout();
+    this.timeout = setTimeout(() => {
+      callback();
+      this.timeout = null;
+    }, this.timeoutDuration);
+  }
+  
+  /**
+   * Clear any pending timeout
    */
   clearTimeout(): void {
-    if (this.timeoutId !== null) {
-      console.log("[ConnectionTimeout] Clearing connection timeout");
-      clearTimeout(this.timeoutId);
-      this.timeoutId = null;
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = null;
     }
   }
   
   /**
-   * Check if a timeout is currently active
+   * Check if a timeout is currently set
+   * @returns Whether a timeout is currently set
    */
-  isActive(): boolean {
-    return this.timeoutId !== null;
-  }
-  
-  /**
-   * Reset the timeout with a new duration
-   * @param onTimeout Callback to execute when timeout occurs
-   * @param timeoutMs Timeout in milliseconds
-   * @returns The new timeout ID
-   */
-  resetTimeout(onTimeout: () => void, timeoutMs: number = 15000): number {
-    return this.setTimeout(onTimeout, timeoutMs);
+  isTimeoutSet(): boolean {
+    return this.timeout !== null;
   }
 }
