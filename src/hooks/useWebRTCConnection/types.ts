@@ -1,3 +1,4 @@
+
 export interface WebRTCMessage {
   type: string;
   text?: string;
@@ -8,7 +9,17 @@ export interface WebRTCMessage {
 export interface MessageMetadata {
   messageType: 'text' | 'voice';
   instructions?: string;
-  knowledgeEntries?: any; // Add the missing property
+  knowledgeEntries?: any;
+}
+
+export interface WebRTCMessageHandlerOptions {
+  onTranscriptUpdate?: (text: string) => void;
+  onTranscriptComplete?: () => void;
+  onAudioData?: (base64Audio: string) => void;
+  onAudioComplete?: () => void;
+  onMessageReceived?: (message: WebRTCMessage) => void;
+  onFinalTranscript?: (transcript: string) => void;
+  instructions?: string;
 }
 
 export interface UseWebRTCConnectionOptions {
@@ -19,7 +30,7 @@ export interface UseWebRTCConnectionOptions {
   enableMicrophone?: boolean;
   apiKey?: string;
   onMessage?: (message: WebRTCMessage) => void;
-  onTrack?: (event: RTCTrackEvent) => void; // Add missing onTrack property
+  onTrack?: (event: RTCTrackEvent) => void; // Keep the onTrack property
 }
 
 /**

@@ -1,6 +1,8 @@
 
 import { useRef, useEffect } from "react";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
+import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
+import { WebRTCMessageHandlerOptions } from "@/hooks/useWebRTCConnection/types";
 
 // Ensure audio processor can accept a WebRTC audio stream
 export function useAudioProcessor(
@@ -29,28 +31,15 @@ export function useAudioProcessor(
     };
   }, []);
   
-  // Process messages from WebRTC data channel
-  const messageHandler = {
-    handleMessage: (data: string) => {
-      try {
-        const event = JSON.parse(data);
-        
-        if (event.type === 'transcript') {
-          setCurrentTranscript(event.text || "");
-        } else if (event.type === 'speaking_started') {
-          setIsAiSpeaking(true);
-        } else if (event.type === 'speaking_stopped') {
-          setIsAiSpeaking(false);
-        }
-      } catch (error) {
-        console.error("Error processing WebRTC message:", error);
-      }
-    },
-    // Add required properties to match WebRTCMessageHandler interface
-    options: {},
-    currentTranscript: '',
-    saveTranscriptToDatabase: () => {} 
+  // Create a proper WebRTCMessageHandler instance with options
+  const messageHandlerOptions: WebRTCMessageHandlerOptions = {
+    onTranscriptUpdate: setCurrentTranscript,
+    onAudioComplete: () => setIsAiSpeaking(false),
+    onAudioData: () => setIsAiSpeaking(true),
   };
+  
+  // Create an actual WebRTCMessageHandler instance instead of a plain object
+  const messageHandler = new WebRTCMessageHandler(messageHandlerOptions);
   
   // Return the processor instance with proper type
   return {

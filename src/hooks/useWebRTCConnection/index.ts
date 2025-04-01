@@ -60,7 +60,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
   // Store references to the created instances
   useEffect(() => {
     if (audioProcessor) {
-      audioProcessorRef.current = audioProcessor;
+      audioProcessorRef.current = audioProcessor as AudioProcessor;
     }
     
     if (messageHandler) {
