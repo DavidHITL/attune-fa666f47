@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+
 import { useConnectionManagement } from "./useConnectionManagement";
 import { useMicrophoneControl } from "./useMicrophoneControl";
-import { useMessageSender } from "./useMessageSender";
 import { useDataChannelStatus } from "./useDataChannelStatus";
 import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
-import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder"; // Updated import path
+import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
+import { 
+  useConnectionInitializer,
+  useConnectionManager,
+  useMessageManager
+} from "./useActionHooks";
 
 export function useConnectionActions(
   isConnected: boolean,
@@ -40,7 +44,7 @@ export function useConnectionActions(
   );
 
   // Then initialize connection management hooks that depend on toggleMicrophone
-  const { connect, disconnect } = useConnectionManagement(
+  const { connect, disconnect } = useConnectionManager(
     isConnected,
     isConnecting,
     connectorRef,
@@ -58,9 +62,10 @@ export function useConnectionActions(
   );
 
   // Initialize message sending hooks
-  const { sendTextMessage, commitAudioBuffer } = useMessageSender(
+  const { sendTextMessage, commitAudioBuffer } = useMessageManager(
     isConnected,
-    connectorRef
+    connectorRef,
+    isDataChannelReady
   );
   
   // Monitor data channel readiness
@@ -69,15 +74,14 @@ export function useConnectionActions(
     connectorRef
   );
   
-  // Prewarm microphone access when autoConnect is enabled
-  useEffect(() => {
-    if (options.autoConnect && !isConnected && !isConnecting) {
-      console.log("[useConnectionActions] Pre-warming microphone for auto-connect");
-      prewarmMicrophoneAccess().catch(err => {
-        console.warn("[useConnectionActions] Failed to pre-warm microphone:", err);
-      });
-    }
-  }, [options.autoConnect, isConnected, isConnecting, prewarmMicrophoneAccess]);
+  // Initialize microphone prewarming
+  useConnectionInitializer(
+    options,
+    isConnected,
+    isConnecting,
+    connectorRef,
+    prewarmMicrophoneAccess
+  );
 
   return {
     connect,
