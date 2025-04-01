@@ -28,6 +28,12 @@ export function useConnectionActions(
   setIsAiSpeaking: (isAiSpeaking: boolean) => void,
   setMessages: (message: WebRTCMessage) => void
 ) {
+  // Monitor data channel readiness first before using it
+  const { isDataChannelReady } = useDataChannelStatus(
+    isConnected,
+    connectorRef
+  );
+  
   // Initialize microphone control hooks first
   const { 
     toggleMicrophone,
@@ -42,12 +48,6 @@ export function useConnectionActions(
     recorderRef,
     audioProcessorRef,
     setIsMicrophoneActive
-  );
-
-  // Monitor data channel readiness first before using it
-  const { isDataChannelReady } = useDataChannelStatus(
-    isConnected,
-    connectorRef
   );
   
   // Initialize message sending hooks
