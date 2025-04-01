@@ -1,7 +1,7 @@
 
 import { useEffect } from "react";
 import { saveMessage } from "@/services/messages/messageStorage";
-import { User } from "@/context/AuthContext"; // Changed from @/context/auth/types
+import { User } from "@supabase/supabase-js"; // Import User type directly from supabase
 
 interface UseVoiceChatEffectsProps {
   isConnected: boolean;
