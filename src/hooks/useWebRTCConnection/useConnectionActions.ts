@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useConnectionManagement } from "./useConnectionManagement";
 import { useMicrophoneControl } from "./useMicrophoneControl";
@@ -6,8 +5,8 @@ import { useMessageSender } from "./useMessageSender";
 import { useDataChannelStatus } from "./useDataChannelStatus";
 import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
-import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
+import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder"; // Updated import path
 
 export function useConnectionActions(
   isConnected: boolean,

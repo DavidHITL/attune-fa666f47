@@ -1,6 +1,7 @@
+
 import { useCallback, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
-import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
+import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder"; // Updated import path
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { useSilenceDetection } from "./useSilenceDetection";
 import { useMediaStreamManager } from "./useMediaStreamManager";
