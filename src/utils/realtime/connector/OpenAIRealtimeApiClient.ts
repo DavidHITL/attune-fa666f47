@@ -1,4 +1,5 @@
 
+import { supabase } from "@/integrations/supabase/client";
 import { ApiResponseHandler } from './ApiResponseHandler';
 import { OfferResult } from './types/OfferTypes';
 
@@ -6,10 +7,10 @@ import { OfferResult } from './types/OfferTypes';
  * Client for OpenAI's Realtime API
  */
 export class OpenAIRealtimeApiClient {
-  private static baseUrl = "https://api.openai.com/v1/realtime";
-  
   /**
-   * Send WebRTC offer to OpenAI's Realtime API
+   * Send WebRTC offer to OpenAI's Realtime API via Supabase Edge Function
+   * to bypass CORS restrictions
+   * 
    * @param localDescription WebRTC local SDP description 
    * @param apiKey Ephemeral API key for OpenAI authentication
    * @param model OpenAI model to use for the realtime session
@@ -20,7 +21,7 @@ export class OpenAIRealtimeApiClient {
     apiKey: string,
     model: string
   ): Promise<OfferResult> {
-    console.log("[WebRTC] Sending offer to OpenAI Realtime API");
+    console.log("[WebRTC] Sending offer to OpenAI Realtime API via Edge Function");
     
     if (!localDescription.sdp) {
       console.error("[WebRTC] No SDP in local description");
@@ -31,12 +32,9 @@ export class OpenAIRealtimeApiClient {
     }
     
     try {
-      // Ensure model is properly URL encoded
-      const modelParam = encodeURIComponent(model || "gpt-4o-realtime-preview-2024-12-17");
-      const requestUrl = `${this.baseUrl}?model=${modelParam}`;
-      
-      console.log(`[WebRTC] Using model: ${model}`);
-      console.log(`[WebRTC] Requesting from endpoint: ${requestUrl}`);
+      // Ensure model is properly set
+      const actualModel = model || "gpt-4o-realtime-preview-2024-12-17";
+      console.log(`[WebRTC] Using model: ${actualModel}`);
       
       // Log the first and last 100 chars of the SDP for debugging
       const sdpPreview = localDescription.sdp.length > 200 
@@ -44,49 +42,46 @@ export class OpenAIRealtimeApiClient {
         : localDescription.sdp;
       console.log(`[WebRTC] SDP offer preview: ${sdpPreview}`);
       
-      console.time("[WebRTC] SDP API Request Time");
+      console.time("[WebRTC] SDP Exchange Request Time");
       
       // Make sure the API key is valid
       if (!apiKey || apiKey.trim() === '') {
         throw new Error("Invalid or empty API key");
       }
-      
-      // Send the SDP offer to OpenAI with the ephemeral token
-      const sdpResponse = await fetch(requestUrl, {
-        method: "POST",
-        body: localDescription.sdp,
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/sdp"
+
+      // Instead of directly calling OpenAI API, use our Edge Function as a proxy
+      const response = await supabase.functions.invoke('webrtc-sdp-exchange', {
+        body: {
+          sdp: localDescription.sdp,
+          apiKey: apiKey,
+          model: actualModel
         }
       });
-      console.timeEnd("[WebRTC] SDP API Request Time");
-
-      // Log response status for debugging
-      console.log(`[WebRTC] SDP response status: ${sdpResponse.status}`);
-
-      // Check for HTTP errors
-      if (!sdpResponse.ok) {
-        const errorMessage = await ApiResponseHandler.processErrorResponse(sdpResponse);
+      
+      console.timeEnd("[WebRTC] SDP Exchange Request Time");
+      console.log(`[WebRTC] Edge Function response status: ${response.status}`);
+      
+      // Check for errors from the Edge Function
+      if (response.error) {
+        console.error("[WebRTC] Edge Function error:", response.error);
         return {
           success: false,
-          error: errorMessage
+          error: `Edge Function error: ${response.error.message || 'Unknown error'}`
         };
       }
-
-      // Get the SDP answer from OpenAI
-      console.log("[WebRTC] Reading response body");
-      const sdpAnswer = await sdpResponse.text();
+      
+      // The Edge Function returns the raw SDP answer as text
+      const sdpAnswer = response.data;
+      
+      if (!sdpAnswer || typeof sdpAnswer !== 'string' || sdpAnswer.trim() === "") {
+        console.error("[WebRTC] Empty or invalid SDP answer received from Edge Function");
+        return {
+          success: false,
+          error: "Empty or invalid SDP answer received"
+        };
+      }
       
       ApiResponseHandler.logSdpPreview(sdpAnswer, 'answer');
-      
-      if (!sdpAnswer || sdpAnswer.trim() === "") {
-        console.error("[WebRTC] Empty SDP answer received");
-        return {
-          success: false,
-          error: "Empty SDP answer received from API"
-        };
-      }
       
       // Create and return the remote description
       const answer: RTCSessionDescriptionInit = {
