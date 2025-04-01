@@ -70,7 +70,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         </div>
       </div>
 
+      {/* Use key with showCallModal to force remounting when modal is closed and reopened */}
       <CallModal 
+        key={showCallModal ? 'modal-open' : 'modal-closed'}
         open={showCallModal} 
         onOpenChange={setShowCallModal} 
         sessionStarted={sessionStarted}

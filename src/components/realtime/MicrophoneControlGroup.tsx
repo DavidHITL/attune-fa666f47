@@ -39,6 +39,16 @@ const MicrophoneControlGroup: React.FC<MicrophoneControlGroupProps> = ({
           />
         </div>
       )}
+      
+      {/* Connection Controls (for ending call) */}
+      <ConnectionControls 
+        isConnected={isConnected}
+        isConnecting={isConnecting}
+        isMicrophoneActive={isMicrophoneActive}
+        isAiSpeaking={isAiSpeaking}
+        onDisconnect={onClose}
+        onClose={onClose}
+      />
     </div>
   );
 };
