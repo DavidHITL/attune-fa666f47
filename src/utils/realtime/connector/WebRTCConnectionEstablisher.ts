@@ -1,5 +1,5 @@
 import { WebRTCOptions } from "../WebRTCTypes";
-import { SDPParser } from "../SDPParser";
+import { SDPParser } from "../SDPParser"; 
 import { AudioSender } from './AudioSender';
 
 interface RTCPeerConnectionWithNewTracks extends RTCPeerConnection {
@@ -52,8 +52,15 @@ export class WebRTCConnectionEstablisher {
         // Reset the audio state before adding the track
         AudioSender.resetAudioState();
         
-        const transceiver = (this.pc as RTCPeerConnectionWithNewTracks).addTrack(audioTrack, new MediaStream([audioTrack]));
-        transceiver.direction = "sendonly";
+        // Add the audio track and create a transceiver with sendonly direction
+        const sender = (this.pc as RTCPeerConnectionWithNewTracks).addTrack(audioTrack, new MediaStream([audioTrack]));
+        
+        // Use addTransceiver method to set direction instead of directly setting it on the sender
+        const transceivers = this.pc.getTransceivers();
+        const audioTransceiver = transceivers.find(t => t.sender === sender);
+        if (audioTransceiver) {
+          audioTransceiver.direction = "sendonly";
+        }
       }
 
       // 3. Create Data Channel

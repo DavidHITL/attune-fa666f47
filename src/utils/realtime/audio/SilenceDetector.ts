@@ -1,78 +1,101 @@
 
+/**
+ * Utility class for detecting silence in audio streams
+ * Used to determine when a user has stopped speaking
+ */
 export class SilenceDetector {
-  private silenceStart: number | null = null;
-  private isSilent: boolean = false;
-  private lastVolume: number = 0;
+  private silenceFrames: number = 0;
   private readonly silenceThreshold: number;
-  private readonly silenceDuration: number;
-  private readonly onSilenceDetected?: () => void;
+  private readonly silenceDurationThreshold: number;
+  private onSilenceDetectedCallback: (() => void) | null = null;
 
-  constructor(silenceThreshold: number = 0.01, silenceDuration: number = 1500, onSilenceDetected?: () => void) {
+  /**
+   * Create a new SilenceDetector
+   * @param silenceThreshold RMS threshold below which audio is considered silence (0.0 to 1.0)
+   * @param silenceDurationFrames Number of consecutive silent frames before silence is detected
+   * @param onSilenceDetected Callback to execute when silence duration is exceeded
+   */
+  constructor(
+    silenceThreshold: number = 0.01, 
+    silenceDurationFrames: number = 15,
+    onSilenceDetected?: () => void
+  ) {
     this.silenceThreshold = silenceThreshold;
-    this.silenceDuration = silenceDuration;
-    this.onSilenceDetected = onSilenceDetected;
+    this.silenceDurationThreshold = silenceDurationFrames;
+    
+    if (onSilenceDetected) {
+      this.onSilenceDetectedCallback = onSilenceDetected;
+    }
   }
 
   /**
-   * Detect silence in audio data and trigger callback when silence duration threshold is met
-   * @param audioData Float32Array of audio samples
+   * Check if the given audio data is silence
+   * @param audioData Audio data to check
+   * @returns True if the audio is silence, false otherwise
    */
-  detectSilence(audioData: Float32Array): void {
-    // Calculate RMS volume of the audio chunk
+  isSilence(audioData: Float32Array): boolean {
+    // Calculate RMS (Root Mean Square) of the audio data
     let sum = 0;
     for (let i = 0; i < audioData.length; i++) {
       sum += audioData[i] * audioData[i];
     }
-    const rmsVolume = Math.sqrt(sum / audioData.length);
-    this.lastVolume = rmsVolume;
+    const rms = Math.sqrt(sum / audioData.length);
     
-    const now = Date.now();
-    const isSilentNow = rmsVolume < this.silenceThreshold;
-    
-    // Handle transition to silence
-    if (!this.isSilent && isSilentNow) {
-      this.isSilent = true;
-      this.silenceStart = now;
-      console.debug(`[SilenceDetector] Silence detected, volume: ${rmsVolume.toFixed(5)}`);
-    }
-    // Handle transition to sound
-    else if (this.isSilent && !isSilentNow) {
-      this.isSilent = false;
-      this.silenceStart = null;
-      console.debug(`[SilenceDetector] Sound detected, volume: ${rmsVolume.toFixed(5)}`);
-    }
-    
-    // Check if silence has lasted long enough to trigger the callback
-    if (this.isSilent && this.silenceStart && 
-        (now - this.silenceStart) > this.silenceDuration && 
-        this.onSilenceDetected) {
-      console.log(`[SilenceDetector] Prolonged silence detected (${now - this.silenceStart}ms)`);
-      this.onSilenceDetected();
-      // Reset silence start to prevent multiple triggers
-      this.silenceStart = null;
-    }
+    // If RMS is below threshold, it's considered silence
+    return rms < this.silenceThreshold;
   }
 
   /**
-   * Reset the silence detection state
+   * Increment the consecutive silence frames counter
+   */
+  incrementSilenceFrames(): void {
+    this.silenceFrames++;
+  }
+
+  /**
+   * Reset the consecutive silence frames counter
+   */
+  resetSilenceFrames(): void {
+    this.silenceFrames = 0;
+  }
+
+  /**
+   * Check if the silence duration threshold has been exceeded
+   * @returns True if silence has been detected for longer than the threshold
+   */
+  isSilenceDurationExceeded(): boolean {
+    return this.silenceFrames >= this.silenceDurationThreshold;
+  }
+
+  /**
+   * Get the current silence frames count
+   * @returns Number of consecutive silence frames
+   */
+  getSilenceFrames(): number {
+    return this.silenceFrames;
+  }
+
+  /**
+   * Reset the silence detector state
    */
   reset(): void {
-    this.silenceStart = null;
-    this.isSilent = false;
+    this.silenceFrames = 0;
   }
 
   /**
-   * Get the current silence state
+   * Trigger the silence detected callback
    */
-  getSilenceInfo(): { 
-    isSilent: boolean; 
-    lastVolume: number; 
-    silenceDuration: number | null;
-  } {
-    return {
-      isSilent: this.isSilent,
-      lastVolume: this.lastVolume,
-      silenceDuration: this.silenceStart ? Date.now() - this.silenceStart : null
-    };
+  onSilenceDetected(): void {
+    if (this.onSilenceDetectedCallback) {
+      this.onSilenceDetectedCallback();
+    }
+  }
+
+  /**
+   * Set the callback to execute when silence is detected
+   * @param callback The callback function
+   */
+  setOnSilenceDetected(callback: () => void): void {
+    this.onSilenceDetectedCallback = callback;
   }
 }
