@@ -19,6 +19,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onRequestEndSession
 }) => {
   const [showCallModal, setShowCallModal] = useState(false);
+  
+  const sessionEndTimeMs = sessionEndTime ? sessionEndTime.getTime() : null;
 
   return (
     <header className="bg-white border-b border-gray-200">
@@ -63,7 +65,12 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         </div>
       </div>
 
-      <CallModal open={showCallModal} onOpenChange={setShowCallModal} />
+      <CallModal 
+        open={showCallModal} 
+        onOpenChange={setShowCallModal} 
+        sessionStarted={sessionStarted}
+        sessionEndTime={sessionEndTimeMs}
+      />
     </header>
   );
 };

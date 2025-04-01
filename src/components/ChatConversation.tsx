@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import ChatMessageList from "./ChatMessageList";
 import ChatInput from "./ChatInput";
@@ -8,12 +9,13 @@ import { toast } from "@/hooks/use-toast";
 import { calculateSessionProgress } from "@/utils/sessionUtils";
 import DatabaseConnectionAlert from "./chat/DatabaseConnectionAlert";
 import ChatLoadingState from "./chat/ChatLoadingState";
-import RealtimeChat from "./realtime/RealtimeChat";
+
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
   sessionStarted?: boolean;
   sessionEndTime?: number | null;
 }
+
 const ChatConversation: React.FC<ChatConversationProps> = ({
   isSpeechEnabled,
   sessionStarted = false,
@@ -25,10 +27,10 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   } = useAuth();
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const didInitialFetchRef = useRef(false);
-  const [showRealtimeChat, setShowRealtimeChat] = useState(false);
 
   // Calculate session progress using the utility function
   const sessionProgress = calculateSessionProgress(sessionStarted, sessionEndTime);
+  
   const {
     messages,
     setMessages,
@@ -40,6 +42,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
     fetchMessages,
     hasError
   } = useChatMessages();
+  
   const {
     isLoading: isSendingMessage,
     handleSendMessage
@@ -88,6 +91,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       console.log("Auth is still loading, waiting before fetching messages");
       return;
     }
+    
     if (!user) {
       // If no user is logged in, just show the welcome message
       if (!initialLoadDone) {
@@ -102,6 +106,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       }
       return;
     }
+    
     console.log("ChatConversation effect: User detected:", user.id);
 
     // Only fetch messages once per component mount
@@ -125,18 +130,16 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       setInitialLoadDone(false);
     };
   }, [user?.id]);
+  
   const isLoading = isLoadingMessages || isSendingMessage || isAuthLoading;
-
-  // Function to toggle real-time chat
-  const toggleRealtimeChat = () => {
-    setShowRealtimeChat(prev => !prev);
-  };
 
   // Show loading state
   if (isAuthLoading) {
     return <ChatLoadingState />;
   }
-  return <div className="flex flex-col h-full">
+  
+  return (
+    <div className="flex flex-col h-full">
       {useLocalFallback && <DatabaseConnectionAlert onRetryConnection={handleRetryDatabaseConnection} />}
       
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
@@ -145,14 +148,8 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       <div className="bg-apple-gray-6">
         <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
-      
-      {user && <>
-          <div className="fixed bottom-20 right-4 z-40">
-            
-          </div>
-          
-          {showRealtimeChat && <RealtimeChat sessionStarted={sessionStarted} sessionEndTime={sessionEndTime} />}
-        </>}
-    </div>;
+    </div>
+  );
 };
+
 export default ChatConversation;
