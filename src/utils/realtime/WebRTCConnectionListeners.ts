@@ -77,19 +77,26 @@ export function setupPeerConnectionListeners(
     if (channel.label === "oai-events") {
       console.log("[WebRTC] Found oai-events channel");
       
-      // Set up message handler for testing
+      // Set up message handler for the events channel
       channel.onmessage = (e) => {
         console.log("[WebRTC] Event message:", e.data);
+        
+        // Pass the message to any registered callbacks but don't attempt to send anything back
+        if (options.onMessage) {
+          options.onMessage(e);
+        }
       };
       
-      // Track channel closing
+      // Track channel closing - log only, don't close the connection
       channel.onclose = () => {
         console.log("[WebRTC] oai-events channel closed");
+        // We only log this event, not taking any action to close the connection
       };
       
-      // Track channel errors
+      // Track channel errors - log only, don't close the connection
       channel.onerror = (error) => {
         console.error("[WebRTC] oai-events channel error:", error);
+        // We only log errors, not taking any action to close the connection
       };
       
       // Track channel open state
