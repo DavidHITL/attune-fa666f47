@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Phone } from "lucide-react";
+import { Phone } from "lucide-react";
 
 interface ConnectionControlsProps {
   isConnected: boolean;
@@ -35,30 +35,8 @@ const ConnectionControls: React.FC<ConnectionControlsProps> = ({
     }
   };
 
-  // Function to handle microphone toggle
-  const handleMicrophoneToggle = async () => {
-    if (onToggleMicrophone) {
-      await onToggleMicrophone();
-    }
-  };
-
   return (
-    <div className="flex items-center justify-center gap-4">
-      {/* Only show mic button if connected */}
-      {isConnected && (
-        <Button 
-          variant={isMicrophoneActive ? "default" : "outline"}
-          size="sm"
-          className="flex items-center gap-1"
-          onClick={handleMicrophoneToggle}
-          disabled={isConnecting || isAiSpeaking}
-          title={isMicrophoneActive ? "Mute microphone" : "Unmute microphone"}
-        >
-          {isMicrophoneActive ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-          {isMicrophoneActive ? "Mute" : "Speak"}
-        </Button>
-      )}
-      
+    <div className="flex items-center justify-center gap-4">      
       {/* End call button is always shown when connected */}
       {isConnected && (
         <Button 

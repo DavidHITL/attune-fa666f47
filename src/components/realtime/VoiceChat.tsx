@@ -11,6 +11,7 @@ import { useVoiceChatEffects } from "@/hooks/useVoiceChatEffects";
 import VoiceChatAudio from "./VoiceChatAudio";
 import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
+import MicrophoneControlGroup from "./MicrophoneControlGroup";
 
 interface VoiceChatProps {
   systemPrompt?: string;
@@ -61,7 +62,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     instructions: systemPrompt,
     voice,
     userId: user?.id,
-    autoConnect: false,
+    autoConnect: true, // Auto connect when component mounts
     enableMicrophone: false,
     // Use the VoiceChatAudio component for handling audio tracks
     onTrack: null // We'll handle this in VoiceChatAudio
@@ -112,15 +113,14 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
         getActiveMediaStream={getActiveMediaStream} 
       />
       
-      {/* Connection Status & Controls */}
-      <ConnectionControls 
+      {/* Microphone Control Group - includes status and controls */}
+      <MicrophoneControlGroup 
         isConnected={isConnected}
         isConnecting={isConnecting}
         isMicrophoneActive={isMicrophoneActive}
-        microphonePermission={microphonePermission}
-        onConnect={connect}
-        onDisconnect={disconnect}
+        isAiSpeaking={isAiSpeaking}
         onToggleMicrophone={handleMicrophoneToggle}
+        onClose={onClose}
       />
       
       {/* AI Transcript Display */}
@@ -132,8 +132,17 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
         transcriptProgress={transcriptProgress}
       />
       
-      {/* Microphone Status Indicator */}
-      <MicrophoneStatus isActive={isMicrophoneActive} />
+      {/* Connection Controls (now just for ending call) */}
+      <ConnectionControls 
+        isConnected={isConnected}
+        isConnecting={isConnecting}
+        isMicrophoneActive={isMicrophoneActive}
+        microphonePermission={microphonePermission}
+        isAiSpeaking={isAiSpeaking}
+        onDisconnect={disconnect}
+        onToggleMicrophone={handleMicrophoneToggle}
+        onClose={onClose}
+      />
       
       {/* Text Input */}
       <MessageInput 

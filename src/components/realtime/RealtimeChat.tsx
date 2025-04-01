@@ -18,7 +18,7 @@ const RealtimeChat: React.FC<RealtimeChatProps> = ({
   sessionStarted = false,
   sessionEndTime = null,
   onClose,
-  autoConnect = true // Default changed to true
+  autoConnect = true // Default is true for automatic connection
 }) => {
   // Set up connection handlers
   const {
