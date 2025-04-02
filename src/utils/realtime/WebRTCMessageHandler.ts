@@ -1,19 +1,7 @@
 
-import { WebRTCMessage, MessageMetadata } from "@/hooks/useWebRTCConnection/types";
+import { WebRTCMessage, MessageMetadata, WebRTCMessageHandlerOptions } from "@/hooks/useWebRTCConnection/types";
 import { saveMessage } from "@/services/messages/messageStorage";
 import { logContextVerification } from "@/services/context/unifiedContextProvider";
-
-export interface WebRTCMessageHandlerOptions {
-  onTranscriptUpdate?: (text: string) => void;
-  onTranscriptComplete?: () => void;
-  onAudioData?: (base64Audio: string) => void;
-  onAudioComplete?: () => void;
-  onMessageReceived?: (message: WebRTCMessage) => void;
-  onFinalTranscript?: (transcript: string) => void;
-  instructions?: string;
-  knowledgeEntries?: any[];
-  userId?: string;
-}
 
 /**
  * Handler for WebRTC messages
@@ -32,14 +20,15 @@ export class WebRTCMessageHandler {
    */
   handleMessage(event: MessageEvent): void {
     try {
-      const message = JSON.parse(event.data) as WebRTCMessage;
+      // Use any type internally for flexibility with API responses
+      const message: any = JSON.parse(event.data);
       
       // Log for debugging
       console.log(`[WebRTCMessageHandler] Received message: ${message.type}`, message);
       
       // Notify about all messages if callback is provided
       if (this.options.onMessageReceived) {
-        this.options.onMessageReceived(message);
+        this.options.onMessageReceived(message as WebRTCMessage);
       }
       
       // Parse message for potential user details to maintain context
@@ -117,7 +106,7 @@ export class WebRTCMessageHandler {
   /**
    * Extract user details from messages to maintain context
    */
-  private extractUserDetailsFromMessage(message: WebRTCMessage): void {
+  private extractUserDetailsFromMessage(message: any): void {
     if (message.type === "response.audio_transcript.delta" && message.delta) {
       const text = message.delta;
       

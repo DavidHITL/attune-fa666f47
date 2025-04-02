@@ -1,5 +1,5 @@
 
-import { useConnectionManagement } from "./useConnectionManagement";
+import { useCallback } from "react";
 import { useMicrophoneControl } from "./useActionHooks/useMicrophoneControl";
 import { useDataChannelStatus } from "./useDataChannelStatus";
 import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
@@ -85,10 +85,11 @@ export function useConnectionActions(
     prewarmMicrophoneAccess
   );
 
+  // Update the return values to match the expected types in WebRTCConnectionResult
   return {
-    connect,
+    connect: async () => { await connect(); },
     disconnect,
-    toggleMicrophone,
+    toggleMicrophone: async () => { await toggleMicrophone(); },
     sendTextMessage,
     commitAudioBuffer,
     getActiveMediaStream,

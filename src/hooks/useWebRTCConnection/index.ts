@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { UseWebRTCConnectionOptions, WebRTCConnectionResult, WebRTCMessage } from "./types";
 import { useConnectionState } from "./useConnectionState";
@@ -146,9 +145,9 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     transcriptProgress,
     messages,
     isDataChannelReady,
-    connect,
+    connect: async () => { await connect(); }, // Wrap to ensure void return type
     disconnect,
-    toggleMicrophone,
+    toggleMicrophone: async () => { await toggleMicrophone(); }, // Wrap to ensure void return type
     sendTextMessage,
     commitAudioBuffer,
     getActiveMediaStream,

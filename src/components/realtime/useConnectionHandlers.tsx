@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from "sonner";
 import { useWebRTCConnection } from '@/hooks/useWebRTCConnection';
@@ -75,7 +74,10 @@ export function useConnectionHandlers({
       setIsConnecting(true);
       
       // Use the actual WebRTC connect function
-      const success = await webRtcConnect();
+      await webRtcConnect();
+      
+      // Check connection status after attempting to connect
+      const success = webRtcIsConnected;
       
       if (success) {
         setIsConnected(true);
@@ -94,7 +96,7 @@ export function useConnectionHandlers({
     } finally {
       setIsConnecting(false);
     }
-  }, [isConnected, isConnecting, webRtcConnect]);
+  }, [isConnected, isConnecting, webRtcConnect, webRtcIsConnected]);
 
   // Function to disconnect from voice chat
   const disconnectVoiceChat = useCallback(() => {

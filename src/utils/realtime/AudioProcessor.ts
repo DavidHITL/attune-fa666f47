@@ -1,99 +1,60 @@
 
-import { AudioPlaybackManager } from "./audio/AudioPlaybackManager";
-import { AudioFormatConverter } from "./audio/AudioFormatConverter";
-import { AudioMessageBuffer } from "./audio/AudioMessageBuffer";
-
 /**
- * Utility for processing and playing audio data from WebRTC connections
+ * Class for processing audio data for WebRTC
  */
 export class AudioProcessor {
-  private playbackManager: AudioPlaybackManager;
-  private currentMessageBuffer: AudioMessageBuffer;
-  
-  // New property to support direct WebRTC media track playback
-  setAudioStream: ((stream: MediaStream) => void) | null = null;
+  private audioContext: AudioContext | null = null;
+  private audioStream: MediaStream | null = null;
 
   constructor() {
-    this.playbackManager = new AudioPlaybackManager();
-    this.currentMessageBuffer = new AudioMessageBuffer();
-    console.log("[AudioProcessor] Successfully initialized");
+    this.initialize();
   }
 
-  /**
-   * Add audio data to the buffer for current message
-   */
-  async addAudioData(base64Audio: string): Promise<void> {
+  private initialize(): void {
     try {
-      await this.playbackManager.ensureAudioContextResumed();
-      
-      // Empty string means we're just testing AudioContext resumption
-      if (!base64Audio) return;
-      
-      // Convert base64 to binary
-      const binaryData = AudioFormatConverter.decodeBase64Audio(base64Audio);
-      
-      // Add to current message buffer
-      this.currentMessageBuffer.addChunk(binaryData);
-      console.log("[AudioProcessor] Added audio chunk to current message buffer, chunks:", this.currentMessageBuffer.getSize());
+      this.audioContext = new AudioContext();
     } catch (error) {
-      console.error("[AudioProcessor] Error processing audio:", error);
+      console.error("[AudioProcessor] Failed to create AudioContext:", error);
     }
   }
 
-  /**
-   * Finalize the audio processing and prepare for playback
-   */
-  async completeAudioMessage(): Promise<void> {
-    try {
-      // If there are no chunks, do nothing
-      if (this.currentMessageBuffer.getSize() === 0) {
-        console.log("[AudioProcessor] No audio chunks to finalize");
-        return;
-      }
-
-      // Combine all chunks into one PCM buffer
-      const combinedPcm = this.currentMessageBuffer.combineChunks();
-      
-      // Create WAV data with proper headers
-      const wavData = AudioFormatConverter.createWavFromPCM(combinedPcm);
-      
-      // Add to playback queue
-      this.playbackManager.addToPlaybackQueue(wavData);
-      
-      // Reset current message buffer
-      this.currentMessageBuffer.clear();
-      
-      // Start playing if not already playing
-      await this.playbackManager.ensureAudioContextResumed();
-      this.playbackManager.startPlayback();
-    } catch (error) {
-      console.error("[AudioProcessor] Error finalizing audio message:", error);
-      // Reset current message buffer even on error
-      this.currentMessageBuffer.clear();
-    }
+  setAudioStream(stream: MediaStream): void {
+    this.audioStream = stream;
   }
 
-  /**
-   * Set the volume for audio playback
-   * @param value Volume level from 0 to 1
-   */
-  setVolume(value: number): void {
-    this.playbackManager.setVolume(value);
+  start(): void {
+    console.log("[AudioProcessor] Starting audio processing");
+    // Implementation for starting audio processing
   }
 
-  /**
-   * Stop audio processing and clean up resources
-   */
   stop(): void {
-    console.log("[AudioProcessor] Stopping audio processor");
-    this.cleanup();
+    console.log("[AudioProcessor] Stopping audio processing");
+    // Implementation for stopping audio processing
   }
 
-  /**
-   * Clean up resources
-   */
+  convertToPCM16(audioData: Float32Array): Uint8Array {
+    // Convert Float32Array to PCM16 format (16-bit signed integer)
+    const pcm16Data = new Int16Array(audioData.length);
+
+    // Scale and convert the Float32Array to Int16Array
+    for (let i = 0; i < audioData.length; i++) {
+      // Clamp between -1 and 1
+      const s = Math.max(-1, Math.min(1, audioData[i]));
+      // Convert to 16-bit integer
+      pcm16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+
+    // Convert to Uint8Array for sending over the wire
+    return new Uint8Array(pcm16Data.buffer);
+  }
+
   cleanup(): void {
-    this.playbackManager.cleanup();
-    this.currentMessageBuffer.clear();
+    if (this.audioContext) {
+      if (this.audioContext.state !== "closed") {
+        this.audioContext.close().catch(console.error);
+      }
+      this.audioContext = null;
+    }
+    this.audioStream = null;
   }
 }
