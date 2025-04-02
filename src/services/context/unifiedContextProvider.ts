@@ -117,14 +117,18 @@ export const logContextVerification = async (
     
     console.log("[UnifiedContext] Context verification metrics:", verificationData);
     
-    // For detailed debugging, log to database - using raw fetch to avoid type issues
+    // Use direct API call to avoid TypeScript issues
     try {
-      const response = await fetch(`${supabase.supabaseUrl}/rest/v1/context_verification_logs`, {
+      // Get the API endpoint and key from the supabase config
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://oseowhythgbqvllwonaz.supabase.co';
+      const apiKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZW93aHl0aGdicXZsbHdvbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE2MTgyNzgsImV4cCI6MjA1NzE5NDI3OH0.MubP80cszCAeIeyve_uY9zLZosck9010uhvbxBC57vo';
+      
+      const response = await fetch(`${supabaseUrl}/rest/v1/context_verification_logs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': supabase.supabaseKey,
-          'Authorization': `Bearer ${supabase.supabaseKey}`
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify(verificationData)
       });

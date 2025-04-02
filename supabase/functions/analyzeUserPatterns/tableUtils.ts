@@ -6,16 +6,18 @@ import { supabaseAdmin } from "./supabaseClient.ts";
  */
 export const checkTableExists = async (tableName: string): Promise<boolean> => {
   try {
-    const { data, error } = await supabaseAdmin.rpc('table_exists', {
-      table_name: tableName
-    });
+    // Use SQL query to check if table exists
+    const { data, error } = await supabaseAdmin.from('pg_tables')
+      .select('tablename')
+      .eq('schemaname', 'public')
+      .eq('tablename', tableName);
     
     if (error) {
       console.error(`Error checking if table ${tableName} exists:`, error);
       return false;
     }
     
-    return !!data;
+    return data && data.length > 0;
   } catch (err) {
     console.error(`Exception checking if table ${tableName} exists:`, err);
     return false;
@@ -31,7 +33,7 @@ export const createTableIfNotExists = async (tableName: string, createTableSql: 
     const exists = await checkTableExists(tableName);
     
     if (!exists) {
-      // Run the SQL to create the table
+      // Execute SQL to create the table
       const { error } = await supabaseAdmin.rpc('run_sql', {
         sql: createTableSql
       });
