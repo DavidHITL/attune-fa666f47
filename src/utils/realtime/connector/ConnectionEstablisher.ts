@@ -35,8 +35,11 @@ export class ConnectionEstablisher {
           params.encodings.forEach(encoding => {
             // Set priority to high for voice
             encoding.priority = 'high';
-            // Don't reduce quality even in low bandwidth conditions
-            encoding.degradationPreference = 'maintain-framerate';
+            
+            // Remove the degradationPreference property as it's not in the TypeScript definition
+            // Instead, set other properties that are available
+            encoding.active = true;
+            encoding.maxBitrate = 128000; // 128 kbps is good for voice quality
           });
           await sender.setParameters(params);
         }
