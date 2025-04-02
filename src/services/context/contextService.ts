@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { fetchMessagesWithMetadata as fetchMessagesFromStorage } from "@/services/messages/messageStorage";
+import { fetchMessagesFromDatabase } from "@/services/messages/messageStorage";
 import { ContextData } from "./types";
 import { formatChatContext, formatKnowledgeEntries } from "./formatters";
 import { extractUserDetails, extractCriticalInformation } from "./extractors";
@@ -21,7 +21,7 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
     console.log(`[Context] Fetching context for user: ${userId}`);
     
     // Fetch messages with metadata
-    const messages = await fetchMessagesFromStorage(userId);
+    const messages = await fetchMessagesFromDatabase(userId);
     
     if (!messages || messages.length === 0) {
       console.log("[Context] No messages found for context enrichment");

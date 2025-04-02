@@ -1,8 +1,9 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { saveMessage, fetchMessages } from "@/services/chatApiService";
+import { saveMessage, fetchMessagesFromDatabase } from "@/services/messages/messageStorage";
 
 export function useChatMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -13,14 +14,15 @@ export function useChatMessages() {
   const [hasError, setHasError] = useState(false);
 
   // Create a memoized fetchMessages function that won't change on re-renders
-  const fetchMessagesFromDatabase = useCallback(async () => {
+  const fetchMessagesFromDb = useCallback(async () => {
     if (!user) {
       console.log("No user, not fetching messages");
       setMessages([{
         id: "welcome",
         text: "Hi there. How are you feeling today?",
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date(),
+        messageType: "text"
       }]);
       setIsLoading(false);
       setIsInitialLoad(false);
@@ -33,16 +35,17 @@ export function useChatMessages() {
       console.log("Fetching messages for user:", user.id);
 
       // Get messages directly from the database using our improved function
-      const dbMessages = await fetchMessages(user.id);
+      const dbMessages = await fetchMessagesFromDatabase();
       
       if (!dbMessages || dbMessages.length === 0) {
         console.log("No messages found or error fetching, creating welcome message");
         // If no messages or error, add a welcome message
-        const welcomeMessage = {
+        const welcomeMessage: Message = {
           id: "welcome",
           text: "Hi there. How are you feeling today?",
           isUser: false,
-          timestamp: new Date()
+          timestamp: new Date(),
+          messageType: "text"
         };
         
         setMessages([welcomeMessage]);
@@ -70,7 +73,8 @@ export function useChatMessages() {
         id: "welcome",
         text: "Hi there. How are you feeling today?",
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date(),
+        messageType: "text"
       }]);
       
       // Mark as using local fallback
@@ -124,7 +128,7 @@ export function useChatMessages() {
     useLocalFallback,
     setUseLocalFallback,
     saveMessageToDatabase,
-    fetchMessages: fetchMessagesFromDatabase,
+    fetchMessages: fetchMessagesFromDb,
     hasError
   };
 }

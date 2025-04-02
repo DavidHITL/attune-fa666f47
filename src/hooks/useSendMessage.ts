@@ -2,7 +2,7 @@
 import { useState, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { generateResponse } from "@/services/responseGenerator";
-import { createMessageObject } from "@/services/messages/messageUtils";
+import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from "@/context/AuthContext";
 
 interface UseSendMessageProps {
@@ -36,7 +36,13 @@ export function useSendMessage({
     }
 
     // Create new user message
-    const newUserMessage = createMessageObject(text, true);
+    const newUserMessage: Message = {
+      id: uuidv4(),
+      text: text,
+      isUser: true,
+      timestamp: new Date(),
+      messageType: "text"
+    };
 
     // Add user message to local state immediately
     setMessages((prevMessages) => [...prevMessages, newUserMessage]);

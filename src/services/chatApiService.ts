@@ -1,10 +1,10 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/components/MessageBubble";
-import { fetchMessagesFromDatabase as fetchMessages, saveMessage } from "./messages/messageStorage";
+import { fetchMessagesFromDatabase, saveMessage } from "./messages/messageStorage";
 
 // Re-export the functions from messageStorage for backward compatibility
-export { fetchMessages, saveMessage };
+export { fetchMessagesFromDatabase, saveMessage };
 
 // Legacy fetchMessages function for backward compatibility
 export async function fetchMessagesLegacy(userId: string): Promise<Message[]> {
@@ -24,11 +24,9 @@ export async function fetchMessagesLegacy(userId: string): Promise<Message[]> {
     const messages: Message[] = data.map(msg => ({
       id: msg.id.toString(),
       text: msg.content || '',
-      isUser: msg.is_user,
+      isUser: !!msg.is_user,
       timestamp: new Date(msg.created_at),
-      messageType: msg.message_type || 'text',
-      instructions: msg.instructions || undefined,
-      knowledgeEntries: msg.knowledge_entries || undefined
+      messageType: (msg.message_type || 'text') as 'text' | 'voice'
     }));
 
     return messages;

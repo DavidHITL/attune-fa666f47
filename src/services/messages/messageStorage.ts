@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { createMessageObject } from "./messageUtils";
-import { MessageMetadata } from "@/hooks/useWebRTCConnection/types";
+import { Message } from "@/components/MessageBubble";
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -14,7 +13,11 @@ import { v4 as uuidv4 } from 'uuid';
 export async function saveMessage(
   content: string,
   isUser: boolean,
-  metadata?: Partial<MessageMetadata>
+  metadata?: {
+    messageType?: string;
+    instructions?: string;
+    knowledgeEntries?: any[];
+  }
 ): Promise<string | null> {
   try {
     const { data: user } = await supabase.auth.getUser();
@@ -23,10 +26,11 @@ export async function saveMessage(
       return null;
     }
 
+    const messageId = uuidv4();
+    
     const { data, error } = await supabase
       .from('messages')
       .insert({
-        id: uuidv4(),
         content: content,
         is_user: isUser,
         user_id: user.user.id,
@@ -50,21 +54,29 @@ export async function saveMessage(
 }
 
 /**
- * Fetch messages from the database for the current user
+ * Fetch messages from the database for the current user or a specific user
+ * @param userId Optional user ID to fetch messages for (defaults to current user)
  * @returns Array of messages or null if fetching failed
  */
-export async function fetchMessagesFromDatabase() {
+export async function fetchMessagesFromDatabase(userId?: string): Promise<Message[] | null> {
   try {
-    const { data: user } = await supabase.auth.getUser();
-    if (!user?.user?.id) {
-      console.error("No user found, cannot fetch messages");
-      return null;
+    let userIdToUse = userId;
+    
+    if (!userIdToUse) {
+      // If no userId provided, try to get the current user
+      const { data: currentUser } = await supabase.auth.getUser();
+      userIdToUse = currentUser?.user?.id;
+      
+      if (!userIdToUse) {
+        console.error("No user found, cannot fetch messages");
+        return null;
+      }
     }
 
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('user_id', user.user.id)
+      .eq('user_id', userIdToUse)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -76,10 +88,9 @@ export async function fetchMessagesFromDatabase() {
     return data.map(msg => ({
       id: msg.id.toString(),
       text: msg.content || '',
-      content: msg.content || '',
       isUser: msg.is_user,
       timestamp: new Date(msg.created_at),
-      messageType: msg.message_type || 'text',
+      messageType: (msg.message_type || 'text') as 'text' | 'voice',
       instructions: msg.instructions || undefined,
       knowledgeEntries: msg.knowledge_entries || undefined
     }));

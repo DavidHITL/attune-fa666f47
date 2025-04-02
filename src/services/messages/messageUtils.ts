@@ -1,5 +1,5 @@
 
-import { MessageMetadata } from "@/hooks/useWebRTCConnection/types";
+import { MessageMetadata } from "@/utils/realtime/WebRTCTypes";
 import { v4 as uuidv4 } from 'uuid';
 
 // Define knowledge entry type locally to avoid dependency issues
@@ -27,7 +27,7 @@ export function createMessageObject(text: string, isUser: boolean, metadata?: Pa
     content: text, // Keep 'content' for compatibility with MessageData
     isUser,
     timestamp: new Date(),
-    messageType: metadata?.messageType || 'text',
+    messageType: (metadata?.messageType || 'text') as 'text' | 'voice' | 'system',
     instructions: metadata?.instructions,
     knowledgeEntries: metadata?.knowledgeEntries
   };
