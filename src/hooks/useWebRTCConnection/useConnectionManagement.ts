@@ -1,174 +1,324 @@
-
-import { useState, useRef, useCallback, useEffect } from "react";
-import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
-import { UseWebRTCConnectionOptions, WebRTCMessage, WebRTCOptions } from "./types";
-import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
+import { useState, useRef, useCallback } from "react";
+import { 
+  UseWebRTCConnectionOptions, 
+  WebRTCConnectionState 
+} from "./types";
+import { WebRTCOptions } from "@/utils/realtime/WebRTCTypes";
+import { ConnectionManager } from "@/utils/realtime/ConnectionManager";
+import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
-import { toast } from "sonner";
+import { AudioRecorder } from "@/utils/realtime/AudioRecorder";
+import { SessionManager } from "@/utils/realtime/connector/SessionManager";
+import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 
-export function useConnectionManagement(
-  options: WebRTCOptions,
-  onMessage: (message: WebRTCMessage) => void
-) {
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnectionError, setIsConnectionError] = useState(false);
-  const [connectionAttempts, setConnectionAttempts] = useState(0);
-  const maxConnectionAttempts = 3;
+interface UseConnectionActions {
+  isConnected: boolean;
+  isConnecting: boolean;
+  isMicrophoneActive: boolean;
+  connectorRef: React.MutableRefObject<ConnectionManager | null>;
+  recorderRef: React.MutableRefObject<AudioRecorder | null>;
+  audioProcessorRef: React.MutableRefObject<AudioProcessor | null>;
+  messageHandlerRef: React.MutableRefObject<WebRTCMessageHandler | null>;
+  handleMessage: (message: any) => void;
+  options: UseWebRTCConnectionOptions;
+  setIsConnected: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsConnecting: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsMicrophoneActive: React.Dispatch<React.SetStateAction<boolean>>;
+  setCurrentTranscript: React.Dispatch<React.SetStateAction<string>>;
+  setIsAiSpeaking: React.Dispatch<React.SetStateAction<boolean>>;
+  addMessage: (message: any) => void;
+}
+
+export const useConnectionActions = (
+  isConnected: boolean,
+  isConnecting: boolean,
+  isMicrophoneActive: boolean,
+  connectorRef: React.MutableRefObject<ConnectionManager | null>,
+  recorderRef: React.MutableRefObject<AudioRecorder | null>,
+  audioProcessorRef: React.MutableRefObject<AudioProcessor | null>,
+  messageHandlerRef: React.MutableRefObject<WebRTCMessageHandler | null>,
+  handleMessage: (message: any) => void,
+  options: UseWebRTCConnectionOptions,
+  setIsConnected: React.Dispatch<React.SetStateAction<boolean>>,
+  setIsConnecting: React.Dispatch<React.SetStateAction<boolean>>,
+  setIsMicrophoneActive: React.Dispatch<React.SetStateAction<boolean>>,
+  setCurrentTranscript: React.Dispatch<React.SetStateAction<string>>,
+  setIsAiSpeaking: React.Dispatch<React.SetStateAction<boolean>>,
+  addMessage: (message: any) => void
+) => {
+  const [dataChannelReady, setDataChannelReady] = useState(false);
+  const activeStreamRef = useRef<MediaStream | null>(null);
+  const sessionManagerRef = useRef<SessionManager | null>(null);
+  const audioPlaybackManagerRef = useRef<AudioPlaybackManager | null>(null);
   
-  const connectorRef = useRef<WebRTCConnector | null>(null);
-  const messageHandlerRef = useRef<WebRTCMessageHandler | null>(null);
-  const connectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  // Clear any connection timers on unmount
-  useEffect(() => {
-    return () => {
-      if (connectionTimerRef.current) {
-        clearTimeout(connectionTimerRef.current);
-        connectionTimerRef.current = null;
-      }
-    };
-  }, []);
-  
-  // Enhanced error handler
-  const handleConnectionError = useCallback((error: Error) => {
-    console.error("[useConnectionManagement] Connection error:", error);
-    setIsConnectionError(true);
-    setIsConnecting(false);
-    
-    // Dispatch a custom error event that can be caught by components
-    const errorEvent = new CustomEvent("webrtc-error", { 
-      detail: { error } 
-    });
-    window.dispatchEvent(errorEvent);
-    
-    // Check if we should attempt reconnection
-    if (connectionAttempts < maxConnectionAttempts) {
-      const newAttempts = connectionAttempts + 1;
-      setConnectionAttempts(newAttempts);
-      
-      // Wait a bit before attempting to reconnect
-      console.log(`[useConnectionManagement] Will attempt reconnection (${newAttempts}/${maxConnectionAttempts}) in 2 seconds...`);
-      connectionTimerRef.current = setTimeout(() => {
-        connect().catch(console.error);
-      }, 2000);
-    } else {
-      toast.error(`Failed to connect after ${maxConnectionAttempts} attempts. Please try again later.`);
-      
-      // If we have an error handler in the options, call it
-      if (options.onError) {
-        options.onError(new Error(`Failed to connect after ${maxConnectionAttempts} attempts`));
-      }
+  const connect = useCallback(async () => {
+    if (isConnected || isConnecting) {
+      console.log("[useConnectionActions] Already connecting/connected, ignoring connect call");
+      return;
     }
-  }, [connectionAttempts, maxConnectionAttempts, options.onError]);
-  
-  // Create enhanced message handler
-  const setupMessageHandler = useCallback(() => {
-    if (!messageHandlerRef.current) {
-      messageHandlerRef.current = new WebRTCMessageHandler({
-        onMessageReceived: onMessage,
-        userId: options.userId,
-        instructions: options.instructions,
+    
+    setIsConnecting(true);
+    setIsConnected(false);
+    setDataChannelReady(false);
+    
+    const { 
+      model, 
+      voice, 
+      instructions, 
+      userId, 
+      onError 
+    } = options;
+    
+    const webrtcOptions: WebRTCOptions = {
+      model: model || "gpt-4o-realtime-preview-2024-12-17",
+      voice: voice || "alloy",
+      instructions: instructions || "You are a helpful assistant. Be concise in your responses.",
+      userId: userId,
+      onError: onError
+    };
+    
+    try {
+      // Initialize connection manager
+      const connector = new ConnectionManager();
+      connectorRef.current = connector;
+      
+      // Set up connection lifecycle events
+      connector.onOpen(() => {
+        console.log("[useConnectionActions] Connection opened");
+        setIsConnecting(false);
+        setIsConnected(true);
       });
       
-      console.log("[useConnectionManagement] Created message handler with userId:", options.userId);
+      connector.onClose(() => {
+        console.log("[useConnectionActions] Connection closed");
+        setIsConnecting(false);
+        setIsConnected(false);
+        setDataChannelReady(false);
+        activeStreamRef.current = null;
+        
+        // Reset session configuration status
+        sessionManagerRef.current?.resetSessionConfigured();
+      });
+      
+      connector.onError((error: any) => {
+        console.error("[useConnectionActions] Connection error:", error);
+        setIsConnecting(false);
+        setIsConnected(false);
+        setDataChannelReady(false);
+        activeStreamRef.current = null;
+        
+        // Reset session configuration status
+        sessionManagerRef.current?.resetSessionConfigured();
+      });
+      
+      connector.onMessage((message: any) => {
+        handleMessage(message);
+      });
+      
+      // Initialize audio recorder
+      const recorder = new AudioRecorder();
+      recorderRef.current = recorder;
+      
+      // Initialize session manager
+      sessionManagerRef.current = new SessionManager(
+        connector.pc, 
+        connector.dc, 
+        webrtcOptions,
+        audioPlaybackManagerRef.current || undefined
+      );
+      
+      // Configure data channel
+      connector.dc.onopen = () => {
+        console.log("[useConnectionActions] Data channel opened");
+        setDataChannelReady(true);
+        
+        // Configure session if ready
+        sessionManagerRef.current?.configureSessionIfReady();
+      };
+      
+      connector.dc.onclose = () => {
+        console.log("[useConnectionActions] Data channel closed");
+        setDataChannelReady(false);
+        
+        // Reset session configuration status
+        sessionManagerRef.current?.resetSessionConfigured();
+      };
+      
+      // Start connecting
+      const connected = await connector.connect();
+      
+      if (connected) {
+        console.log("[useConnectionActions] Successfully initiated connection");
+      } else {
+        console.warn("[useConnectionActions] Failed to initiate connection");
+        setIsConnecting(false);
+        setIsConnected(false);
+        setDataChannelReady(false);
+      }
+    } catch (error: any) {
+      console.error("[useConnectionActions] Error during connection setup:", error);
+      setIsConnecting(false);
+      setIsConnected(false);
+      setDataChannelReady(false);
+      
+      // Reset session configuration status
+      sessionManagerRef.current?.resetSessionConfigured();
+      
+      // Pass the error up to the parent component
+      options.onError?.(error);
     }
-  }, [options.userId, options.instructions, onMessage]);
+  }, [
+    isConnected,
+    isConnecting,
+    options,
+    setIsConnected,
+    setIsConnecting,
+    handleMessage
+  ]);
   
-  // Connect to OpenAI's WebRTC API
-  const connect = useCallback(async (): Promise<boolean> => {
-    // Don't try to connect if we're already connecting or connected
-    if (isConnecting) {
-      console.log("[useConnectionManagement] Already connecting, ignoring connect request");
-      return false;
+  const disconnect = useCallback(() => {
+    console.log("[useConnectionActions] Disconnecting");
+    
+    // Stop the audio stream if it's active
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach(track => track.stop());
+      activeStreamRef.current = null;
     }
     
-    if (isConnected && connectorRef.current) {
-      console.log("[useConnectionManagement] Already connected, ignoring connect request");
-      return true;
+    // Stop audio processing
+    audioProcessorRef.current?.stop();
+    
+    // Disconnect from the server
+    connectorRef.current?.disconnect();
+    setIsConnecting(false);
+    setIsConnected(false);
+    setIsMicrophoneActive(false);
+    setDataChannelReady(false);
+    
+    // Reset session configuration status
+    sessionManagerRef.current?.resetSessionConfigured();
+  }, [
+    setIsConnected,
+    setIsConnecting,
+    setIsMicrophoneActive,
+    connectorRef,
+    audioProcessorRef
+  ]);
+  
+  const toggleMicrophone = useCallback(async () => {
+    if (!isConnected || !recorderRef.current || !audioProcessorRef.current) {
+      console.warn("[useConnectionActions] Not connected or recorder/processor not initialized");
+      return;
     }
     
     try {
-      console.log("[useConnectionManagement] Starting connection process");
-      setIsConnecting(true);
-      setIsConnectionError(false);
-      
-      // Create WebRTC connector with options
-      connectorRef.current = new WebRTCConnector({
-        ...options,
-        onMessage: (event: MessageEvent) => {
-          try {
-            setupMessageHandler();
-            messageHandlerRef.current?.handleMessage(event);
-          } catch (error) {
-            console.error("[useConnectionManagement] Error handling message:", error);
-          }
-        },
-        onError: handleConnectionError
-      });
-      
-      // Attempt to connect
-      const connected = await connectorRef.current.connect();
-      
-      if (connected) {
-        console.log("[useConnectionManagement] Connection established successfully");
-        setIsConnected(true);
-        setIsConnecting(false);
-        setConnectionAttempts(0); // Reset attempts counter on successful connection
-        return true;
+      if (!isMicrophoneActive) {
+        console.log("[useConnectionActions] Starting microphone");
+        
+        // Start audio processing
+        audioProcessorRef.current.start();
+        
+        // Get the audio stream
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        activeStreamRef.current = stream;
+        
+        // Get the active audio track
+        const audioTrack = stream.getAudioTracks()[0];
+        
+        // Start recording the audio
+        recorderRef.current.start(audioTrack);
+        
+        // Set microphone as active
+        setIsMicrophoneActive(true);
       } else {
-        console.error("[useConnectionManagement] Failed to establish connection");
-        setIsConnected(false);
-        setIsConnecting(false);
-        // This will trigger reconnect if we haven't exceeded max attempts
-        handleConnectionError(new Error("Failed to establish connection"));
-        return false;
+        console.log("[useConnectionActions] Stopping microphone");
+        
+        // Stop audio processing
+        audioProcessorRef.current?.stop();
+        
+        // Stop the audio stream
+        if (activeStreamRef.current) {
+          activeStreamRef.current.getTracks().forEach(track => track.stop());
+          activeStreamRef.current = null;
+        }
+        
+        // Stop recording
+        recorderRef.current.stop();
+        
+        // Set microphone as inactive
+        setIsMicrophoneActive(false);
       }
-    } catch (error) {
-      console.error("[useConnectionManagement] Error during connection:", error);
-      setIsConnected(false);
-      setIsConnecting(false);
-      handleConnectionError(error instanceof Error ? error : new Error(String(error)));
-      return false;
+    } catch (error: any) {
+      console.error("[useConnectionActions] Error toggling microphone:", error);
+      setIsMicrophoneActive(false);
+      options.onError?.(error);
     }
-  }, [isConnecting, isConnected, options, setupMessageHandler, handleConnectionError]);
+  }, [
+    isConnected,
+    isMicrophoneActive,
+    setIsMicrophoneActive,
+    options
+  ]);
   
-  // Disconnect from OpenAI's WebRTC API
-  const disconnect = useCallback(() => {
-    if (connectorRef.current) {
-      connectorRef.current.disconnect();
-      connectorRef.current = null;
+  const sendTextMessage = useCallback((text: string) => {
+    if (!isConnected || !connectorRef.current) {
+      console.warn("[useConnectionActions] Not connected, cannot send text message");
+      return;
     }
     
-    // Clear any pending reconnection timers
-    if (connectionTimerRef.current) {
-      clearTimeout(connectionTimerRef.current);
-      connectionTimerRef.current = null;
+    // Send the text message through the connection manager
+    connectorRef.current.send(JSON.stringify({
+      event_id: `event_${Date.now()}`,
+      type: "message.user",
+      message: {
+        type: "text",
+        text: text
+      }
+    }));
+  }, [isConnected, connectorRef]);
+  
+  const commitAudioBuffer = useCallback((audioData: Float32Array) => {
+    if (!isConnected || !connectorRef.current) {
+      console.warn("[useConnectionActions] Not connected, cannot commit audio buffer");
+      return;
     }
     
-    setIsConnected(false);
-    setIsConnecting(false);
-    setConnectionAttempts(0);
-    console.log("[useConnectionManagement] Disconnected from OpenAI WebRTC API");
+    // Convert audio data to PCM16 format
+    const pcm16Data = audioProcessorRef.current?.convertToPCM16(audioData);
+    
+    if (!pcm16Data) {
+      console.warn("[useConnectionActions] Could not convert audio data to PCM16");
+      return;
+    }
+    
+    // Send the audio data through the connection manager
+    connectorRef.current.send(pcm16Data);
+  }, [isConnected, connectorRef, audioProcessorRef]);
+  
+  const getActiveMediaStream = useCallback(() => {
+    return activeStreamRef.current;
   }, []);
   
-  // Set the AudioPlaybackManager for the connector
+  const getActiveAudioTrack = useCallback(() => {
+    return activeStreamRef.current?.getAudioTracks()[0];
+  }, []);
+  
   const setAudioPlaybackManager = useCallback((manager: AudioPlaybackManager) => {
-    if (connectorRef.current) {
-      connectorRef.current.setAudioPlaybackManager(manager);
-      console.log("[useConnectionManagement] AudioPlaybackManager set");
-    } else {
-      console.warn("[useConnectionManagement] Cannot set AudioPlaybackManager: No active connector");
-    }
+    audioPlaybackManagerRef.current = manager;
+    
+    // Set the audio playback manager on the session manager
+    sessionManagerRef.current?.setAudioPlaybackManager(manager);
   }, []);
   
   return {
     connect,
     disconnect,
-    setAudioPlaybackManager,
-    isConnected,
-    isConnecting,
-    isConnectionError,
-    connectorRef
+    toggleMicrophone,
+    sendTextMessage,
+    commitAudioBuffer,
+    getActiveMediaStream,
+    getActiveAudioTrack,
+    isDataChannelReady: dataChannelReady,
+    setAudioPlaybackManager
   };
-}
+};

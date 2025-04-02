@@ -1,97 +1,102 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { Json } from "@/integrations/supabase/types";
 
-export interface AnalysisResult {
-  summary?: string;
-  keywords?: string[];
-  losingStrategies?: {
-    beingRight?: number;
-    controlling?: number;
-    unbridledSelfExpression?: number;
-    retaliation?: number;
-    withdrawal?: number;
-  };
+export interface AnalysisResults {
+  summary: string | null;
+  keywords: string[];
+  losingStrategies: {
+    beingRight: number;
+    controlling: number;
+    unbridledSelfExpression: number;
+    retaliation: number;
+    withdrawal: number;
+  } | null;
 }
 
-/**
- * Fetch analysis results for a specific user
- * This now handles the case where analysis might not exist yet
- */
-export const fetchAnalysisResults = async (userId: string): Promise<AnalysisResult | null> => {
+export async function formatLosingStrategies(strategies: Json | null): Promise<Record<string, number> | null> {
+  if (!strategies) return null;
+  
   try {
-    console.log(`[AnalysisService] Fetching analysis results for user: ${userId}`);
+    // If it's a string, try to parse it
+    if (typeof strategies === 'string') {
+      const parsed = JSON.parse(strategies);
+      return parsed;
+    }
     
-    // First check if there are any analysis results
-    const { data: hasResults, error: checkError } = await supabase
+    // If it's already an object, use it
+    if (typeof strategies === 'object') {
+      // Cast it to a Record<string, number> - we'll do safety checks when accessing
+      return strategies as Record<string, number>;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("[Analysis] Error formatting losing strategies:", error);
+    return null;
+  }
+}
+
+export async function doesAnalysisExist(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
       .from('analysis_results')
       .select('id')
       .eq('user_id', userId)
-      .maybeSingle(); // Use maybeSingle instead of single to avoid errors
-    
-    // If no results exist yet, return null without logging errors
-    if (checkError || !hasResults) {
-      console.log(`[AnalysisService] No analysis results found for user: ${userId}`);
-      return null;
+      .maybeSingle();
+      
+    if (error) {
+      console.error("[Analysis] Error checking analysis existence:", error);
+      return false;
     }
     
-    // Fetch actual analysis results
+    return !!data;
+  } catch (error) {
+    console.error("[Analysis] Error in doesAnalysisExist:", error);
+    return false;
+  }
+}
+
+export async function fetchAnalysisResults(userId: string): Promise<AnalysisResults | null> {
+  try {
     const { data, error } = await supabase
       .from('analysis_results')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
-      
+      .maybeSingle();
+    
     if (error || !data) {
-      console.warn(`[AnalysisService] Error fetching analysis results: ${error?.message}`);
+      if (error?.code === '406') {
+        // This is often a false positive, just log and continue
+        console.log("[Analysis] Note: 406 error fetching analysis results, likely not found");
+      } else if (error) {
+        console.error("[Analysis] Error fetching analysis results:", error);
+      } else {
+        console.log("[Analysis] No analysis results found for user:", userId);
+      }
       return null;
     }
     
-    console.log(`[AnalysisService] Analysis results fetched successfully for user: ${userId}`);
+    // Format the losing strategies safely
+    const strategies = await formatLosingStrategies(data.losing_strategy_flags);
     
-    // Extract and return analysis result data with proper type checking
-    const losingStrategyFlags = data.losing_strategy_flags ? 
-      (typeof data.losing_strategy_flags === 'string' 
-        ? JSON.parse(data.losing_strategy_flags) 
-        : data.losing_strategy_flags) 
-      : {};
-    
-    return {
-      summary: data.summary_text || undefined,
-      keywords: data.keywords || undefined,
-      losingStrategies: {
-        beingRight: losingStrategyFlags?.beingRight,
-        controlling: losingStrategyFlags?.controlling,
-        unbridledSelfExpression: losingStrategyFlags?.unbridledSelfExpression,
-        retaliation: losingStrategyFlags?.retaliation,
-        withdrawal: losingStrategyFlags?.withdrawal
-      }
+    const analysisResults: AnalysisResults = {
+      summary: data.summary_text,
+      keywords: data.keywords || [],
+      losingStrategies: strategies ? {
+        // Safely access properties with optional chaining and nullish coalescing
+        beingRight: Number(strategies?.beingRight ?? 0),
+        controlling: Number(strategies?.controlling ?? 0),
+        unbridledSelfExpression: Number(strategies?.unbridledSelfExpression ?? 0),
+        retaliation: Number(strategies?.retaliation ?? 0),
+        withdrawal: Number(strategies?.withdrawal ?? 0)
+      } : null
     };
+    
+    return analysisResults;
   } catch (error) {
-    console.error("[AnalysisService] Error in fetchAnalysisResults:", error);
+    console.error("[Analysis] Error in fetchAnalysisResults:", error);
     return null;
   }
-};
-
-/**
- * Check if analysis exists for a user
- */
-export const doesAnalysisExist = async (userId: string): Promise<boolean> => {
-  try {
-    const { count, error } = await supabase
-      .from('analysis_results')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-      
-    if (error) {
-      console.warn(`[AnalysisService] Error checking analysis existence: ${error.message}`);
-      return false;
-    }
-    
-    return count !== null && count > 0;
-  } catch (error) {
-    console.error("[AnalysisService] Error in doesAnalysisExist:", error);
-    return false;
-  }
-};
+}

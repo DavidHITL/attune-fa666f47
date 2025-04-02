@@ -1,4 +1,3 @@
-
 import { Message } from "@/components/MessageBubble";
 import { fetchUserContext, enhanceInstructionsWithContext } from "@/services/context";
 import { saveMessage } from "@/services/messages/messageStorage";
@@ -28,6 +27,28 @@ export const getUnifiedEnhancedInstructions = async (baseInstructions: string, o
   }
 
   try {
+    console.log(`[UnifiedContext] Loading full context for user: ${options.userId}`);
+    
+    // Fetch complete user context including all available context elements
+    const userContext = await fetchUserContext(options.userId);
+    
+    if (!userContext) {
+      console.warn(`[UnifiedContext] Failed to fetch context for user: ${options.userId}`);
+      return baseInstructions;
+    }
+    
+    // Log the context components that were successfully loaded
+    console.log(`[UnifiedContext] Context loaded with: ${
+      [
+        userContext.recentMessages?.length > 0 ? `${userContext.recentMessages.length} messages` : null,
+        userContext.userDetails ? 'user details' : null,
+        userContext.criticalInformation?.length > 0 ? `${userContext.criticalInformation.length} critical insights` : null,
+        userContext.analysisResults ? 'analysis results' : null,
+        userContext.knowledgeEntries?.length > 0 ? `${userContext.knowledgeEntries.length} knowledge entries` : null,
+        userContext.userInstructions ? 'custom instructions' : null
+      ].filter(Boolean).join(', ')
+    }`);
+    
     // Add transition flag to indicate context continuity
     const enhancedInstructions = await enhanceInstructionsWithContext(
       baseInstructions,
@@ -56,7 +77,7 @@ export const getUnifiedEnhancedInstructions = async (baseInstructions: string, o
     return baseInstructions + 
       `\n\nIMPORTANT: Maintain context from previous conversations with this user, regardless of whether they were in text or voice mode.`;
   }
-}
+};
 
 /**
  * Track a transition between modes to ensure context continuity

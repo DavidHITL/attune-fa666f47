@@ -1,51 +1,26 @@
+import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
+
+// Define the structure for WebRTC messages
 export interface WebRTCMessage {
-  type: string;
-  text?: string;
-  delta?: string;
-  audio?: string;
-  // Add session property to fix type errors
-  session?: {
-    instructions?: string;
-    modalities?: string[];
-    voice?: string;
-    temperature?: number;
-    priority_hints?: string[];
-    [key: string]: any; // Allow for other session properties
-  };
+  id: string;
+  text: string;
+  isUser: boolean;
+  timestamp: Date;
 }
 
-export interface MessageMetadata {
-  messageType: 'text' | 'voice';
-  instructions?: string;
-  knowledgeEntries?: any;
-}
-
-export interface WebRTCMessageHandlerOptions {
-  onTranscriptUpdate?: (text: string) => void;
-  onTranscriptComplete?: () => void;
-  onAudioData?: (base64Audio: string) => void;
-  onAudioComplete?: () => void;
-  onMessageReceived?: (message: WebRTCMessage) => void;
-  onFinalTranscript?: (transcript: string) => void;
-  instructions?: string;
-}
-
+// Define the options for the useWebRTCConnection hook
+// Add onError to the interface
 export interface UseWebRTCConnectionOptions {
   model?: string;
   voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
   instructions?: string;
-  userId?: string; // Add userId to options
+  userId?: string;
   autoConnect?: boolean;
   enableMicrophone?: boolean;
-  apiKey?: string;
-  onMessage?: (message: WebRTCMessage) => void;
-  onTrack?: (event: RTCTrackEvent) => void;
   onError?: (error: Error) => void;
 }
 
-/**
- * Result object returned by useWebRTCConnection hook
- */
+// Define the result type for the useWebRTCConnection hook
 export interface WebRTCConnectionResult {
   isConnected: boolean;
   isConnecting: boolean;
@@ -56,17 +31,16 @@ export interface WebRTCConnectionResult {
   transcriptProgress: number;
   messages: WebRTCMessage[];
   isDataChannelReady: boolean;
-  connect: () => Promise<boolean>;
+  connect: () => Promise<void>;
   disconnect: () => void;
-  toggleMicrophone: () => Promise<boolean>;
-  sendTextMessage: (text: string) => boolean;
-  commitAudioBuffer: () => boolean;
+  toggleMicrophone: () => void;
+  sendTextMessage: (text: string) => void;
+  commitAudioBuffer: (audioData: Float32Array) => void;
   getActiveMediaStream: () => MediaStream | null;
   getActiveAudioTrack: () => MediaStreamTrack | null;
-  setAudioPlaybackManager?: (manager: any) => void;
+  setAudioPlaybackManager: (manager: AudioPlaybackManager) => void;
 }
 
-// Add the missing WebRTCConnectionState interface
 export interface WebRTCConnectionState {
   isConnected: boolean;
   isConnecting: boolean;
@@ -75,6 +49,3 @@ export interface WebRTCConnectionState {
   currentTranscript: string;
   messages: WebRTCMessage[];
 }
-
-// Export WebRTCOptions from WebRTCTypes.ts to fix the second error
-export type WebRTCOptions = import("@/utils/realtime/WebRTCTypes").WebRTCOptions;
