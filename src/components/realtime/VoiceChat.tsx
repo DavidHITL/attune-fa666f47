@@ -13,6 +13,7 @@ import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 import MicrophoneControlGroup from "./MicrophoneControlGroup";
 import { toast } from "sonner";
+import { trackModeTransition, logContextVerification } from "@/services/context/unifiedContextProvider";
 
 interface VoiceChatProps {
   systemPrompt?: string;
@@ -72,8 +73,31 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     enableMicrophone: false,
     // Use the VoiceChatAudio component for handling audio tracks
     onTrack: null, // We'll handle this in VoiceChatAudio
-    // Remove the onError property since it doesn't exist in UseWebRTCConnectionOptions
   });
+
+  // Log that we're entering voice mode when component mounts
+  useEffect(() => {
+    if (user?.id) {
+      console.log("[VoiceChat] Entering voice mode");
+      // Track mode transition (text -> voice)
+      trackModeTransition('text', 'voice', user.id).catch(console.error);
+      
+      // Log context verification
+      logContextVerification({
+        userId: user.id,
+        activeMode: 'voice',
+        sessionStarted: true
+      }, systemPrompt).catch(console.error);
+    }
+    
+    return () => {
+      if (user?.id) {
+        console.log("[VoiceChat] Exiting voice mode");
+        // Track transition back to text mode when unmounting
+        trackModeTransition('voice', 'text', user.id, currentTranscript).catch(console.error);
+      }
+    };
+  }, [user?.id, systemPrompt, currentTranscript]);
 
   // Connect the audio playback manager to the WebRTC connection
   useEffect(() => {

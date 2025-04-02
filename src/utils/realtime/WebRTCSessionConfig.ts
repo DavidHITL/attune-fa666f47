@@ -1,6 +1,6 @@
 
 import { WebRTCOptions } from "./WebRTCTypes";
-import { enhanceInstructionsWithContext } from "@/services/context";
+import { getUnifiedEnhancedInstructions } from "@/services/context/unifiedContextProvider";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -43,13 +43,16 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     // Get base instructions from configuration
     const baseInstructions = await getBaseInstructions();
     
-    // Enhance instructions with therapy context
-    const enhancedInstructions = await enhanceInstructionsWithContext(
+    // Enhance instructions with therapy context, using unified context provider
+    const enhancedInstructions = await getUnifiedEnhancedInstructions(
       options.instructions || baseInstructions,
-      options.userId
+      {
+        userId: options.userId,
+        activeMode: 'voice'
+      }
     );
 
-    console.log("[WebRTCSessionConfig] Using enhanced instructions with context");
+    console.log("[WebRTCSessionConfig] Using enhanced instructions with unified context");
     
     // Send session configuration to OpenAI
     const sessionConfig = {
@@ -57,7 +60,7 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        instructions: enhancedInstructions, // Using the enhanced instructions
+        instructions: enhancedInstructions, // Using the enhanced instructions with unified context
         voice: options.voice || "alloy",
         // Use 'opus' as input format since we're using the direct WebRTC track
         // which typically uses Opus codec

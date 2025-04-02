@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { calculateSessionProgress } from "@/utils/sessionUtils";
 import DatabaseConnectionAlert from "./chat/DatabaseConnectionAlert";
 import ChatLoadingState from "./chat/ChatLoadingState";
+import { logContextVerification, trackModeTransition } from "@/services/context/unifiedContextProvider";
 
 interface ChatConversationProps {
   isSpeechEnabled: boolean;
@@ -55,6 +56,26 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
     isSpeechEnabled,
     sessionProgress
   });
+
+  // Log that we're in text mode and track transitions
+  useEffect(() => {
+    if (user?.id && !isAuthLoading && initialLoadDone) {
+      console.log("[ChatConversation] Active in text mode");
+      
+      // Track mode as text when component mounts
+      trackModeTransition('voice', 'text', user.id).catch(console.error);
+      
+      // Log context verification for text mode
+      logContextVerification({
+        userId: user.id,
+        activeMode: 'text',
+        sessionStarted,
+        sessionProgress
+      }, undefined, {
+        messageCount: messages.length
+      }).catch(console.error);
+    }
+  }, [user?.id, isAuthLoading, initialLoadDone, messages.length, sessionStarted, sessionProgress]);
 
   // Log session progress for debugging
   useEffect(() => {

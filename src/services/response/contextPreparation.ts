@@ -1,8 +1,8 @@
 
-import { ContextData, fetchUserContext } from "@/services/context";
+import { fetchUserContext } from "@/services/context";
 import { ApiContextData } from "./types";
-import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { logContextVerification } from "@/services/context/unifiedContextProvider";
 
 /**
  * Prepare context data for the API request
@@ -25,6 +25,16 @@ export const prepareContextData = async (userId?: string): Promise<ApiContextDat
   if (!contextData) {
     return null;
   }
+  
+  // Log context verification data
+  await logContextVerification({
+    userId,
+    activeMode: 'text'
+  }, undefined, {
+    contextDataSize: JSON.stringify(contextData).length,
+    messageCount: contextData.recentMessages.length,
+    knowledgeEntries: contextData.knowledgeEntries?.length || 0
+  });
   
   // Log context data being used (helpful for debugging)
   console.log("[contextPreparation] Context data prepared:", {

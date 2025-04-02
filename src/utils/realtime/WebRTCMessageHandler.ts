@@ -1,6 +1,7 @@
 
 import { WebRTCMessage, MessageMetadata } from "@/hooks/useWebRTCConnection/types";
 import { saveMessage } from "@/services/messages/messageStorage";
+import { logContextVerification } from "@/services/context/unifiedContextProvider";
 
 export interface WebRTCMessageHandlerOptions {
   onTranscriptUpdate?: (text: string) => void;
@@ -11,6 +12,7 @@ export interface WebRTCMessageHandlerOptions {
   onFinalTranscript?: (transcript: string) => void;
   instructions?: string;
   knowledgeEntries?: any[];
+  userId?: string;
 }
 
 /**
@@ -76,6 +78,9 @@ export class WebRTCMessageHandler {
             
             // Save the transcript to database with metadata
             this.saveTranscriptToDatabase();
+            
+            // Log context verification data
+            this.verifyContextIntegrity();
           }
           
           // Reset current transcript
@@ -88,6 +93,15 @@ export class WebRTCMessageHandler {
         if (this.options.onAudioComplete) {
           this.options.onAudioComplete();
         }
+      }
+      else if (message.type === "session.created" || message.type === "session.updated") {
+        // Log session creation/updates for context verification
+        console.log(`[WebRTCMessageHandler] ${message.type} event received`, 
+          message.session ? {
+            hasInstructions: !!message.session.instructions,
+            modalities: message.session.modalities,
+            voice: message.session.voice
+          } : "No session details");
       }
     } catch (error) {
       console.error("[WebRTCMessageHandler] Error handling message:", error);
@@ -138,7 +152,8 @@ export class WebRTCMessageHandler {
       knowledgeEntries.push({
         type: 'user_details',
         content: JSON.stringify(this.userDetails),
-        description: 'User details detected in conversation'
+        description: 'User details detected in conversation',
+        interface: 'voice'
       });
     }
     
@@ -149,6 +164,28 @@ export class WebRTCMessageHandler {
       knowledgeEntries: knowledgeEntries.length > 0 ? knowledgeEntries : undefined
     }).catch(error => {
       console.error("[WebRTCMessageHandler] Error saving transcript:", error);
+    });
+  }
+  
+  /**
+   * Verify context integrity after message processing
+   */
+  private verifyContextIntegrity(): void {
+    // Skip if no userId available
+    if (!this.options.userId) {
+      return;
+    }
+    
+    // Log context verification data
+    logContextVerification({
+      userId: this.options.userId,
+      activeMode: 'voice'
+    }, this.options.instructions, {
+      transcriptLength: this.currentTranscript?.length || 0,
+      extractedUserDetails: Object.keys(this.userDetails).length,
+      knowledgeEntries: this.options.knowledgeEntries?.length || 0
+    }).catch(error => {
+      console.error("[WebRTCMessageHandler] Error verifying context:", error);
     });
   }
   
