@@ -3,6 +3,7 @@ import { Message } from "@/components/MessageBubble";
 import { fetchUserContext, enhanceInstructionsWithContext } from "@/services/context";
 import { saveMessage } from "@/services/messages/messageStorage";
 import { supabase } from "@/integrations/supabase/client";
+import { logToConsoleIfDbFails } from "./contextVerificationService";
 
 /**
  * Unified Context Provider 
@@ -102,37 +103,39 @@ export const logContextVerification = async (
     }
     
     // Log key metrics for verification
-    console.log("[UnifiedContext] Context verification metrics:", {
+    const verificationData = {
+      user_id: options.userId,
       mode: options.activeMode,
-      messageCount: contextData.recentMessages.length,
-      hasUserDetails: !!contextData.userDetails && Object.keys(contextData.userDetails).length > 0,
-      hasCriticalInfo: !!contextData.criticalInformation && contextData.criticalInformation.length > 0,
-      hasAnalysis: !!contextData.analysisResults,
-      knowledgeEntryCount: contextData.knowledgeEntries?.length || 0,
-      instructionsLength: instructions ? instructions.length : 0,
-      sessionProgress: options.sessionProgress || 0,
-      ...additionalContext
-    });
+      message_count: contextData.recentMessages.length,
+      has_user_details: !!contextData.userDetails && Object.keys(contextData.userDetails).length > 0,
+      has_critical_info: !!contextData.criticalInformation && contextData.criticalInformation.length > 0,
+      has_analysis: !!contextData.analysisResults,
+      knowledge_entry_count: contextData.knowledgeEntries?.length || 0,
+      instructions_provided: !!instructions,
+      additional_context: additionalContext || {}
+    };
     
-    // For detailed debugging, log to database
-    const { error } = await supabase
-      .from('context_verification_logs')
-      .insert({
-        user_id: options.userId,
-        mode: options.activeMode,
-        message_count: contextData.recentMessages.length,
-        has_user_details: !!contextData.userDetails && Object.keys(contextData.userDetails).length > 0,
-        has_critical_info: !!contextData.criticalInformation && contextData.criticalInformation.length > 0, 
-        has_analysis: !!contextData.analysisResults,
-        knowledge_entry_count: contextData.knowledgeEntries?.length || 0,
-        instructions_provided: !!instructions,
-        additional_context: additionalContext || {}
-      })
-      .maybeSingle();
+    console.log("[UnifiedContext] Context verification metrics:", verificationData);
     
-    if (error) {
-      // Non-critical error, log but continue
-      console.warn("[UnifiedContext] Error logging verification data:", error);
+    // For detailed debugging, log to database - using raw fetch to avoid type issues
+    try {
+      const response = await fetch(`${supabase.supabaseUrl}/rest/v1/context_verification_logs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabase.supabaseKey,
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        },
+        body: JSON.stringify(verificationData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error logging to context_verification_logs: ${response.statusText}`);
+      }
+    } catch (dbError) {
+      // Log the error but continue execution
+      console.warn("[UnifiedContext] Error logging verification data:", dbError);
+      logToConsoleIfDbFails(verificationData, dbError instanceof Error ? dbError : new Error(String(dbError)));
     }
   } catch (err) {
     console.error("[UnifiedContext] Error during context verification:", err);

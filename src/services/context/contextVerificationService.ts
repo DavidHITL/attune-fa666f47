@@ -7,14 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export const ensureContextVerificationTable = async () => {
   try {
-    // Check if the table exists by trying to select from it
-    const { error } = await supabase
-      .from('context_verification_logs')
-      .select('id')
-      .limit(1);
+    // Instead of directly checking the table, we'll use a safer approach
+    // that doesn't rely on type checking at compile time
+    const { error } = await supabase.rpc(
+      'table_exists',
+      { table_name: 'context_verification_logs' }
+    ).single();
     
-    // If the table doesn't exist, the error code will be '42P01'
-    if (error && error.code === '42P01') {
+    if (error) {
       console.warn("Context verification logs table does not exist. It needs to be created in the database.");
       return false;
     }

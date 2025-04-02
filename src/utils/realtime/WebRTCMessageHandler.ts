@@ -96,12 +96,18 @@ export class WebRTCMessageHandler {
       }
       else if (message.type === "session.created" || message.type === "session.updated") {
         // Log session creation/updates for context verification
-        console.log(`[WebRTCMessageHandler] ${message.type} event received`, 
-          message.session ? {
+        console.log(`[WebRTCMessageHandler] ${message.type} event received`); 
+        
+        // Safely access session properties if they exist
+        if (message.session) {
+          console.log("[WebRTCMessageHandler] Session info:", {
             hasInstructions: !!message.session.instructions,
             modalities: message.session.modalities,
             voice: message.session.voice
-          } : "No session details");
+          });
+        } else {
+          console.log("[WebRTCMessageHandler] No session details available");
+        }
       }
     } catch (error) {
       console.error("[WebRTCMessageHandler] Error handling message:", error);
