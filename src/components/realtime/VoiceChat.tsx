@@ -55,7 +55,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     const preloadUserContext = async () => {
       if (user?.id && !contextLoaded) {
         try {
-          console.log("[VoiceChat] Preloading user context for voice mode");
+          console.log(`[VoiceChat] Preloading user context for voice mode with userId: ${user.id}`);
           
           // Get context summary
           const contextSummary = await getRecentContextSummary(user.id);
@@ -96,6 +96,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
         }
       } else if (!user?.id) {
         // No user, but still mark as loaded to proceed
+        console.log("[VoiceChat] No user ID available, proceeding without context");
         setContextLoaded(true);
       }
     };
@@ -138,7 +139,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   } = useWebRTCConnection({
     instructions: systemPrompt || "You are a helpful, conversational AI assistant. Maintain context from previous text chats.", 
     voice,
-    userId: user?.id,
+    userId: user?.id, // Ensure userId is properly passed
     autoConnect: contextLoaded && connectionAttempts === 0, // Only auto-connect after context is loaded and on first attempt
     enableMicrophone: false,
     onError: handleConnectionError
@@ -148,7 +149,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   useEffect(() => {
     const initializeVoiceMode = async () => {
       if (user?.id) {
-        console.log("[VoiceChat] Entering voice mode");
+        console.log(`[VoiceChat] Entering voice mode for user: ${user.id}`);
         
         // Track mode transition (text -> voice)
         await trackModeTransition('text', 'voice', user.id);
@@ -162,6 +163,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
           contextLoaded,
           connectionInitiated: new Date().toISOString()
         });
+      } else {
+        console.log("[VoiceChat] No user ID available for voice mode");
       }
     };
     

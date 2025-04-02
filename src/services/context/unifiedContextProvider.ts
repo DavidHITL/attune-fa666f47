@@ -45,12 +45,12 @@ export const getUnifiedEnhancedInstructions = async (baseInstructions: string, o
        - Remember: The user expects you to maintain continuity from previous conversations.`;
 
     // Log success
-    console.log(`[UnifiedContext] Successfully enhanced instructions with ${options.activeMode} mode context`);
+    console.log(`[UnifiedContext] Successfully enhanced instructions with ${options.activeMode} mode context for user: ${options.userId}`);
     
     // Return the enhanced instructions
     return enhancedInstructions + modeTransitionInstructions;
   } catch (error) {
-    console.error("[UnifiedContext] Error enhancing instructions:", error);
+    console.error(`[UnifiedContext] Error enhancing instructions for user ${options.userId}:`, error);
     
     // If there's an error, add a fallback instruction to at least try to maintain context
     return baseInstructions + 

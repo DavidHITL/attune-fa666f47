@@ -43,14 +43,14 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     // Get base instructions from configuration
     const baseInstructions = await getBaseInstructions();
     
-    // Enhance instructions with context, using unified context provider
-    console.log(`[WebRTCSessionConfig] Enhancing instructions with userId: ${options.userId || 'none'}`);
-    
-    // Check if we have a userId before trying to get enhanced instructions
+    // Check if we have a userId before attempting to get enhanced instructions
     if (!options.userId) {
       console.warn("[WebRTCSessionConfig] No userId provided, using base instructions only");
+    } else {
+      console.log(`[WebRTCSessionConfig] Using userId for enhanced instructions: ${options.userId}`);
     }
     
+    // Enhance instructions with context, using unified context provider
     const enhancedInstructions = await getUnifiedEnhancedInstructions(
       options.instructions || baseInstructions,
       {
