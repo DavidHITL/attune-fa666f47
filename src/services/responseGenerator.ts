@@ -1,3 +1,4 @@
 
 // Re-export functionality from the refactored modules
-export { generateResponse, ResponseGeneratorOptions } from "./response";
+export { generateResponse } from "./response";
+export type { ResponseGeneratorOptions } from "./response/types";

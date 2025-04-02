@@ -88,7 +88,7 @@ export async function fetchMessagesFromDatabase(userId?: string): Promise<Messag
     return data.map(msg => ({
       id: msg.id.toString(),
       text: msg.content || '',
-      isUser: msg.is_user,
+      isUser: !!msg.is_user,
       timestamp: new Date(msg.created_at),
       messageType: (msg.message_type || 'text') as 'text' | 'voice',
       instructions: msg.instructions || undefined,
@@ -99,3 +99,6 @@ export async function fetchMessagesFromDatabase(userId?: string): Promise<Messag
     return null;
   }
 }
+
+// Alias for fetchMessagesFromDatabase (for compatibility)
+export const fetchMessagesWithMetadata = fetchMessagesFromDatabase;

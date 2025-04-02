@@ -1,22 +1,13 @@
 
 import { Message } from "@/components/MessageBubble";
-import { createMessageObject } from "@/services/messages/messageUtils";
 import { prepareConversationHistory, generateLocalResponse } from "./messagePreparation";
 import { prepareContextData } from "./contextPreparation";
 import { callChatResponseApi } from "./apiService";
+import { v4 as uuidv4 } from 'uuid';
+import { ApiRequestPayload, ApiMessage, ResponseGeneratorOptions } from "./types";
 
-// Define ResponseGeneratorOptions interface here since we have an error importing it
-export interface ResponseGeneratorOptions {
-  sessionProgress?: number;
-  useContextEnrichment?: boolean;
-}
-
-// Define ApiRequestPayload interface here to avoid import errors
-export interface ApiRequestPayload {
-  messages: { role: string; content: string }[];
-  sessionProgress: number;
-  contextData: any;
-}
+// Re-export types
+export type { ResponseGeneratorOptions, ApiRequestPayload, ApiMessage };
 
 /**
  * Generate a response to the user's message
@@ -57,7 +48,7 @@ export const generateResponse = async (
     const messages = prepareConversationHistory(conversation);
     
     // Add the most recent user message
-    messages.push({ role: "user", content: userMessage });
+    messages.push({ role: "user" as const, content: userMessage });
 
     console.log("Generating response with session progress:", sessionProgress);
 
@@ -103,11 +94,3 @@ export const generateResponse = async (
     } as Message;
   }
 };
-
-// Helper function to generate UUIDs
-function uuidv4() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}

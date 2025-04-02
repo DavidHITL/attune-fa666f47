@@ -7,7 +7,9 @@ export interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
-  messageType?: 'text' | 'voice';
+  messageType?: 'text' | 'voice' | 'system';
+  instructions?: string;
+  knowledgeEntries?: any[];
 }
 
 interface MessageBubbleProps {

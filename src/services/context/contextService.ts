@@ -42,8 +42,8 @@ export const fetchUserContext = async (userId?: string): Promise<ContextData | n
     
     // Extract knowledge entries
     const knowledgeEntries = messages
-      .filter(msg => msg.knowledge_entries && Array.isArray(msg.knowledge_entries))
-      .flatMap(msg => msg.knowledge_entries || []);
+      .filter(msg => msg.knowledgeEntries && Array.isArray(msg.knowledgeEntries))
+      .flatMap(msg => msg.knowledgeEntries || []);
     
     // Format the chat history
     const formattedHistory = formatChatContext(messages);

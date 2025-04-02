@@ -1,6 +1,12 @@
 
-import { MessageMetadata } from "@/utils/realtime/WebRTCTypes";
 import { v4 as uuidv4 } from 'uuid';
+
+// Define message metadata type locally to avoid dependency issues
+export interface MessageMetadata {
+  messageType?: 'text' | 'voice' | 'system';
+  instructions?: string;
+  knowledgeEntries?: KnowledgeEntry[];
+}
 
 // Define knowledge entry type locally to avoid dependency issues
 export interface KnowledgeEntry {
