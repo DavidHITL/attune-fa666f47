@@ -76,8 +76,13 @@ export function useConnectionManager(
       
       connectorRef.current = connector;
       
+      // Get microphone access if needed but not already available
+      let audioTrack = getActiveAudioTrack();
+      if (!audioTrack && options.enableMicrophone) {
+        audioTrack = await requestMicrophoneAccess();
+      }
+      
       // Attempt to connect with the audio track if available
-      const audioTrack = getActiveAudioTrack();
       console.log("[useConnectionManagement] Connecting with audio track:", 
         audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
       
