@@ -1,4 +1,3 @@
-
 export interface WebRTCMessage {
   type: string;
   text?: string;
@@ -41,6 +40,7 @@ export interface UseWebRTCConnectionOptions {
   apiKey?: string;
   onMessage?: (message: WebRTCMessage) => void;
   onTrack?: (event: RTCTrackEvent) => void;
+  onError?: (error: Error) => void;
 }
 
 /**
@@ -75,3 +75,6 @@ export interface WebRTCConnectionState {
   currentTranscript: string;
   messages: WebRTCMessage[];
 }
+
+// Export WebRTCOptions from WebRTCTypes.ts to fix the second error
+export type WebRTCOptions = import("@/utils/realtime/WebRTCTypes").WebRTCOptions;

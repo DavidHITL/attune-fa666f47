@@ -50,16 +50,22 @@ export const fetchAnalysisResults = async (userId: string): Promise<AnalysisResu
     
     console.log(`[AnalysisService] Analysis results fetched successfully for user: ${userId}`);
     
-    // Extract and return analysis result data
+    // Extract and return analysis result data with proper type checking
+    const losingStrategyFlags = data.losing_strategy_flags ? 
+      (typeof data.losing_strategy_flags === 'string' 
+        ? JSON.parse(data.losing_strategy_flags) 
+        : data.losing_strategy_flags) 
+      : {};
+    
     return {
       summary: data.summary_text || undefined,
       keywords: data.keywords || undefined,
       losingStrategies: {
-        beingRight: data.losing_strategy_flags?.beingRight,
-        controlling: data.losing_strategy_flags?.controlling,
-        unbridledSelfExpression: data.losing_strategy_flags?.unbridledSelfExpression,
-        retaliation: data.losing_strategy_flags?.retaliation,
-        withdrawal: data.losing_strategy_flags?.withdrawal
+        beingRight: losingStrategyFlags?.beingRight,
+        controlling: losingStrategyFlags?.controlling,
+        unbridledSelfExpression: losingStrategyFlags?.unbridledSelfExpression,
+        retaliation: losingStrategyFlags?.retaliation,
+        withdrawal: losingStrategyFlags?.withdrawal
       }
     };
   } catch (error) {

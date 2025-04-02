@@ -1,7 +1,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
-import { WebRTCOptions, WebRTCMessage } from "./types";
+import { UseWebRTCConnectionOptions, WebRTCMessage, WebRTCOptions } from "./types";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
 import { toast } from "sonner";
