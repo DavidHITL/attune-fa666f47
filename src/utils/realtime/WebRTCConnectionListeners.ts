@@ -93,14 +93,31 @@ export function setupPeerConnectionListeners(
     }
   };
   
-  // Handle incoming data channels with improved error handling and logging
+  // Enhanced data channel handling with timeout monitoring
   pc.ondatachannel = (event) => {
     const channel = event.channel;
-    console.log("[WebRTC] Received data channel:", channel.label);
+    console.log(`[WebRTC] Received data channel: ${channel.label} (state: ${channel.readyState})`);
     
     // Special handling for the oai-events channel from OpenAI
     if (channel.label === "oai-events") {
-      console.log("[WebRTC] Found oai-events channel - Setting up event handlers");
+      console.log("[WebRTC] Found oai-events channel - Setting up enhanced event handlers");
+      
+      // Set up timeout to monitor channel opening
+      const channelOpenTimeout = setTimeout(() => {
+        if (channel.readyState !== 'open') {
+          console.error("[WebRTC] oai-events channel failed to open within timeout period");
+          
+          // Notify about the timeout issue
+          if (options.onError) {
+            options.onError(new Error("Data channel failed to open within timeout period"));
+          }
+          
+          // Signal connection problem to trigger potential reconnection
+          if (options.onConnectionStateChange && pc.connectionState === 'connected') {
+            options.onConnectionStateChange('disconnected');
+          }
+        }
+      }, 5000); // 5 second timeout
       
       // Set up message handler for the events channel
       channel.onmessage = (e) => {
@@ -135,14 +152,16 @@ export function setupPeerConnectionListeners(
         }
       };
       
-      // Track channel opening
+      // Track channel opening and clear the timeout
       channel.onopen = () => {
         console.log("[WebRTC] oai-events channel opened and ready for communication");
+        clearTimeout(channelOpenTimeout);
       };
       
       // Track channel closing - now we handle unexpected closure
       channel.onclose = () => {
         console.warn("[WebRTC] oai-events channel closed");
+        clearTimeout(channelOpenTimeout);
         
         // Check if the data channel closed while the connection is still active
         if (pc.connectionState === 'connected') {
@@ -163,6 +182,7 @@ export function setupPeerConnectionListeners(
       // Enhanced error handling - log detailed error information
       channel.onerror = (error) => {
         console.error("[WebRTC] oai-events channel error occurred");
+        clearTimeout(channelOpenTimeout);
         
         // Extract more details from RTCErrorEvent if available
         if (error instanceof RTCErrorEvent) {
@@ -228,4 +248,3 @@ export function setupPeerConnectionListeners(
     console.log("[WebRTC] Signaling state changed:", pc.signalingState);
   };
 }
-

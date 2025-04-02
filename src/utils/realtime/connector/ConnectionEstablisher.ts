@@ -1,21 +1,13 @@
 
+// Import the existing code for ConnectionEstablisher
 import { WebRTCOptions } from "../WebRTCTypes";
-import { PeerConnectionFactory } from "./PeerConnectionFactory";
-import { OfferService } from "./OfferService";
-import { DataChannelCreator } from "./DataChannelCreator";
-import { AudioSender } from "./AudioSender";
 import { ConnectionCallbacks } from "./types/ConnectionTypes";
+import { DataChannelCreator } from "./DataChannelCreator";
+import { setupPeerConnectionListeners } from "../WebRTCConnectionListeners";
 
-/**
- * Handles the establishment of WebRTC connections to OpenAI
- */
 export class ConnectionEstablisher {
   /**
-   * Establish a WebRTC connection to OpenAI
-   * @param apiKey OpenAI API key
-   * @param options WebRTC options
-   * @param callbacks Connection lifecycle callbacks
-   * @param audioTrack Optional MediaStreamTrack to add to the peer connection
+   * Establish a connection to OpenAI's Realtime API
    */
   async establish(
     apiKey: string,
@@ -24,119 +16,144 @@ export class ConnectionEstablisher {
     audioTrack?: MediaStreamTrack
   ): Promise<{ pc: RTCPeerConnection; dc: RTCDataChannel } | null> {
     try {
-      console.log("[ConnectionEstablisher] Starting connection process");
-      
-      // 1. Create Peer Connection
-      const pc = PeerConnectionFactory.createPeerConnectionWithListeners(
-        options,
-        callbacks.onConnectionStateChange
-      );
-      
-      // 2. Add the audio track from microphone to the peer connection
-      let usedAudioTrack = audioTrack;
-      
-      // If no audio track was provided, try to get one directly
-      if (!usedAudioTrack) {
-        console.log("[ConnectionEstablisher] No audio track provided, attempting to get one");
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 24000 // Setting recommended sample rate for OpenAI
-            } 
+      // Create and configure peer connection
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      });
+
+      // Add audio track to the connection if provided
+      let stream: MediaStream | undefined;
+      if (audioTrack) {
+        stream = new MediaStream([audioTrack]);
+        const sender = pc.addTrack(audioTrack, stream);
+        console.log("[ConnectionEstablisher] Added audio track to peer connection:", 
+          audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
+        
+        // Configure the audio sender for best quality
+        const params = sender.getParameters();
+        if (params.encodings) {
+          params.encodings.forEach(encoding => {
+            // Set priority to high for voice
+            encoding.priority = 'high';
+            // Don't reduce quality even in low bandwidth conditions
+            encoding.degradationPreference = 'maintain-framerate';
           });
-          usedAudioTrack = stream.getAudioTracks()[0];
-          console.log("[ConnectionEstablisher] Successfully acquired microphone track:", 
-            usedAudioTrack.label || "Unnamed track", 
-            "- ID:", usedAudioTrack.id);
-        } catch (err) {
-          console.warn("[ConnectionEstablisher] Could not access microphone:", err);
-          // Continue without audio track - we can still use data channel for text
+          await sender.setParameters(params);
         }
-      }
-      
-      // Add the audio track if we have one (either provided or acquired)
-      if (usedAudioTrack) {
-        console.log("[ConnectionEstablisher] Adding audio track to peer connection:", 
-          usedAudioTrack.label || "Unnamed track", 
-          "- Enabled:", usedAudioTrack.enabled, 
-          "- ID:", usedAudioTrack.id);
         
-        // Reset the audio state before adding the track
-        AudioSender.resetAudioState();
-        
-        // Create a new MediaStream with the track
-        const mediaStream = new MediaStream([usedAudioTrack]);
-        
-        // Add the track to the peer connection
-        const sender = pc.addTrack(usedAudioTrack, mediaStream);
-        console.log("[ConnectionEstablisher] Audio track added to peer connection with sender ID:", 
-          sender.track?.id || "unknown");
-          
-        // Use transceiver to set direction if needed
-        const transceivers = pc.getTransceivers();
-        const audioTransceiver = transceivers.find(t => t.sender === sender);
-        if (audioTransceiver) {
-          audioTransceiver.direction = "sendrecv"; // Allow bi-directional audio
-          console.log("[ConnectionEstablisher] Audio transceiver direction set to:", audioTransceiver.direction);
-        }
+        // Also add a transceiver with proper direction
+        pc.addTransceiver('audio', { 
+          direction: 'sendrecv',
+          streams: [stream]
+        });
       } else {
-        console.log("[ConnectionEstablisher] No audio track available, continuing without audio input");
+        console.log("[ConnectionEstablisher] No audio track provided, proceeding without audio sending capability");
       }
 
-      // 3. Create Data Channel
+      // Set up connection listeners
+      setupPeerConnectionListeners(pc, options, callbacks.onConnectionStateChange);
+
+      // Create data channel before generating offer
       const dc = DataChannelCreator.createDataChannel(pc, "data", options, callbacks.onDataChannelOpen);
       if (!dc) {
-        console.error("[ConnectionEstablisher] Failed to create data channel");
-        this.cleanup(pc, dc);
-        return null;
+        throw new Error("Failed to create data channel");
       }
 
-      // 4. Create offer
-      console.log("[ConnectionEstablisher] Creating offer");
-      const offer = await pc.createOffer();
+      // Create offer with audio codec preferences
+      const offerOptions: RTCOfferOptions = {
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false
+      };
+      
+      console.log("[ConnectionEstablisher] Creating SDP offer with options:", offerOptions);
+      const offer = await pc.createOffer(offerOptions);
+
+      // Set preferred audio codec if needed
+      // This is commented out but could be enabled for specific codec preferences
+      // offer.sdp = this.setPreferredAudioCodec(offer.sdp, 'opus');
+
+      console.log("[ConnectionEstablisher] Setting local description");
       await pc.setLocalDescription(offer);
-      console.log("[ConnectionEstablisher] Local description set");
-
-      // 5. Send the offer to OpenAI and get answer
-      const offerResult = await OfferService.sendOffer(
-        pc.localDescription as RTCSessionDescription,
-        apiKey,
-        options?.model || "gpt-4o-realtime-preview-2024-12-17"
-      );
       
-      if (!offerResult.success || !offerResult.answer) {
-        console.error("[ConnectionEstablisher] Failed to get answer SDP:", offerResult.error);
-        callbacks.onError?.(new Error(offerResult.error || "Failed to get answer SDP"));
-        this.cleanup(pc, dc);
-        return null;
+      if (!pc.localDescription || !pc.localDescription.sdp) {
+        throw new Error("Failed to set local description");
       }
-      
-      // 6. Set Remote Description from the answer
-      await pc.setRemoteDescription(offerResult.answer);
-      console.log("[ConnectionEstablisher] Remote description set");
-      
-      console.log("[ConnectionEstablisher] WebRTC connection established successfully");
+
+      // Request the API endpoint with the SDP offer
+      const endpoint = `https://api.openai.com/v1/realtime?model=${options.model}`;
+      console.log(`[ConnectionEstablisher] Sending SDP offer to ${endpoint}`);
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/sdp"
+        },
+        body: pc.localDescription.sdp
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+
+      // Get the SDP answer from the response
+      const answerSdp = await response.text();
+      console.log("[ConnectionEstablisher] Received SDP answer from API");
+
+      // Create and set remote description
+      const answerDesc = new RTCSessionDescription({
+        type: "answer",
+        sdp: answerSdp
+      });
+
+      console.log("[ConnectionEstablisher] Setting remote description");
+      await pc.setRemoteDescription(answerDesc);
+      console.log("[ConnectionEstablisher] Remote description set successfully");
+
       return { pc, dc };
     } catch (error) {
-      console.error("[ConnectionEstablisher] Error during connection establishment:", error);
-      callbacks.onError?.(error);
+      console.error("[ConnectionEstablisher] Error establishing connection:", error);
+      callbacks.onError(error);
       return null;
     }
   }
 
   /**
-   * Clean up connection resources
+   * Set preferred audio codec (optional utility)
    */
-  cleanup(pc: RTCPeerConnection | null, dc: RTCDataChannel | null): void {
-    if (dc) {
-      dc.close();
+  private setPreferredAudioCodec(sdp: string, codec: string): string {
+    const lines = sdp.split('\n');
+    const audioMLineIndex = lines.findIndex(line => line.startsWith('m=audio'));
+    
+    if (audioMLineIndex === -1) {
+      return sdp;
     }
-
-    if (pc) {
-      pc.close();
+    
+    // Find the codec PT
+    const codecRegExp = new RegExp('a=rtpmap:(\\d+) ' + codec + '/');
+    const codecIndex = lines.findIndex(line => codecRegExp.test(line));
+    
+    if (codecIndex === -1) {
+      return sdp;
     }
+    
+    const codecPT = lines[codecIndex].match(codecRegExp)![1];
+    
+    // Move codec to top of payload types
+    const mLine = lines[audioMLineIndex].split(' ');
+    const payloadTypes = mLine.slice(3);
+    
+    if (!payloadTypes.includes(codecPT)) {
+      return sdp;
+    }
+    
+    payloadTypes.splice(payloadTypes.indexOf(codecPT), 1);
+    payloadTypes.unshift(codecPT);
+    
+    mLine.splice(3, payloadTypes.length, ...payloadTypes);
+    lines[audioMLineIndex] = mLine.join(' ');
+    
+    return lines.join('\n');
   }
 }

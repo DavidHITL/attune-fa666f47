@@ -25,6 +25,15 @@ export class DataChannelHandler {
    * Set the data channel
    */
   setDataChannel(dataChannel: RTCDataChannel | null, onError?: (error: any) => void): void {
+    // Don't replace an existing open data channel with a new one
+    if (this.dataChannel && 
+        this.dataChannel.readyState === 'open' && 
+        dataChannel && 
+        dataChannel.label === this.dataChannel.label) {
+      console.log(`[DataChannelHandler] Not replacing existing open data channel '${this.dataChannel.label}'`);
+      return;
+    }
+    
     this.dataChannel = dataChannel;
     this.onError = onError || null;
     this.reconnectAttempts = 0;
@@ -57,11 +66,14 @@ export class DataChannelHandler {
       };
       
       dataChannel.onclose = () => {
-        console.warn(`[DataChannelHandler] Data channel '${dataChannel.label}' closed unexpectedly`);
+        // Check if closure was unexpected
+        const wasUnexpected = this.dataChannelReady;
+        console.warn(`[DataChannelHandler] Data channel '${dataChannel.label}' closed ${wasUnexpected ? 'unexpectedly' : 'as expected'}`);
+        
         this.dataChannelReady = false;
         
         // Only report as error if it was previously ready
-        if (this.dataChannelReady) {
+        if (wasUnexpected) {
           if (this.onError) {
             this.onError(new Error(`Data channel '${dataChannel.label}' closed unexpectedly`));
           }
@@ -74,6 +86,26 @@ export class DataChannelHandler {
           // so we don't need to do anything specific here
         }
       };
+      
+      // Track when the data channel actually opens
+      dataChannel.onopen = () => {
+        console.log(`[DataChannelHandler] Data channel '${dataChannel.label}' opened`);
+        this.dataChannelReady = true;
+        
+        // Clear timeout once the channel is opened
+        if (this.dataChannelOpenTimeout) {
+          clearTimeout(this.dataChannelOpenTimeout);
+          this.dataChannelOpenTimeout = null;
+        }
+        
+        // Reset reconnect attempts on successful opening
+        this.reconnectAttempts = 0;
+      };
+    } else if (dataChannel && dataChannel.readyState === 'open') {
+      // If the channel is already open, mark it as ready immediately
+      console.log(`[DataChannelHandler] Data channel '${dataChannel.label}' already open`);
+      this.dataChannelReady = true;
+      this.reconnectAttempts = 0;
     }
   }
   
@@ -89,9 +121,9 @@ export class DataChannelHandler {
     // Increase timeout to 10 seconds
     this.dataChannelOpenTimeout = setTimeout(() => {
       if (this.dataChannel && this.dataChannel.readyState !== 'open') {
-        console.error('[DataChannelHandler] Data channel open timed out after 10 seconds');
+        console.error(`[DataChannelHandler] Data channel '${this.dataChannel.label}' open timed out after 10 seconds`);
         if (this.onError) {
-          this.onError(new Error('Data channel open timed out'));
+          this.onError(new Error(`Data channel '${this.dataChannel.label}' open timed out`));
         }
       }
       this.dataChannelOpenTimeout = null;
@@ -209,6 +241,9 @@ export class DataChannelHandler {
       this.commitDebounceTimeout = null;
     }
     
+    // Don't explicitly close the data channel here, just remove our reference to it
+    // This prevents premature closure which can result in "User-Initiated Abort" errors
+    console.log("[DataChannelHandler] Cleaning up references (but not closing data channel)");
     this.dataChannel = null;
     this.dataChannelReady = false;
     this.reconnectAttempts = 0;

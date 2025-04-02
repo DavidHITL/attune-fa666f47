@@ -33,7 +33,27 @@ export class WebRTCConnectionEstablisher {
       onError
     };
     
-    return this.connectionEstablisher.establish(apiKey, options, callbacks, audioTrack);
+    // Log connection attempt with audioTrack details
+    if (audioTrack) {
+      console.log("[WebRTCConnectionEstablisher] Establishing connection with audio track:", {
+        id: audioTrack.id,
+        kind: audioTrack.kind,
+        label: audioTrack.label,
+        enabled: audioTrack.enabled,
+        muted: audioTrack.muted,
+        readyState: audioTrack.readyState
+      });
+    } else {
+      console.log("[WebRTCConnectionEstablisher] Establishing connection without audio track");
+    }
+    
+    try {
+      return await this.connectionEstablisher.establish(apiKey, options, callbacks, audioTrack);
+    } catch (error) {
+      console.error("[WebRTCConnectionEstablisher] Connection establishment failed:", error);
+      onError(error);
+      return null;
+    }
   }
 
   /**
