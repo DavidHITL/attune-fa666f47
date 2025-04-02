@@ -72,10 +72,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     enableMicrophone: false,
     // Use the VoiceChatAudio component for handling audio tracks
     onTrack: null, // We'll handle this in VoiceChatAudio
-    onError: (error: Error) => {
-      console.error("[VoiceChat] WebRTC error:", error);
-      toast.error(`Connection error: ${error.message || "Unknown error"}`);
-    }
+    // Remove the onError property since it doesn't exist in UseWebRTCConnectionOptions
   });
 
   // Connect the audio playback manager to the WebRTC connection
@@ -114,6 +111,22 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
       sendTextMessage(text);
     }
   };
+
+  // Setup error handling for WebRTC errors
+  useEffect(() => {
+    // Add global error handler for WebRTC errors
+    const handleWebRTCError = (error: any) => {
+      console.error("[VoiceChat] WebRTC error:", error);
+      toast.error(`Connection error: ${error.message || "Unknown error"}`);
+    };
+
+    // Add event listener for custom WebRTC errors
+    window.addEventListener("webrtc-error", handleWebRTCError as EventListener);
+
+    return () => {
+      window.removeEventListener("webrtc-error", handleWebRTCError as EventListener);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col space-y-4 w-full max-w-xl mx-auto p-4 bg-white rounded-lg shadow-md">

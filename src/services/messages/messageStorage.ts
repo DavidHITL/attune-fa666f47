@@ -87,11 +87,14 @@ export const convertToMessageObjects = (messages: any[]): Message[] => {
   }
   
   return messages.map(msg => {
+    // Create message object with just the essential parameters
+    // The createMessageObject function should handle only what it needs
     return createMessageObject(
       msg.content,
       msg.sender_type === 'user',
-      new Date(msg.created_at),
-      msg.id.toString()
+      {
+        messageType: msg.message_type || 'text'
+      }
     );
   });
 };

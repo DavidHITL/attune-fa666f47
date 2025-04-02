@@ -8,6 +8,7 @@ import { useAudioProcessor } from "./useAudioProcessor";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
+import { toast } from "sonner";
 
 // Re-export hooks and types for external use
 export * from "./types";
@@ -83,6 +84,18 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     setMessages(prev => [...prev, message]);
   };
   
+  // Custom error handler function
+  const handleError = (error: Error) => {
+    console.error("[WebRTCConnection] Error:", error);
+    toast.error(`WebRTC error: ${error.message || "Unknown error"}`);
+    
+    // Dispatch a custom error event that can be caught by components
+    const errorEvent = new CustomEvent("webrtc-error", { 
+      detail: { error } 
+    });
+    window.dispatchEvent(errorEvent);
+  };
+  
   // Set up connection actions
   const {
     connect,
@@ -114,7 +127,7 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
   // Auto-connect if enabled
   useEffect(() => {
     if (connectionOptions.autoConnect && !isConnected && !isConnecting) {
-      connect();
+      connect().catch(handleError);
     }
     
     return () => {
