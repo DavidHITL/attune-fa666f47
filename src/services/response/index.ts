@@ -1,9 +1,9 @@
 
 import { Message } from "@/components/MessageBubble";
 import { v4 as uuidv4 } from 'uuid';
-import { ResponseGeneratorOptions } from "./types";
+import type { ResponseGeneratorOptions } from "./types";
 
-export { ResponseGeneratorOptions } from "./types";
+export type { ResponseGeneratorOptions } from "./types";
 
 /**
  * Generate a response to a user message.

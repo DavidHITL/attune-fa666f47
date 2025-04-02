@@ -16,9 +16,14 @@ export class ConnectionManager {
       if (typeof data === 'string') {
         const encoder = new TextEncoder();
         const arrayBuffer = encoder.encode(data).buffer;
-        this.dataChannel.send(arrayBuffer);
+        const arrayBufferView = new Uint8Array(arrayBuffer);
+        this.dataChannel.send(arrayBufferView);
+      } else if (data instanceof ArrayBuffer) {
+        // Convert ArrayBuffer to ArrayBufferView
+        const arrayBufferView = new Uint8Array(data);
+        this.dataChannel.send(arrayBufferView);
       } else {
-        // For non-string data, send as is
+        // For Blob data, send as is
         this.dataChannel.send(data);
       }
       return true;
