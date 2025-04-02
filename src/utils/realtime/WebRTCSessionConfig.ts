@@ -91,9 +91,9 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     
     console.log("[WebRTCSessionConfig] Sending session configuration with enhanced context");
     
-    // Monitor message sending
-    const sendResult = dc.send(JSON.stringify(sessionConfig));
-    console.log(`[WebRTCSessionConfig] Session configuration sent: ${sendResult !== false ? "success" : "failed"}`);
+    // Send the configuration and log the result
+    dc.send(JSON.stringify(sessionConfig));
+    console.log("[WebRTCSessionConfig] Session configuration sent successfully");
     
     // Success
     console.log("[WebRTCSessionConfig] Session configuration completed");
