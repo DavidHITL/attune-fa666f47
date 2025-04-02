@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { useAuth } from "@/context/AuthContext";
 import ConnectionControls from "./ConnectionControls";
@@ -15,6 +15,7 @@ import MicrophoneControlGroup from "./MicrophoneControlGroup";
 import { toast } from "sonner";
 import { trackModeTransition, logContextVerification, getRecentContextSummary } from "@/services/context/unifiedContextProvider";
 import { fetchUserContext } from "@/services/context";
+import { doesAnalysisExist } from "@/services/context/analysisService";
 
 interface VoiceChatProps {
   systemPrompt?: string;
@@ -31,6 +32,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioPlaybackManager = useRef<AudioPlaybackManager | null>(null);
   const [contextLoaded, setContextLoaded] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const maxConnectionAttempts = 3;
   
   // Initialize audio playback manager
   useEffect(() => {
@@ -60,13 +63,18 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
             console.log("[VoiceChat] Context summary:", contextSummary);
           }
           
+          // Check if user has analysis results
+          const hasAnalysis = await doesAnalysisExist(user.id);
+          console.log("[VoiceChat] User has analysis results:", hasAnalysis);
+          
           // Load full context
           const userContext = await fetchUserContext(user.id);
           if (userContext) {
             console.log("[VoiceChat] User context loaded successfully:", {
               messageCount: userContext.recentMessages?.length || 0,
               hasUserDetails: !!userContext.userDetails,
-              analysisPresent: !!userContext.analysisResults
+              analysisPresent: !!userContext.analysisResults,
+              knowledgeEntries: userContext.knowledgeEntries?.length || 0
             });
             
             // Mark context as loaded
@@ -76,15 +84,40 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
             if (userContext.recentMessages && userContext.recentMessages.length > 0) {
               toast.success(`Loaded context from ${userContext.recentMessages.length} previous messages`);
             }
+          } else {
+            // If no context was loaded, still mark as loaded to proceed
+            console.log("[VoiceChat] No user context available, proceeding anyway");
+            setContextLoaded(true);
           }
         } catch (error) {
           console.error("[VoiceChat] Error preloading user context:", error);
+          // Even on error, mark as loaded to allow the user to continue
+          setContextLoaded(true);
         }
+      } else if (!user?.id) {
+        // No user, but still mark as loaded to proceed
+        setContextLoaded(true);
       }
     };
     
     preloadUserContext();
   }, [user?.id, contextLoaded]);
+
+  // Handle reconnection attempts
+  const handleConnectionError = useCallback(() => {
+    if (connectionAttempts < maxConnectionAttempts) {
+      const newAttemptCount = connectionAttempts + 1;
+      setConnectionAttempts(newAttemptCount);
+      toast.warning(`Connection failed. Attempting to reconnect (${newAttemptCount}/${maxConnectionAttempts})...`);
+      
+      // Wait a moment before reconnecting
+      setTimeout(() => {
+        if (connect) connect().catch(console.error);
+      }, 1500);
+    } else {
+      toast.error("Connection failed after multiple attempts. Please try again later.");
+    }
+  }, [connectionAttempts, maxConnectionAttempts]);
 
   // Set up WebRTC connection with enhanced options
   const {
@@ -106,9 +139,9 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     instructions: systemPrompt || "You are a helpful, conversational AI assistant. Maintain context from previous text chats.", 
     voice,
     userId: user?.id,
-    autoConnect: contextLoaded, // Only auto-connect after context is loaded
+    autoConnect: contextLoaded && connectionAttempts === 0, // Only auto-connect after context is loaded and on first attempt
     enableMicrophone: false,
-    onTrack: null, // We'll handle this in VoiceChatAudio
+    onError: handleConnectionError
   });
 
   // Log that we're entering voice mode when component mounts
@@ -191,6 +224,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
       // Show more helpful error message
       if (event.detail.error.message?.includes("configuration timed out")) {
         toast.error("Connection timed out. Please try again.");
+      } else if (event.detail.error.message?.includes("closed unexpectedly")) {
+        toast.error("Connection was closed unexpectedly. Please try again.");
       } else {
         toast.error(`Connection error: ${event.detail.error.message || "Unknown error"}`);
       }

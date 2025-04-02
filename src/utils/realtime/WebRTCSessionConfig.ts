@@ -13,7 +13,7 @@ async function getBaseInstructions(): Promise<string> {
       .from('ai_configuration')
       .select('value')
       .eq('id', 'system_prompt')
-      .single();
+      .maybeSingle();
     
     if (error || !data) {
       console.warn("[WebRTCSessionConfig] Could not load AI configuration:", error);
@@ -45,6 +45,12 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     
     // Enhance instructions with context, using unified context provider
     console.log(`[WebRTCSessionConfig] Enhancing instructions with userId: ${options.userId || 'none'}`);
+    
+    // Check if we have a userId before trying to get enhanced instructions
+    if (!options.userId) {
+      console.warn("[WebRTCSessionConfig] No userId provided, using base instructions only");
+    }
+    
     const enhancedInstructions = await getUnifiedEnhancedInstructions(
       options.instructions || baseInstructions,
       {
@@ -91,7 +97,7 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     
     console.log("[WebRTCSessionConfig] Sending session configuration with enhanced context");
     
-    // Send the configuration and log the result
+    // Send the configuration
     dc.send(JSON.stringify(sessionConfig));
     console.log("[WebRTCSessionConfig] Session configuration sent successfully");
     

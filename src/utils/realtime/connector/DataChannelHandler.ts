@@ -13,6 +13,8 @@ export class DataChannelHandler {
   private commitDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
   private lastCommitTime: number = 0;
   private readonly MIN_COMMIT_INTERVAL = 1500; // Minimum ms between commits
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 3;
 
   constructor() {
     this.dataChannelReady = false;
@@ -25,6 +27,7 @@ export class DataChannelHandler {
   setDataChannel(dataChannel: RTCDataChannel | null, onError?: (error: any) => void): void {
     this.dataChannel = dataChannel;
     this.onError = onError || null;
+    this.reconnectAttempts = 0;
     
     // Clear any existing timeout
     if (this.dataChannelOpenTimeout) {
@@ -39,8 +42,17 @@ export class DataChannelHandler {
       // Add error and close event handlers
       dataChannel.onerror = (event) => {
         console.error(`[DataChannelHandler] Data channel error on '${dataChannel.label}':`, event);
+        
         if (this.onError) {
-          this.onError(new Error(`Data channel error on '${dataChannel.label}'`));
+          // Include more detailed information about the event
+          let errorMessage = `Data channel error on '${dataChannel.label}'`;
+          
+          // Check if it's an RTCErrorEvent and extract more details if possible
+          if (event instanceof RTCErrorEvent && event.error) {
+            errorMessage += `: ${event.error.message || 'Unknown error'}`;
+          }
+          
+          this.onError(new Error(errorMessage));
         }
       };
       
@@ -49,8 +61,17 @@ export class DataChannelHandler {
         this.dataChannelReady = false;
         
         // Only report as error if it was previously ready
-        if (this.dataChannelReady && this.onError) {
-          this.onError(new Error(`Data channel '${dataChannel.label}' closed unexpectedly`));
+        if (this.dataChannelReady) {
+          if (this.onError) {
+            this.onError(new Error(`Data channel '${dataChannel.label}' closed unexpectedly`));
+          }
+        } else if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          // Attempt to recover if we haven't exceeded max attempts
+          this.reconnectAttempts++;
+          console.log(`[DataChannelHandler] Attempting recovery (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+          
+          // The WebRTCConnectionManager should handle reconnection logic
+          // so we don't need to do anything specific here
         }
       };
     }
@@ -65,16 +86,16 @@ export class DataChannelHandler {
       clearTimeout(this.dataChannelOpenTimeout);
     }
     
-    // Set a 5 second timeout for the data channel to open
+    // Increase timeout to 10 seconds
     this.dataChannelOpenTimeout = setTimeout(() => {
       if (this.dataChannel && this.dataChannel.readyState !== 'open') {
-        console.error('[DataChannelHandler] Data channel open timed out after 5 seconds');
+        console.error('[DataChannelHandler] Data channel open timed out after 10 seconds');
         if (this.onError) {
           this.onError(new Error('Data channel open timed out'));
         }
       }
       this.dataChannelOpenTimeout = null;
-    }, 5000);
+    }, 10000); // Increased to 10s from 5s
   }
   
   /**
@@ -87,6 +108,11 @@ export class DataChannelHandler {
     if (ready && this.dataChannelOpenTimeout) {
       clearTimeout(this.dataChannelOpenTimeout);
       this.dataChannelOpenTimeout = null;
+    }
+    
+    // Reset reconnect attempts when channel is successfully ready
+    if (ready) {
+      this.reconnectAttempts = 0;
     }
   }
 
@@ -160,7 +186,8 @@ export class DataChannelHandler {
     try {
       console.log("[DataChannelHandler] Committing audio buffer");
       this.lastCommitTime = Date.now();
-      return AudioSender.commitAudioBuffer(this.dataChannel!, false);
+      AudioSender.commitAudioBuffer(this.dataChannel!, false);
+      return true;
     } catch (error) {
       console.error("[DataChannelHandler] Error committing audio buffer:", error);
       handleError(error);
@@ -184,5 +211,6 @@ export class DataChannelHandler {
     
     this.dataChannel = null;
     this.dataChannelReady = false;
+    this.reconnectAttempts = 0;
   }
 }

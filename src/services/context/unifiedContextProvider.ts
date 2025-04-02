@@ -149,27 +149,14 @@ export const logContextVerification = async (
     
     console.log("[UnifiedContext] Context verification metrics:", verificationData);
     
-    // Use direct API call to avoid TypeScript issues
+    // Use direct supabase query instead of API call to avoid connection issues
     try {
-      // Get the API endpoint and key from environment variables or fallback to defaults
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://oseowhythgbqvllwonaz.supabase.co';
-      const apiKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZW93aHl0aGdicXZsbHdvbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE2MTgyNzgsImV4cCI6MjA1NzE5NDI3OH0.MubP80cszCAeIeyve_uY9zLZosck9010uhvbxBC57vo';
-      
-      const response = await fetch(`${supabaseUrl}/rest/v1/context_verification_logs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': apiKey,
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          ...verificationData,
-          timestamp: verificationData.timestamp
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error logging to context_verification_logs: ${response.statusText}`);
+      const { error } = await supabase
+        .from('context_verification_logs')
+        .insert([verificationData]);
+
+      if (error) {
+        throw new Error(`Error logging to context_verification_logs: ${error.message}`);
       }
     } catch (dbError) {
       // Log the error but continue execution

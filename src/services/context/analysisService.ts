@@ -1,44 +1,91 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { LosingStrategyFlags } from "@/utils/strategyUtils";
+
+export interface AnalysisResult {
+  summary?: string;
+  keywords?: string[];
+  losingStrategies?: {
+    beingRight?: number;
+    controlling?: number;
+    unbridledSelfExpression?: number;
+    retaliation?: number;
+    withdrawal?: number;
+  };
+}
 
 /**
- * Fetch user's analysis results from database
+ * Fetch analysis results for a specific user
+ * This now handles the case where analysis might not exist yet
  */
-export const fetchAnalysisResults = async (userId: string) => {
+export const fetchAnalysisResults = async (userId: string): Promise<AnalysisResult | null> => {
   try {
-    const { data, error } = await supabase
-      .from('analysis_results')
-      .select('summary_text, keywords, losing_strategy_flags')
-      .eq('user_id', userId)
-      .order('timestamp', { ascending: false })
-      .limit(1)
-      .single();
+    console.log(`[AnalysisService] Fetching analysis results for user: ${userId}`);
     
-    if (error || !data) {
-      console.log("No analysis results found or error:", error);
+    // First check if there are any analysis results
+    const { data: hasResults, error: checkError } = await supabase
+      .from('analysis_results')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle(); // Use maybeSingle instead of single to avoid errors
+    
+    // If no results exist yet, return null without logging errors
+    if (checkError || !hasResults) {
+      console.log(`[AnalysisService] No analysis results found for user: ${userId}`);
       return null;
     }
     
-    // Type assertion and validation to ensure proper structure
-    const losingStrategiesData = data.losing_strategy_flags as LosingStrategyFlags | null;
+    // Fetch actual analysis results
+    const { data, error } = await supabase
+      .from('analysis_results')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+      
+    if (error || !data) {
+      console.warn(`[AnalysisService] Error fetching analysis results: ${error?.message}`);
+      return null;
+    }
     
-    // Check if losing strategies data is properly structured
-    const validatedLosingStrategies = losingStrategiesData ? {
-      beingRight: typeof losingStrategiesData.beingRight === 'number' ? losingStrategiesData.beingRight : undefined,
-      unbridledSelfExpression: typeof losingStrategiesData.unbridledSelfExpression === 'number' ? losingStrategiesData.unbridledSelfExpression : undefined,
-      controlling: typeof losingStrategiesData.controlling === 'number' ? losingStrategiesData.controlling : undefined,
-      retaliation: typeof losingStrategiesData.retaliation === 'number' ? losingStrategiesData.retaliation : undefined,
-      withdrawal: typeof losingStrategiesData.withdrawal === 'number' ? losingStrategiesData.withdrawal : undefined
-    } : undefined;
+    console.log(`[AnalysisService] Analysis results fetched successfully for user: ${userId}`);
     
+    // Extract and return analysis result data
     return {
-      summary: data.summary_text,
-      keywords: data.keywords,
-      losingStrategies: validatedLosingStrategies
+      summary: data.summary_text || undefined,
+      keywords: data.keywords || undefined,
+      losingStrategies: {
+        beingRight: data.losing_strategy_flags?.beingRight,
+        controlling: data.losing_strategy_flags?.controlling,
+        unbridledSelfExpression: data.losing_strategy_flags?.unbridledSelfExpression,
+        retaliation: data.losing_strategy_flags?.retaliation,
+        withdrawal: data.losing_strategy_flags?.withdrawal
+      }
     };
-  } catch (err) {
-    console.error("Error fetching analysis results:", err);
+  } catch (error) {
+    console.error("[AnalysisService] Error in fetchAnalysisResults:", error);
     return null;
+  }
+};
+
+/**
+ * Check if analysis exists for a user
+ */
+export const doesAnalysisExist = async (userId: string): Promise<boolean> => {
+  try {
+    const { count, error } = await supabase
+      .from('analysis_results')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+      
+    if (error) {
+      console.warn(`[AnalysisService] Error checking analysis existence: ${error.message}`);
+      return false;
+    }
+    
+    return count !== null && count > 0;
+  } catch (error) {
+    console.error("[AnalysisService] Error in doesAnalysisExist:", error);
+    return false;
   }
 };
