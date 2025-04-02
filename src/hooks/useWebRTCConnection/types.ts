@@ -4,6 +4,15 @@ export interface WebRTCMessage {
   text?: string;
   delta?: string;
   audio?: string;
+  // Add session property to fix type errors
+  session?: {
+    instructions?: string;
+    modalities?: string[];
+    voice?: string;
+    temperature?: number;
+    priority_hints?: string[];
+    [key: string]: any; // Allow for other session properties
+  };
 }
 
 export interface MessageMetadata {

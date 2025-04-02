@@ -78,6 +78,48 @@ export type Database = {
         }
         Relationships: []
       }
+      context_verification_logs: {
+        Row: {
+          additional_context: Json | null
+          created_at: string
+          has_analysis: boolean | null
+          has_critical_info: boolean | null
+          has_user_details: boolean | null
+          id: string
+          instructions_provided: boolean | null
+          knowledge_entry_count: number | null
+          message_count: number | null
+          mode: string
+          user_id: string
+        }
+        Insert: {
+          additional_context?: Json | null
+          created_at?: string
+          has_analysis?: boolean | null
+          has_critical_info?: boolean | null
+          has_user_details?: boolean | null
+          id?: string
+          instructions_provided?: boolean | null
+          knowledge_entry_count?: number | null
+          message_count?: number | null
+          mode: string
+          user_id: string
+        }
+        Update: {
+          additional_context?: Json | null
+          created_at?: string
+          has_analysis?: boolean | null
+          has_critical_info?: boolean | null
+          has_user_details?: boolean | null
+          id?: string
+          instructions_provided?: boolean | null
+          knowledge_entry_count?: number | null
+          message_count?: number | null
+          mode?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ephemeral_keys: {
         Row: {
           created_at: string
