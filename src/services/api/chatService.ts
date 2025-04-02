@@ -2,24 +2,25 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Message } from "@/components/MessageBubble";
 import { MessageMetadata } from "../messages/messageUtils";
+import { Json } from "@/integrations/supabase/types";
 
 // Simple API service for chat operations
 export const chatService = {
   saveMessage: async (text: string, isUser: boolean, metadata?: Partial<MessageMetadata>) => {
     try {
       // Get the user from the session
-      const { data: session } = await supabase.auth.getSession();
-      const user = session?.user;
-      
-      if (!user) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.user) {
         throw new Error("User not authenticated");
       }
+      
+      const user = sessionData.session.user;
       
       // Format any metadata for database storage
       const formattedMetadata = {
         message_type: metadata?.messageType || 'text',
         instructions: metadata?.instructions || null,
-        knowledge_entries: metadata?.knowledgeEntries || null,
+        knowledge_entries: metadata?.knowledgeEntries ? JSON.stringify(metadata.knowledgeEntries) : null,
       };
       
       // Insert the message into the database
@@ -31,7 +32,7 @@ export const chatService = {
           sender_type: isUser ? 'user' : 'assistant',
           message_type: formattedMetadata.message_type,
           instructions: formattedMetadata.instructions,
-          knowledge_entries: formattedMetadata.knowledge_entries
+          knowledge_entries: formattedMetadata.knowledge_entries as Json
         })
         .select('id')
         .single();

@@ -12,9 +12,9 @@ export { saveMessage, fetchMessagesFromDatabase } from "./messages/messageStorag
  */
 export async function fetchMessages(): Promise<Message[]> {
   try {
-    const { data: session } = await supabase.auth.getSession();
+    const { data: sessionData } = await supabase.auth.getSession();
     
-    if (!session?.user) {
+    if (!sessionData?.session?.user) {
       console.error("No authenticated user found");
       return [];
     }
@@ -22,7 +22,7 @@ export async function fetchMessages(): Promise<Message[]> {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', sessionData.session.user.id)
       .order('created_at', { ascending: true });
       
     if (error) {

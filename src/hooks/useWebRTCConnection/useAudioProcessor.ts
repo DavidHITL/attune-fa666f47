@@ -34,10 +34,13 @@ export function useAudioProcessor(
   }, []);
   
   // Create a proper WebRTCMessageHandler instance with options
-  const messageHandlerOptions: WebRTCMessageHandlerOptions = {
+  const messageHandlerOptions = {
     onTranscriptUpdate: setCurrentTranscript,
     onAudioComplete: () => setIsAiSpeaking(false),
     onAudioData: () => setIsAiSpeaking(true),
+    onTranscriptComplete: () => {},
+    onFinalTranscript: () => {},
+    onMessageReceived: () => {}
   };
   
   // Create an actual WebRTCMessageHandler instance instead of a plain object

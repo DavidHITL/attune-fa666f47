@@ -1,18 +1,14 @@
+
 import { MessageMetadata } from "@/services/messages/messageUtils";
 import { logContextVerification } from "@/services/context/unifiedContextProvider";
 
-interface MessageHandlerOptions {
+export interface MessageHandlerOptions {
   onTranscriptUpdate: (text: string) => void;
   onTranscriptComplete: () => void;
   onAudioData: (base64Audio: string) => void;
   onAudioComplete: () => void;
   onMessageReceived: (message: any) => void;
   onFinalTranscript: (transcript: string) => void;
-  instructions?: string;
-  userId?: string;
-}
-
-interface UpdateOptions {
   instructions?: string;
   userId?: string;
 }
@@ -36,7 +32,7 @@ export class WebRTCMessageHandler {
    * Update the options for the message handler
    * @param newOptions New options to use
    */
-  public updateOptions(newOptions: UpdateOptions) {
+  public updateOptions(newOptions: Partial<MessageHandlerOptions>) {
     this.options = {
       ...this.options,
       ...newOptions

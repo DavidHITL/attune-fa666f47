@@ -13,19 +13,20 @@ export async function saveMessage(
   metadata?: Partial<MessageMetadata>
 ): Promise<string | null> {
   try {
-    const { data: session } = await supabase.auth.getSession();
-    const user = session?.user;
+    const { data: sessionData } = await supabase.auth.getSession();
     
-    if (!user) {
+    if (!sessionData?.session?.user) {
       console.error("Cannot save message: No authenticated user");
       throw new Error("Authentication required to save messages");
     }
+    
+    const user = sessionData.session.user;
     
     // Format any metadata for database storage
     const formattedMetadata = {
       message_type: metadata?.messageType || 'text',
       instructions: metadata?.instructions || null,
-      knowledge_entries: metadata?.knowledgeEntries || null,
+      knowledge_entries: metadata?.knowledgeEntries ? JSON.stringify(metadata.knowledgeEntries) : null,
     };
     
     // Insert the message into the database
@@ -37,7 +38,7 @@ export async function saveMessage(
         sender_type: isUser ? 'user' : 'assistant',
         message_type: formattedMetadata.message_type,
         instructions: formattedMetadata.instructions,
-        knowledge_entries: formattedMetadata.knowledge_entries
+        knowledge_entries: formattedMetadata.knowledge_entries as Json
       })
       .select('id')
       .single();
@@ -67,13 +68,14 @@ export async function fetchMessagesFromDatabase(userId?: string): Promise<Messag
   try {
     // If userId is not provided, get it from the current session
     if (!userId) {
-      const { data: session } = await supabase.auth.getSession();
-      userId = session?.user?.id;
+      const { data: sessionData } = await supabase.auth.getSession();
       
-      if (!userId) {
+      if (!sessionData?.session?.user) {
         console.error("Cannot fetch messages: No authenticated user");
         return [];
       }
+      
+      userId = sessionData.session.user.id;
     }
     
     // Fetch messages from the database
