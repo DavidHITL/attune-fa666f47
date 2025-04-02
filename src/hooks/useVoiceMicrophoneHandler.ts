@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 interface UseVoiceMicrophoneHandlerProps {
   isConnected: boolean;
   isMicrophoneActive: boolean;
-  commitAudioBuffer: () => void;
+  commitAudioBuffer: () => boolean; // Changed to match expected signature
   toggleMicrophone: () => Promise<boolean>;
 }
 

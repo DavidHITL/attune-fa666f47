@@ -59,7 +59,7 @@ export interface WebRTCConnectionResult {
   disconnect: () => void;
   toggleMicrophone: () => Promise<void>;
   sendTextMessage: (text: string) => void;
-  commitAudioBuffer: (audioData: Float32Array) => void;
+  commitAudioBuffer: () => boolean;
   getActiveMediaStream: () => MediaStream | null;
   getActiveAudioTrack: () => MediaStreamTrack | null;
   setAudioPlaybackManager: (manager: AudioPlaybackManager) => void;

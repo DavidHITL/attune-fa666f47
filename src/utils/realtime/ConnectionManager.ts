@@ -1,6 +1,31 @@
 
 import { WebRTCOptions } from "@/hooks/useWebRTCConnection/types";
-import { EventEmitter } from "./EventEmitter";
+
+/**
+ * Simple EventEmitter implementation
+ */
+export class EventEmitter {
+  private events: Record<string, Function[]> = {};
+
+  on(event: string, listener: Function): void {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+    this.events[event].push(listener);
+  }
+
+  emit(event: string, ...args: any[]): void {
+    if (this.events[event]) {
+      this.events[event].forEach(listener => listener(...args));
+    }
+  }
+
+  off(event: string, listener: Function): void {
+    if (this.events[event]) {
+      this.events[event] = this.events[event].filter(l => l !== listener);
+    }
+  }
+}
 
 /**
  * Connection Manager for WebRTC
@@ -48,7 +73,14 @@ export class ConnectionManager {
 
   send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
     if (this.dc.readyState === 'open') {
-      this.dc.send(data);
+      // Type safety: only send data if it's a valid type for RTCDataChannel.send()
+      if (typeof data === 'string' || data instanceof ArrayBuffer || data instanceof Blob) {
+        this.dc.send(data);
+      } else if (ArrayBuffer.isView(data)) {
+        this.dc.send(data);
+      } else {
+        console.warn("[ConnectionManager] Cannot send data, invalid data type");
+      }
     } else {
       console.warn("[ConnectionManager] Cannot send data, data channel not open");
     }
@@ -60,30 +92,6 @@ export class ConnectionManager {
     }
     if (this.dc.readyState !== 'closed') {
       this.dc.close();
-    }
-  }
-}
-
-// Create an EventEmitter class
-export class EventEmitter {
-  private events: Record<string, Function[]> = {};
-
-  on(event: string, listener: Function): void {
-    if (!this.events[event]) {
-      this.events[event] = [];
-    }
-    this.events[event].push(listener);
-  }
-
-  emit(event: string, ...args: any[]): void {
-    if (this.events[event]) {
-      this.events[event].forEach(listener => listener(...args));
-    }
-  }
-
-  off(event: string, listener: Function): void {
-    if (this.events[event]) {
-      this.events[event] = this.events[event].filter(l => l !== listener);
     }
   }
 }

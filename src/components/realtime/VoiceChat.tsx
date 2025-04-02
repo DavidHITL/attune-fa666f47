@@ -1,10 +1,8 @@
-
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { useAuth } from "@/context/AuthContext";
 import ConnectionControls from "./ConnectionControls";
 import TranscriptDisplay from "./TranscriptDisplay";
-import MicrophoneStatus from "./MicrophoneStatus";
 import MessageInput from "./MessageInput";
 import { useVoiceMicrophoneHandler } from "@/hooks/useVoiceMicrophoneHandler";
 import { useVoiceChatEffects } from "@/hooks/useVoiceChatEffects";
@@ -13,7 +11,11 @@ import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 import MicrophoneControlGroup from "./MicrophoneControlGroup";
 import { toast } from "sonner";
-import { trackModeTransition, logContextVerification, getRecentContextSummary } from "@/services/context/unifiedContextProvider";
+import { 
+  trackModeTransition, 
+  logContextVerification, 
+  getRecentContextSummary 
+} from "@/services/context/unifiedContextProvider";
 import { fetchUserContext } from "@/services/context";
 import { doesAnalysisExist } from "@/services/context/analysisService";
 
@@ -188,15 +190,23 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     }
   }, [setAudioPlaybackManager]);
 
-  // Extract microphone handling logic
+  // Extract microphone handling logic - fix the signature mismatches
   const {
     microphonePermission,
     handleMicrophoneToggle
   } = useVoiceMicrophoneHandler({
     isConnected,
     isMicrophoneActive,
-    commitAudioBuffer,
-    toggleMicrophone
+    // Fix: Provide a no-op function with the correct signature for commitAudioBuffer
+    commitAudioBuffer: () => {
+      commitAudioBuffer();
+      return true; // Return true to match expected boolean return type
+    },
+    // Fix: Update toggleMicrophone to return a Promise<boolean>
+    toggleMicrophone: async () => {
+      await toggleMicrophone();
+      return true; // Return true to match expected boolean return type
+    }
   });
   
   // Extract side effects

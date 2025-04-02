@@ -1,101 +1,67 @@
-import { useEffect } from "react";
-import { UseWebRTCConnectionOptions, WebRTCConnectionResult, WebRTCMessage } from "./types";
-import { useConnectionState } from "./useConnectionState";
-import { useMessageHandler } from "./useMessageHandler";
-import { useConnectionActions } from "./useConnectionActions";
-import { useAudioProcessor } from "./useAudioProcessor";
+import { useState, useRef, useCallback } from "react";
+import { WebRTCMessage, UseWebRTCConnectionOptions, WebRTCConnectionResult } from "./types";
+import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
+import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
-import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
-import { toast } from "sonner";
+import { useConnectionActions } from "./useConnectionActions";
 
-// Re-export hooks and types for external use
-export * from "./types";
-export * from "./useConnectionState";
-export * from "./useConnectionManagement";
-export * from "./useConnectionLifecycle";
-export * from "./useConnectionStateHandler";
-export * from "./useConnectionErrorHandler";
-export * from "./useDisconnection";
-export * from "./useDataChannelStatus";
+// Main hook for using WebRTC connection
+export function useWebRTCConnection(
+  options: UseWebRTCConnectionOptions = {}
+): WebRTCConnectionResult {
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
+  const [currentTranscript, setCurrentTranscript] = useState("");
+  const [transcriptProgress, setTranscriptProgress] = useState(0);
+  const [messages, setMessages] = useState<WebRTCMessage[]>([]);
 
-export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): WebRTCConnectionResult {
-  // Set default options
-  const connectionOptions = {
-    model: "gpt-4o-realtime-preview-2024-12-17",
-    voice: "alloy" as const,
-    instructions: "You are a helpful assistant. Be concise in your responses.",
-    autoConnect: false,
-    enableMicrophone: false,
-    ...options
-  };
-  
-  // Initialize state
-  const {
-    isConnected,
-    isConnecting,
-    isMicrophoneActive,
-    isAiSpeaking,
-    currentTranscript,
-    messages,
-    connectorRef,
-    recorderRef,
-    audioProcessorRef,
-    messageHandlerRef,
-    setIsConnected,
-    setIsConnecting,
-    setIsMicrophoneActive,
-    setIsAiSpeaking,
-    setCurrentTranscript,
-    setMessages
-  } = useConnectionState();
-  
-  // Initialize audio processor and message handler
-  const { 
-    audioProcessor,
-    messageHandler,
-    isProcessingAudio,
-    transcriptProgress
-  } = useAudioProcessor(setIsAiSpeaking, setCurrentTranscript);
-  
-  // Store references to the created instances
-  useEffect(() => {
-    if (audioProcessor) {
-      audioProcessorRef.current = audioProcessor as AudioProcessor;
-    }
-    
-    if (messageHandler) {
-      messageHandlerRef.current = messageHandler as WebRTCMessageHandler;
-    }
-    
-    return () => {
-      if (audioProcessorRef.current) {
-        audioProcessorRef.current.cleanup();
-      }
-    };
-  }, [audioProcessor, messageHandler, audioProcessorRef, messageHandlerRef]);
-  
-  // Set up message handler
-  const { handleMessage } = useMessageHandler(messageHandlerRef, setMessages);
-  
-  // Create a wrapper function to adapt setMessages to the expected signature
-  const addMessage = (message: WebRTCMessage) => {
-    setMessages(prev => [...prev, message]);
-  };
-  
-  // Custom error handler function
-  const handleError = (error: Error) => {
-    console.error("[WebRTCConnection] Error:", error);
-    toast.error(`WebRTC error: ${error.message || "Unknown error"}`);
-    
-    // Dispatch a custom error event that can be caught by components
-    const errorEvent = new CustomEvent("webrtc-error", { 
-      detail: { error } 
+  // Refs for managing WebRTC connector, audio processor, and recorder
+  const connectorRef = useRef<WebRTCConnector | null>(null);
+  const audioProcessorRef = useRef<AudioProcessor | null>(null);
+  const recorderRef = useRef<AudioRecorder | null>(null);
+
+  // Initialize WebRTC message handler
+  const messageHandlerRef = useRef<WebRTCMessageHandler>(new WebRTCMessageHandler({
+    onTranscriptUpdate: (text) => {
+      setCurrentTranscript(text);
+    },
+    onTranscriptComplete: () => {
+      setTranscriptProgress(100);
+    },
+    onAudioData: (base64Audio) => {
+      //console.log("Received audio data:", base64Audio);
+    },
+    onAudioComplete: () => {
+      setIsAiSpeaking(false);
+    },
+    onMessageReceived: (message) => {
+      setMessages((prevMessages) => [...prevMessages, message]);
+    },
+    onFinalTranscript: (transcript) => {
+      setCurrentTranscript(transcript);
+    },
+    instructions: options.instructions,
+    userId: options.userId
+  }));
+
+  // Function to handle incoming messages
+  const handleMessage = useCallback((event: MessageEvent) => {
+    messageHandlerRef.current.handleMessage(event);
+  }, []);
+
+  // Update message handler options when options change
+  useCallback(() => {
+    messageHandlerRef.current.updateOptions({
+      instructions: options.instructions,
+      userId: options.userId
     });
-    window.dispatchEvent(errorEvent);
-  };
-  
-  // Set up connection actions
+  }, [options.instructions, options.userId]);
+
+  // Connection actions
   const {
     connect,
     disconnect,
@@ -104,6 +70,8 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     commitAudioBuffer,
     getActiveMediaStream,
     getActiveAudioTrack,
+    prewarmMicrophoneAccess,
+    isMicrophoneReady,
     isDataChannelReady,
     setAudioPlaybackManager
   } = useConnectionActions(
@@ -114,27 +82,18 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     recorderRef,
     audioProcessorRef,
     handleMessage,
-    connectionOptions,
+    options,
     setIsConnected,
     setIsConnecting,
     setIsMicrophoneActive,
     setCurrentTranscript,
     setIsAiSpeaking,
-    addMessage
-  );
-  
-  // Auto-connect if enabled
-  useEffect(() => {
-    if (connectionOptions.autoConnect && !isConnected && !isConnecting) {
-      connect().catch(handleError);
+    (message: WebRTCMessage) => {
+      setMessages((prevMessages) => [...prevMessages, message]);
     }
-    
-    return () => {
-      disconnect();
-    };
-  }, [connect, disconnect, isConnected, isConnecting, connectionOptions.autoConnect]);
-  
-  // Return the public API
+  );
+
+  // Fix the type in the return statement to match WebRTCConnectionResult
   return {
     isConnected,
     isConnecting,
@@ -145,9 +104,15 @@ export function useWebRTCConnection(options: UseWebRTCConnectionOptions = {}): W
     transcriptProgress,
     messages,
     isDataChannelReady,
-    connect: async () => { await connect(); }, // Wrap to ensure void return type
+    // Make connect return Promise<void> to match the interface
+    connect: async () => { 
+      await connect();
+    },
     disconnect,
-    toggleMicrophone: async () => { await toggleMicrophone(); }, // Wrap to ensure void return type
+    // Make toggleMicrophone return Promise<void> to match the interface 
+    toggleMicrophone: async () => {
+      await toggleMicrophone();
+    },
     sendTextMessage,
     commitAudioBuffer,
     getActiveMediaStream,

@@ -85,11 +85,11 @@ export function useConnectionActions(
     prewarmMicrophoneAccess
   );
 
-  // Update the return values to match the expected types in WebRTCConnectionResult
+  // Update the return values to match the expected types
   return {
-    connect: async () => { await connect(); },
+    connect,
     disconnect,
-    toggleMicrophone: async () => { await toggleMicrophone(); },
+    toggleMicrophone,
     sendTextMessage,
     commitAudioBuffer,
     getActiveMediaStream,

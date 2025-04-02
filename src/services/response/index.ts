@@ -70,3 +70,6 @@ export const generateResponse = async (
     return createMessageObject(generateLocalResponse(userMessage), false);
   }
 };
+
+// Re-export types for convenience
+export type { ResponseGeneratorOptions } from "./response/types";

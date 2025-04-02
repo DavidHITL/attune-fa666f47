@@ -28,7 +28,18 @@ export class WebRTCMessageHandler {
       
       // Notify about all messages if callback is provided
       if (this.options.onMessageReceived) {
-        this.options.onMessageReceived(message as WebRTCMessage);
+        // Create a proper WebRTCMessage object to match the expected type
+        const webRTCMessage: WebRTCMessage = {
+          id: message.id || message.event_id || Date.now().toString(),
+          text: message.text || message.delta || "",
+          isUser: false,
+          timestamp: new Date(),
+          type: message.type,
+          delta: message.delta,
+          session: message.session
+        };
+        
+        this.options.onMessageReceived(webRTCMessage);
       }
       
       // Parse message for potential user details to maintain context

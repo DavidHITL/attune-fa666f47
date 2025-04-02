@@ -1,9 +1,8 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Message } from "@/components/MessageBubble";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { saveMessage, fetchMessagesFromDatabase } from "@/services/chatApiService";
+import { saveMessage, fetchMessages } from "@/services/chatApiService";
 
 export function useChatMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -14,7 +13,7 @@ export function useChatMessages() {
   const [hasError, setHasError] = useState(false);
 
   // Create a memoized fetchMessages function that won't change on re-renders
-  const fetchMessages = useCallback(async () => {
+  const fetchMessagesFromDatabase = useCallback(async () => {
     if (!user) {
       console.log("No user, not fetching messages");
       setMessages([{
@@ -34,9 +33,9 @@ export function useChatMessages() {
       console.log("Fetching messages for user:", user.id);
 
       // Get messages directly from the database using our improved function
-      const dbMessages = await fetchMessagesFromDatabase();
+      const dbMessages = await fetchMessages(user.id);
       
-      if (!dbMessages) {
+      if (!dbMessages || dbMessages.length === 0) {
         console.log("No messages found or error fetching, creating welcome message");
         // If no messages or error, add a welcome message
         const welcomeMessage = {
@@ -80,7 +79,7 @@ export function useChatMessages() {
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-  }, [user, useLocalFallback]);
+  }, [user, useLocalFallback, setMessages, setIsLoading, setIsInitialLoad, setUseLocalFallback, setHasError]);
 
   const saveMessageToDatabase = useCallback(async (text: string, isUser: boolean) => {
     try {
@@ -125,7 +124,7 @@ export function useChatMessages() {
     useLocalFallback,
     setUseLocalFallback,
     saveMessageToDatabase,
-    fetchMessages,
+    fetchMessages: fetchMessagesFromDatabase,
     hasError
   };
 }
