@@ -13,6 +13,8 @@ export class SessionManager {
   private sessionConfigured: boolean = false;
   private configurationTimeout: ReturnType<typeof setTimeout> | null = null;
   private audioPlaybackManager: AudioPlaybackManager | null = null;
+  private configurationRetryCount: number = 0;
+  private maxConfigRetries: number = 3;
   
   constructor(pc: RTCPeerConnection, dc: RTCDataChannel, options: WebRTCOptions, audioPlaybackManager?: AudioPlaybackManager) {
     this.pc = pc;
@@ -33,7 +35,10 @@ export class SessionManager {
       clearTimeout(this.configurationTimeout);
     }
     
-    // Set a timeout for session configuration (20 seconds - increased from 8 seconds)
+    // Increased to 45 seconds from 20 seconds
+    const timeoutDuration = 45000;
+    
+    // Set a timeout for session configuration
     this.configurationTimeout = setTimeout(() => {
       if (!this.sessionConfigured) {
         // First check if audio is currently playing - don't time out if it is
@@ -44,7 +49,20 @@ export class SessionManager {
           return;
         }
         
-        console.error("[SessionManager] Session configuration timed out after 20 seconds");
+        // If we haven't exceeded retry count, try again
+        if (this.configurationRetryCount < this.maxConfigRetries) {
+          this.configurationRetryCount++;
+          console.log(`[SessionManager] Session configuration timeout - retrying (${this.configurationRetryCount}/${this.maxConfigRetries})`);
+          
+          // Try to configure the session again
+          this.configureSessionIfReady();
+          
+          // Restart the timeout
+          this.startConfigurationTimeout();
+          return;
+        }
+        
+        console.error(`[SessionManager] Session configuration timed out after ${timeoutDuration/1000} seconds and ${this.configurationRetryCount} retries`);
         
         // Report this as an error if the connection still appears to be alive
         if (this.pc?.connectionState === 'connected' && this.options.onError) {
@@ -53,7 +71,7 @@ export class SessionManager {
       }
       
       this.configurationTimeout = null;
-    }, 20000);
+    }, timeoutDuration);
   }
 
   /**
@@ -66,9 +84,11 @@ export class SessionManager {
     }
 
     // Check if connection and data channel are ready
-    if (this.pc?.connectionState === 'connected' && this.dc?.readyState === 'open') {
+    const connectionReady = this.pc?.connectionState === 'connected' || this.pc?.connectionState === 'connecting';
+    const dataChannelReady = this.dc?.readyState === 'open';
+    
+    if (connectionReady && dataChannelReady) {
       console.log("[SessionManager] Both connection and data channel ready, configuring session");
-      this.sessionConfigured = true;
       
       // Clear the configuration timeout since we're configuring now
       if (this.configurationTimeout) {
@@ -77,7 +97,19 @@ export class SessionManager {
       }
       
       try {
-        configureSession(this.dc, this.options);
+        // Attempt to configure the session asynchronously
+        configureSession(this.dc, this.options)
+          .then(() => {
+            console.log("[SessionManager] Session configured successfully");
+            this.sessionConfigured = true;
+          })
+          .catch(error => {
+            console.error("[SessionManager] Error during session configuration:", error);
+            if (this.options.onError) {
+              this.options.onError(error);
+            }
+          });
+          
         return true;
       } catch (error) {
         console.error("[SessionManager] Error configuring session:", error);
@@ -108,6 +140,7 @@ export class SessionManager {
    */
   resetSessionConfigured(): void {
     this.sessionConfigured = false;
+    this.configurationRetryCount = 0;
     
     // Clear any pending timeout
     if (this.configurationTimeout) {

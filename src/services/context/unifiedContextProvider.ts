@@ -20,23 +20,42 @@ export interface UnifiedContextOptions {
  * Get enhanced instructions that work for both text and voice interfaces
  */
 export const getUnifiedEnhancedInstructions = async (baseInstructions: string, options: UnifiedContextOptions): Promise<string> => {
-  console.log(`[UnifiedContext] Getting enhanced instructions for ${options.activeMode} mode`);
+  console.log(`[UnifiedContext] Getting enhanced instructions for ${options.activeMode} mode, userId: ${options.userId || 'none'}`);
 
-  // Add transition flag to indicate context continuity
-  const enhancedInstructions = await enhanceInstructionsWithContext(
-    baseInstructions,
-    options.userId
-  );
-  
-  // Add specific instructions for maintaining context across modes
-  const modeTransitionInstructions = 
-    `\n\nIMPORTANT CONTEXT CONTINUITY INSTRUCTIONS:
-     - You are running in ${options.activeMode.toUpperCase()} mode.
-     - Maintain complete memory and context continuity between text and voice conversations.
-     - Reference relevant details from previous interactions regardless of whether they occurred in text or voice mode.
-     - Ensure consistency in personality, knowledge access, and context awareness across both interfaces.`;
+  if (!options.userId) {
+    console.warn("[UnifiedContext] No userId provided for context enhancement");
+    return baseInstructions;
+  }
 
-  return enhancedInstructions + modeTransitionInstructions;
+  try {
+    // Add transition flag to indicate context continuity
+    const enhancedInstructions = await enhanceInstructionsWithContext(
+      baseInstructions,
+      options.userId
+    );
+    
+    // Add specific instructions for maintaining context across modes
+    const modeTransitionInstructions = 
+      `\n\nIMPORTANT CONTEXT CONTINUITY INSTRUCTIONS:
+       - You are running in ${options.activeMode.toUpperCase()} mode.
+       - Maintain complete memory and context continuity between text and voice conversations.
+       - Reference relevant details from previous interactions regardless of whether they occurred in text or voice mode.
+       - Ensure consistency in personality, knowledge access, and context awareness across both interfaces.
+       - If the user previously chatted with you, make sure to maintain that context and knowledge.
+       - Remember: The user expects you to maintain continuity from previous conversations.`;
+
+    // Log success
+    console.log(`[UnifiedContext] Successfully enhanced instructions with ${options.activeMode} mode context`);
+    
+    // Return the enhanced instructions
+    return enhancedInstructions + modeTransitionInstructions;
+  } catch (error) {
+    console.error("[UnifiedContext] Error enhancing instructions:", error);
+    
+    // If there's an error, add a fallback instruction to at least try to maintain context
+    return baseInstructions + 
+      `\n\nIMPORTANT: Maintain context from previous conversations with this user, regardless of whether they were in text or voice mode.`;
+  }
 }
 
 /**
@@ -53,7 +72,7 @@ export const trackModeTransition = async (
     return;
   }
 
-  console.log(`[UnifiedContext] Tracking transition from ${fromMode} to ${toMode} mode`);
+  console.log(`[UnifiedContext] Tracking transition from ${fromMode} to ${toMode} mode for user ${userId}`);
   
   try {
     // Create a system message to mark the transition
@@ -61,6 +80,7 @@ export const trackModeTransition = async (
     
     // Save as system message for context but don't display to user
     await saveMessage(transitionMessage, false, {
+      userId,
       messageType: 'system',
       instructions: `Maintain context continuity. Previous mode: ${fromMode}, new mode: ${toMode}`,
       knowledgeEntries: [{
@@ -70,6 +90,17 @@ export const trackModeTransition = async (
         timestamp: new Date().toISOString(),
         lastMessage
       }]
+    });
+    
+    // Also log the transition for verification purposes
+    await logContextVerification({
+      userId,
+      activeMode: toMode,
+      sessionStarted: true
+    }, undefined, { 
+      transitionFrom: fromMode,
+      transitionTo: toMode,
+      transitionTime: new Date().toISOString()
     });
     
     console.log("[UnifiedContext] Successfully tracked mode transition");
@@ -106,9 +137,10 @@ export const logContextVerification = async (
     const verificationData = {
       user_id: options.userId,
       mode: options.activeMode,
-      message_count: contextData.recentMessages.length,
-      has_user_details: !!contextData.userDetails && Object.keys(contextData.userDetails).length > 0,
-      has_critical_info: !!contextData.criticalInformation && contextData.criticalInformation.length > 0,
+      timestamp: new Date().toISOString(),
+      message_count: contextData.recentMessages?.length || 0,
+      has_user_details: !!contextData.userDetails && Object.keys(contextData.userDetails || {}).length > 0,
+      has_critical_info: !!contextData.criticalInformation && contextData.criticalInformation?.length > 0,
       has_analysis: !!contextData.analysisResults,
       knowledge_entry_count: contextData.knowledgeEntries?.length || 0,
       instructions_provided: !!instructions,
@@ -119,9 +151,9 @@ export const logContextVerification = async (
     
     // Use direct API call to avoid TypeScript issues
     try {
-      // Get the API endpoint and key from the supabase config
-      const supabaseUrl = process.env.SUPABASE_URL || 'https://oseowhythgbqvllwonaz.supabase.co';
-      const apiKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZW93aHl0aGdicXZsbHdvbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE2MTgyNzgsImV4cCI6MjA1NzE5NDI3OH0.MubP80cszCAeIeyve_uY9zLZosck9010uhvbxBC57vo';
+      // Get the API endpoint and key from environment variables or fallback to defaults
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://oseowhythgbqvllwonaz.supabase.co';
+      const apiKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZW93aHl0aGdicXZsbHdvbmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE2MTgyNzgsImV4cCI6MjA1NzE5NDI3OH0.MubP80cszCAeIeyve_uY9zLZosck9010uhvbxBC57vo';
       
       const response = await fetch(`${supabaseUrl}/rest/v1/context_verification_logs`, {
         method: 'POST',
@@ -130,7 +162,10 @@ export const logContextVerification = async (
           'apikey': apiKey,
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify(verificationData)
+        body: JSON.stringify({
+          ...verificationData,
+          timestamp: verificationData.timestamp
+        })
       });
       
       if (!response.ok) {

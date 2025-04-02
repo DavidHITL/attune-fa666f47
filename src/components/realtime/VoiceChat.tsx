@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { useWebRTCConnection } from "@/hooks/useWebRTCConnection";
 import { useAuth } from "@/context/AuthContext";
 import ConnectionControls from "./ConnectionControls";
@@ -13,7 +13,8 @@ import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 import MicrophoneControlGroup from "./MicrophoneControlGroup";
 import { toast } from "sonner";
-import { trackModeTransition, logContextVerification } from "@/services/context/unifiedContextProvider";
+import { trackModeTransition, logContextVerification, getRecentContextSummary } from "@/services/context/unifiedContextProvider";
+import { fetchUserContext } from "@/services/context";
 
 interface VoiceChatProps {
   systemPrompt?: string;
@@ -29,6 +30,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   const { user } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioPlaybackManager = useRef<AudioPlaybackManager | null>(null);
+  const [contextLoaded, setContextLoaded] = useState(false);
   
   // Initialize audio playback manager
   useEffect(() => {
@@ -45,11 +47,46 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     };
   }, []);
 
-  // Log user state for debugging
+  // Pre-load user context before connection
   useEffect(() => {
-    console.log("[VoiceChat] User state:", user ? { id: user.id } : "No user");
-  }, [user]);
-  
+    const preloadUserContext = async () => {
+      if (user?.id && !contextLoaded) {
+        try {
+          console.log("[VoiceChat] Preloading user context for voice mode");
+          
+          // Get context summary
+          const contextSummary = await getRecentContextSummary(user.id);
+          if (contextSummary) {
+            console.log("[VoiceChat] Context summary:", contextSummary);
+          }
+          
+          // Load full context
+          const userContext = await fetchUserContext(user.id);
+          if (userContext) {
+            console.log("[VoiceChat] User context loaded successfully:", {
+              messageCount: userContext.recentMessages?.length || 0,
+              hasUserDetails: !!userContext.userDetails,
+              analysisPresent: !!userContext.analysisResults
+            });
+            
+            // Mark context as loaded
+            setContextLoaded(true);
+            
+            // Show toast if we have previous context
+            if (userContext.recentMessages && userContext.recentMessages.length > 0) {
+              toast.success(`Loaded context from ${userContext.recentMessages.length} previous messages`);
+            }
+          }
+        } catch (error) {
+          console.error("[VoiceChat] Error preloading user context:", error);
+        }
+      }
+    };
+    
+    preloadUserContext();
+  }, [user?.id, contextLoaded]);
+
+  // Set up WebRTC connection with enhanced options
   const {
     isConnected,
     isConnecting,
@@ -66,28 +103,37 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     getActiveMediaStream,
     setAudioPlaybackManager
   } = useWebRTCConnection({
-    instructions: systemPrompt, // This will be overridden by the config from database
+    instructions: systemPrompt || "You are a helpful, conversational AI assistant. Maintain context from previous text chats.", 
     voice,
     userId: user?.id,
-    autoConnect: true, // Auto connect when component mounts
+    autoConnect: contextLoaded, // Only auto-connect after context is loaded
     enableMicrophone: false,
-    // Use the VoiceChatAudio component for handling audio tracks
     onTrack: null, // We'll handle this in VoiceChatAudio
   });
 
   // Log that we're entering voice mode when component mounts
   useEffect(() => {
-    if (user?.id) {
-      console.log("[VoiceChat] Entering voice mode");
-      // Track mode transition (text -> voice)
-      trackModeTransition('text', 'voice', user.id).catch(console.error);
-      
-      // Log context verification
-      logContextVerification({
-        userId: user.id,
-        activeMode: 'voice',
-        sessionStarted: true
-      }, systemPrompt).catch(console.error);
+    const initializeVoiceMode = async () => {
+      if (user?.id) {
+        console.log("[VoiceChat] Entering voice mode");
+        
+        // Track mode transition (text -> voice)
+        await trackModeTransition('text', 'voice', user.id);
+        
+        // Log context verification
+        await logContextVerification({
+          userId: user.id,
+          activeMode: 'voice',
+          sessionStarted: true
+        }, systemPrompt, {
+          contextLoaded,
+          connectionInitiated: new Date().toISOString()
+        });
+      }
+    };
+    
+    if (contextLoaded) {
+      initializeVoiceMode();
     }
     
     return () => {
@@ -97,7 +143,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
         trackModeTransition('voice', 'text', user.id, currentTranscript).catch(console.error);
       }
     };
-  }, [user?.id, systemPrompt, currentTranscript]);
+  }, [user?.id, systemPrompt, currentTranscript, contextLoaded]);
 
   // Connect the audio playback manager to the WebRTC connection
   useEffect(() => {
@@ -139,9 +185,15 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   // Setup error handling for WebRTC errors
   useEffect(() => {
     // Add global error handler for WebRTC errors
-    const handleWebRTCError = (error: any) => {
-      console.error("[VoiceChat] WebRTC error:", error);
-      toast.error(`Connection error: ${error.message || "Unknown error"}`);
+    const handleWebRTCError = (event: CustomEvent) => {
+      console.error("[VoiceChat] WebRTC error:", event.detail.error);
+      
+      // Show more helpful error message
+      if (event.detail.error.message?.includes("configuration timed out")) {
+        toast.error("Connection timed out. Please try again.");
+      } else {
+        toast.error(`Connection error: ${event.detail.error.message || "Unknown error"}`);
+      }
     };
 
     // Add event listener for custom WebRTC errors
@@ -154,6 +206,14 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
 
   return (
     <div className="flex flex-col space-y-4 w-full max-w-xl mx-auto p-4 bg-white rounded-lg shadow-md">
+      {/* Loading indicator while context is loading */}
+      {!contextLoaded && user?.id && (
+        <div className="flex justify-center items-center py-2">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+          <span className="ml-2 text-sm text-gray-600">Loading conversation context...</span>
+        </div>
+      )}
+      
       {/* Audio element handled by separate component */}
       <VoiceChatAudio 
         audioRef={audioRef} 

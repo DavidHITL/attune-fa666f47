@@ -36,19 +36,21 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
   
   if (dc.readyState !== "open") {
     console.error(`[WebRTCSessionConfig] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
-    return;
+    throw new Error(`Data channel not open (state: ${dc.readyState})`);
   }
   
   try {
     // Get base instructions from configuration
     const baseInstructions = await getBaseInstructions();
     
-    // Enhance instructions with therapy context, using unified context provider
+    // Enhance instructions with context, using unified context provider
+    console.log(`[WebRTCSessionConfig] Enhancing instructions with userId: ${options.userId || 'none'}`);
     const enhancedInstructions = await getUnifiedEnhancedInstructions(
       options.instructions || baseInstructions,
       {
         userId: options.userId,
-        activeMode: 'voice'
+        activeMode: 'voice',
+        sessionStarted: true
       }
     );
 
@@ -62,8 +64,6 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
         modalities: ["text", "audio"],
         instructions: enhancedInstructions, // Using the enhanced instructions with unified context
         voice: options.voice || "alloy",
-        // Use 'opus' as input format since we're using the direct WebRTC track
-        // which typically uses Opus codec
         input_audio_format: "opus", 
         output_audio_format: "pcm16", 
         input_audio_transcription: {
@@ -80,20 +80,26 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
         // Add priority directive for context maintenance
         priority_hints: [
           "Maintain consistent awareness of user details across the conversation",
-          "Remember important personal details like names and relationship history",
+          "Remember previous messages regardless of text or voice interface used",
+          "Maintain context continuity between text and voice conversations with the same user",
           "Apply insights from previous pattern analysis to current interaction",
-          "Maintain continuity between text and voice conversations",
-          "Prioritize remembering personal names and relationship details",
-          "Provide continuous therapeutic support without forgetting previously discussed topics"
+          "Prioritize remembering personal names and details mentioned in previous conversations",
+          "Always keep track of conversation history and reference it when relevant"
         ]
       }
     };
     
     console.log("[WebRTCSessionConfig] Sending session configuration with enhanced context");
-    dc.send(JSON.stringify(sessionConfig));
     
+    // Monitor message sending
+    const sendResult = dc.send(JSON.stringify(sessionConfig));
+    console.log(`[WebRTCSessionConfig] Session configuration sent: ${sendResult !== false ? "success" : "failed"}`);
+    
+    // Success
     console.log("[WebRTCSessionConfig] Session configuration completed");
+    return Promise.resolve();
   } catch (error) {
     console.error("[WebRTCSessionConfig] Error configuring session:", error);
+    return Promise.reject(error);
   }
 }
