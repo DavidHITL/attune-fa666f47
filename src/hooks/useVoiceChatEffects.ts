@@ -30,6 +30,8 @@ export function useVoiceChatEffects({
           await logContextVerification({
             userId: user.id,
             activeMode: 'voice',
+            sessionStarted: true,
+            sessionProgress: 0
           }, systemPrompt, {
             transcriptLength: currentTranscript.length,
             aiSpeakingState: isAiSpeaking,

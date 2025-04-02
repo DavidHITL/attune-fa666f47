@@ -1,71 +1,51 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
-import { ChatMessage } from "../messages/messageUtils";
+import { Message } from "@/components/MessageBubble";
+import { MessageMetadata } from "../messages/messageUtils";
 
-// Function to call the Supabase Edge Function
-export const callChatApi = async (
-  message: string,
-  conversationHistory: ChatMessage[],
-  sessionProgress: number = 0 // Default to 0 if not provided
-): Promise<string> => {
-  console.log("Calling generateChatResponse function");
-  console.log("Conversation history length:", conversationHistory.length);
-  console.log("Session progress:", sessionProgress);
-  
-  try {
-    // Check if the session is valid before making the request
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      console.error("No valid session found before API call");
-      throw new Error("You need to be logged in to use the chat");
-    }
-    
-    const { data, error } = await supabase.functions.invoke('generateChatResponse', {
-      body: {
-        message,
-        conversationHistory,
-        sessionProgress
-      }
-    });
-
-    if (error) {
-      console.error("Supabase Function Error:", error);
-      throw new Error(`Error calling function: ${error.message}`);
-    }
-
-    if (!data) {
-      throw new Error("No response data received");
-    }
-    
-    if (!data.success) {
-      throw new Error(data?.error || "Failed to get response");
-    }
-
-    return data.reply;
-  } catch (error) {
-    console.error("Error in callChatApi:", error);
-    throw error;
-  }
-};
-
-// Helper function to verify database access before saving
-export const testDatabaseAccess = async (): Promise<boolean> => {
-  try {
-    // First check if we can access the messages table
-    const { error: testError } = await supabase
-      .from('messages')
-      .select('id')
-      .limit(1);
+// Simple API service for chat operations
+export const chatService = {
+  saveMessage: async (text: string, isUser: boolean, metadata?: Partial<MessageMetadata>) => {
+    try {
+      // Get the user from the session
+      const { data: session } = await supabase.auth.getSession();
+      const user = session?.user;
       
-    if (testError) {
-      console.error("Database access test failed:", testError);
-      return false;
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
+      // Format any metadata for database storage
+      const formattedMetadata = {
+        message_type: metadata?.messageType || 'text',
+        instructions: metadata?.instructions || null,
+        knowledge_entries: metadata?.knowledgeEntries || null,
+      };
+      
+      // Insert the message into the database
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          content: text,
+          user_id: user.id,
+          sender_type: isUser ? 'user' : 'assistant',
+          message_type: formattedMetadata.message_type,
+          instructions: formattedMetadata.instructions,
+          knowledge_entries: formattedMetadata.knowledge_entries
+        })
+        .select('id')
+        .single();
+        
+      if (error) {
+        throw error;
+      }
+      
+      return data.id.toString();
+    } catch (error) {
+      console.error("Error saving message:", error);
+      throw error;
     }
-    
-    return true;
-  } catch (error) {
-    console.error("Error testing database access:", error);
-    return false;
-  }
+  },
+  
+  // Additional chat service methods can be added here
 };

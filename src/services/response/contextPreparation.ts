@@ -29,7 +29,9 @@ export const prepareContextData = async (userId?: string): Promise<ApiContextDat
   // Log context verification data
   await logContextVerification({
     userId,
-    activeMode: 'text'
+    activeMode: 'text',
+    sessionStarted: true,
+    sessionProgress: 0
   }, undefined, {
     contextDataSize: JSON.stringify(contextData).length,
     messageCount: contextData.recentMessages.length,
