@@ -59,12 +59,12 @@ export async function getEphemeralKey(options: {
     });
     
     if (error) {
-      console.error("[ephemeralKeyService] Error fetching ephemeral key:", error);
+      console.error("[ephemeralKeyService] [TokenFetchError] Error fetching ephemeral key:", error);
       throw new Error(`Failed to get ephemeral key: ${error.message}`);
     }
     
     if (!data || !data.client_secret?.value) {
-      console.error("[ephemeralKeyService] Invalid response format:", data);
+      console.error("[ephemeralKeyService] [TokenFetchError] Invalid response format:", data);
       throw new Error("Invalid ephemeral key response format");
     }
     
@@ -74,14 +74,14 @@ export async function getEphemeralKey(options: {
     const timeUntilExpiration = expiresAt - currentTimestamp;
     
     if (timeUntilExpiration < 5) {
-      console.error("[ephemeralKeyService] Token expiring too soon:", timeUntilExpiration);
+      console.error("[ephemeralKeyService] [TokenFetchError] Token expiring too soon:", timeUntilExpiration);
       throw new Error(`Ephemeral key expiring too soon (${timeUntilExpiration}s)`);
     }
     
     console.log("[ephemeralKeyService] Successfully obtained ephemeral key, valid for", timeUntilExpiration, "seconds");
     return data.client_secret.value;
   } catch (error) {
-    console.error("[ephemeralKeyService] Exception getting ephemeral key:", error);
+    console.error("[ephemeralKeyService] [TokenFetchError] Exception getting ephemeral key:", error);
     toast.error(`Connection error: Please try again in a moment.`);
     throw new Error(`Failed to get ephemeral key: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -105,14 +105,14 @@ export async function withSecureOpenAI<T>(
     const ephemeralKey = await getEphemeralKey(options);
     
     if (!ephemeralKey) {
-      console.error("[ephemeralKeyService] No valid ephemeral key returned");
+      console.error("[ephemeralKeyService] [TokenFetchError] No valid ephemeral key returned");
       throw new Error("Failed to get valid ephemeral key");
     }
     
     console.log("[ephemeralKeyService] Executing API callback with ephemeral key");
     return await apiCallback(ephemeralKey);
   } catch (error) {
-    console.error("[ephemeralKeyService] Error in secure API call:", error);
+    console.error("[ephemeralKeyService] [TokenFetchError] Error in secure API call:", error);
     throw new Error(`Secure API call failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

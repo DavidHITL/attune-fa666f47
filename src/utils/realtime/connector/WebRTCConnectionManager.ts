@@ -15,7 +15,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   private connectionEstablisher: WebRTCConnectionEstablisher;
   private connectionStateManager: ConnectionStateManager;
   private dataChannelHandler: DataChannelHandler;
-  private reconnectionHandler: ConnectionReconnectionHandler;
+  private reconnectionHandler: ConnectionReconnectionHandler(options);
   private timeoutManager: ConnectionTimeoutManager;
   private audioManager: AudioConnectionManager;
   private messageSender: MessageSender;
@@ -78,22 +78,32 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Store user context info in the data channel handler for Phase 2 loading
     if (this.options.userId && this.options.instructions) {
-      console.log("[WebRTCConnectionManager] Setting userId and instructions for Phase 2 context loading");
+      console.log("[WebRTCConnectionManager] [UserContext] Setting userId and instructions for Phase 2 context loading");
+      console.log(`[WebRTCConnectionManager] [UserContext] User ID: ${this.options.userId}`);
       this.dataChannelHandler.setUserId(this.options.userId);
       this.dataChannelHandler.setBaseInstructions(this.options.instructions);
+    } else {
+      console.log("[WebRTCConnectionManager] [UserContext] No userId available for context loading");
     }
     
     // Store the audio track for potential reconnection
+    if (audioTrack) {
+      console.log("[WebRTCConnectionManager] [AudioTrack] Setting audio track for connection:", 
+        audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
+    } else {
+      console.log("[WebRTCConnectionManager] [AudioTrack] No audio track provided");
+    }
     this.reconnectionHandler.setAudioTrack(audioTrack);
     
     try {
+      console.log("[WebRTCConnectionManager] Establishing connection through ConnectionEstablisher");
       const connection = await this.connectionEstablisher.establish(
         apiKey,
         this.options,
         (state) => this.handleConnectionStateChange(state),
         () => {
           // This will be called when the data channel opens
-          console.log("[WebRTCConnectionManager] Data channel is open and ready");
+          console.log("[WebRTCConnectionManager] [DataChannelOpen] Data channel is open and ready");
           this.dataChannelHandler.setDataChannelReady(true);
           this.configureSessionWhenReady();
         },
@@ -102,17 +112,18 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
       );
       
       if (!connection) {
-        console.error("[WebRTCConnectionManager] Failed to establish connection");
+        console.error("[WebRTCConnectionManager] [ConnectionError] Failed to establish connection");
         return false;
       }
       
+      console.log("[WebRTCConnectionManager] Setting peer connection and data channel");
       this.connectionStateManager.setPeerConnection(connection.pc);
       this.dataChannelHandler.setDataChannel(connection.dc, this.handleError.bind(this));
       
       console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
       return true;
     } catch (error) {
-      console.error("[WebRTCConnectionManager] Error connecting to OpenAI:", error);
+      console.error("[WebRTCConnectionManager] [ConnectionError] Error connecting to OpenAI:", error);
       this.handleError(error);
       return false;
     }
@@ -123,7 +134,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * @param state The new connection state
    */
   private handleConnectionStateChange(state: RTCPeerConnectionState): void {
-    console.log("[WebRTCConnectionManager] Connection state changed:", state);
+    console.log("[WebRTCConnectionManager] [ConnectionState] Connection state changed:", state);
     this.connectionStateManager.setConnectionState(state);
     
     // Notify the state change through callback
@@ -133,9 +144,12 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Configure the session when connected
     if (state === "connected") {
+      console.log("[WebRTCConnectionManager] [ConnectionState] Connection established, configuring session");
       this.configureSessionWhenReady();
       // Reset reconnection manager on successful connection
       this.reconnectionHandler.reset();
+    } else if (state === "failed" || state === "disconnected") {
+      console.error(`[WebRTCConnectionManager] [ConnectionFailure] Connection state: ${state}`);
     }
     
     // Handle disconnection or failure with automatic reconnection
@@ -154,8 +168,47 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     const dc = this.dataChannelHandler.isDataChannelReady() ? 
                 this.dataChannelHandler.getDataChannel() : 
                 null;
-              
+    
+    if (!pc) {
+      console.error("[WebRTCConnectionManager] [ConfigurationError] Cannot configure session: No peer connection available");
+      return;
+    }
+    
+    if (!dc) {
+      console.error("[WebRTCConnectionManager] [ConfigurationError] Cannot configure session: Data channel not ready");
+      return;
+    }
+    
+    if (pc.connectionState !== "connected") {
+      console.warn(`[WebRTCConnectionManager] [ConfigurationError] Cannot configure session: Peer connection not connected (state: ${pc.connectionState})`);
+      return;
+    }
+    
+    if (dc.readyState !== "open") {
+      console.warn(`[WebRTCConnectionManager] [DataChannelError] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
+      return;
+    }
+    
+    console.log("[WebRTCConnectionManager] All conditions met, configuring session");
     this.sessionManager.configureSession(pc, dc, this.options);
+  }
+
+  /**
+   * Handle errors in the WebRTC connection
+   */
+  private handleError(error: any): void {
+    console.error("[WebRTCConnectionManager] [ConnectionError] Error occurred:", error);
+    
+    // Dispatch custom error event for global handling
+    const errorEvent = new CustomEvent("webrtc-error", {
+      detail: { error }
+    });
+    window.dispatchEvent(errorEvent);
+    
+    // Call the error handler callback if provided
+    if (this.options.onError) {
+      this.options.onError(error);
+    }
   }
 
   /**

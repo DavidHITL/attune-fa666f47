@@ -9,6 +9,8 @@ import { prepareContextData } from "@/services/response/contextPreparation";
  */
 async function getBaseInstructions(): Promise<string> {
   try {
+    console.log("[WebRTCSessionConfig] Loading AI configuration from database");
+    
     // Fetch base system prompt from AI configuration table
     const { data, error } = await supabase
       .from('ai_configuration')
@@ -17,14 +19,14 @@ async function getBaseInstructions(): Promise<string> {
       .maybeSingle();
     
     if (error || !data) {
-      console.warn("[WebRTCSessionConfig] Could not load AI configuration:", error);
+      console.warn("[WebRTCSessionConfig] [ConfigLoadError] Could not load AI configuration:", error);
       return "You are a helpful assistant. Be conversational yet concise in your responses.";
     }
     
     console.log("[WebRTCSessionConfig] Loaded AI configuration from database");
     return data.value;
   } catch (err) {
-    console.error("[WebRTCSessionConfig] Error fetching AI configuration:", err);
+    console.error("[WebRTCSessionConfig] [ConfigLoadError] Error fetching AI configuration:", err);
     return "You are a helpful assistant. Be conversational yet concise in your responses.";
   }
 }
@@ -37,16 +39,18 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
   console.log("[WebRTCSessionConfig] Phase 1: Configuring initial session");
   
   if (dc.readyState !== "open") {
-    console.error(`[WebRTCSessionConfig] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
+    console.error(`[WebRTCSessionConfig] [DataChannelError] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
     throw new Error(`Data channel not open (state: ${dc.readyState})`);
   }
   
   try {
     // Get base instructions from configuration
+    console.log("[WebRTCSessionConfig] Phase 1: Fetching base instructions");
     const baseInstructions = await getBaseInstructions();
     
     // Get minimal instructions for fast initial connection
     // This is Phase 1 - lightweight context for quick connection
+    console.log("[WebRTCSessionConfig] Phase 1: Getting minimal instructions");
     const minimalInstructions = await getMinimalInstructions(
       baseInstructions,
       {
@@ -55,7 +59,7 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
       }
     );
     
-    console.log("[WebRTCSessionConfig] Sending initial session configuration with minimal context");
+    console.log("[WebRTCSessionConfig] Phase 1: Sending initial session configuration with minimal context");
     
     // Send session configuration with minimal context to OpenAI
     const initialSessionConfig = {
@@ -84,13 +88,18 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
       }
     };
     
-    // Send the initial configuration
-    dc.send(JSON.stringify(initialSessionConfig));
-    console.log("[WebRTCSessionConfig] Initial session configuration sent successfully");
+    try {
+      // Send the initial configuration
+      dc.send(JSON.stringify(initialSessionConfig));
+      console.log("[WebRTCSessionConfig] Phase 1: Initial session configuration sent successfully");
+    } catch (error) {
+      console.error("[WebRTCSessionConfig] [DataChannelError] Phase 1: Error sending initial configuration:", error);
+      throw error;
+    }
     
     // Listen for data channel open event to trigger Phase 2
     // Set up event listener for full context update when data channel is confirmed working
-    console.log("[WebRTCSessionConfig] Setting up Phase 2 context loading");
+    console.log("[WebRTCSessionConfig] Phase 1: Setting up Phase 2 context loading");
     
     // Wait a moment before loading the full context to ensure the connection is stable
     setTimeout(() => {
@@ -98,10 +107,10 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     }, 1000);
     
     // Success
-    console.log("[WebRTCSessionConfig] Phase 1 configuration completed");
+    console.log("[WebRTCSessionConfig] Phase 1: Configuration completed");
     return Promise.resolve();
   } catch (error) {
-    console.error("[WebRTCSessionConfig] Error in Phase 1 session configuration:", error);
+    console.error("[WebRTCSessionConfig] [ConfigurationError] Phase 1: Error in session configuration:", error);
     return Promise.reject(error);
   }
 }
@@ -118,36 +127,41 @@ async function loadFullContextPhase(
     console.log("[WebRTCSessionConfig] Phase 2: Loading full context");
     
     if (dc.readyState !== 'open') {
-      console.warn("[WebRTCSessionConfig] Phase 2 aborted: Data channel no longer open");
+      console.warn("[WebRTCSessionConfig] [DataChannelError] Phase 2: Aborted - Data channel no longer open");
       return;
     }
     
     // Verify we have a userId before proceeding with context loading
     if (!options.userId) {
-      console.log("[WebRTCSessionConfig] No userId available for Phase 2, skipping full context");
+      console.log("[WebRTCSessionConfig] [UserIdMissing] Phase 2: No userId available, skipping full context");
       return;
     }
     
     console.log(`[WebRTCSessionConfig] Phase 2: Loading full context for user: ${options.userId}`);
     
-    // Update the session with full context
-    const success = await updateSessionWithFullContext(
-      dc,
-      baseInstructions,
-      {
-        userId: options.userId,
-        activeMode: 'voice',
-        sessionStarted: true
+    try {
+      // Update the session with full context
+      const success = await updateSessionWithFullContext(
+        dc,
+        baseInstructions,
+        {
+          userId: options.userId,
+          activeMode: 'voice',
+          sessionStarted: true
+        }
+      );
+      
+      if (success) {
+        console.log("[WebRTCSessionConfig] Phase 2: Full context loaded and sent successfully");
+      } else {
+        console.warn("[WebRTCSessionConfig] [ContextLoadWarning] Phase 2: Some context may not have been loaded");
       }
-    );
-    
-    if (success) {
-      console.log("[WebRTCSessionConfig] Phase 2 completed: Full context loaded and sent");
-    } else {
-      console.warn("[WebRTCSessionConfig] Phase 2 completed with warnings: Some context may not have been loaded");
+    } catch (contextError) {
+      console.error("[WebRTCSessionConfig] [ContextLoadError] Phase 2: Error loading context:", contextError);
+      // Don't throw here - this is a background task that shouldn't break the connection
     }
   } catch (error) {
-    console.error("[WebRTCSessionConfig] Error in Phase 2 context loading:", error);
+    console.error("[WebRTCSessionConfig] [ContextLoadError] Phase 2: Error in context loading:", error);
     // Don't throw here - this is a background task that shouldn't break the connection
   }
 }

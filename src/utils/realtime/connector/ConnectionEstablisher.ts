@@ -16,7 +16,10 @@ export class ConnectionEstablisher {
     audioTrack?: MediaStreamTrack
   ): Promise<{ pc: RTCPeerConnection; dc: RTCDataChannel } | null> {
     try {
+      console.log("[ConnectionEstablisher] Starting connection establishment process");
+      
       // Create and configure peer connection
+      console.log("[ConnectionEstablisher] Creating RTCPeerConnection");
       const pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
       });
@@ -24,41 +27,54 @@ export class ConnectionEstablisher {
       // Add audio track to the connection if provided
       let stream: MediaStream | undefined;
       if (audioTrack) {
-        stream = new MediaStream([audioTrack]);
-        const sender = pc.addTrack(audioTrack, stream);
-        console.log("[ConnectionEstablisher] Added audio track to peer connection:", 
-          audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
-        
-        // Configure the audio sender for best quality
-        const params = sender.getParameters();
-        if (params.encodings) {
-          params.encodings.forEach(encoding => {
-            // Set priority to high for voice
-            encoding.priority = 'high';
-            
-            // Remove the degradationPreference property as it's not in the TypeScript definition
-            // Instead, set other properties that are available
-            encoding.active = true;
-            encoding.maxBitrate = 128000; // 128 kbps is good for voice quality
+        console.log("[ConnectionEstablisher] [AudioTrack] Adding audio track to peer connection");
+        try {
+          stream = new MediaStream([audioTrack]);
+          const sender = pc.addTrack(audioTrack, stream);
+          console.log("[ConnectionEstablisher] [AudioTrack] Added audio track to peer connection:", 
+            audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
+          
+          // Configure the audio sender for best quality
+          console.log("[ConnectionEstablisher] [AudioTrack] Configuring audio sender parameters");
+          const params = sender.getParameters();
+          if (params.encodings) {
+            params.encodings.forEach(encoding => {
+              // Set priority to high for voice
+              encoding.priority = 'high';
+              
+              // Set other properties that are available
+              encoding.active = true;
+              encoding.maxBitrate = 128000; // 128 kbps is good for voice quality
+            });
+            await sender.setParameters(params).catch(err => {
+              console.warn("[ConnectionEstablisher] [AudioTrack] Failed to set sender parameters:", err);
+              // Non-fatal error, continue without failing
+            });
+          }
+          
+          // Also add a transceiver with proper direction
+          console.log("[ConnectionEstablisher] [AudioTrack] Adding audio transceiver");
+          pc.addTransceiver('audio', { 
+            direction: 'sendrecv',
+            streams: [stream]
           });
-          await sender.setParameters(params);
+        } catch (audioError) {
+          console.error("[ConnectionEstablisher] [AudioTrackError] Error adding audio track:", audioError);
+          // Continue without audio track rather than failing completely
         }
-        
-        // Also add a transceiver with proper direction
-        pc.addTransceiver('audio', { 
-          direction: 'sendrecv',
-          streams: [stream]
-        });
       } else {
         console.log("[ConnectionEstablisher] No audio track provided, proceeding without audio sending capability");
       }
 
       // Set up connection listeners
+      console.log("[ConnectionEstablisher] Setting up peer connection listeners");
       setupPeerConnectionListeners(pc, options, callbacks.onConnectionStateChange);
 
       // Create data channel before generating offer
+      console.log("[ConnectionEstablisher] Creating data channel");
       const dc = DataChannelCreator.createDataChannel(pc, "data", options, callbacks.onDataChannelOpen);
       if (!dc) {
+        console.error("[ConnectionEstablisher] [DataChannelError] Failed to create data channel");
         throw new Error("Failed to create data channel");
       }
 
@@ -68,55 +84,75 @@ export class ConnectionEstablisher {
         offerToReceiveVideo: false
       };
       
-      console.log("[ConnectionEstablisher] Creating SDP offer with options:", offerOptions);
-      const offer = await pc.createOffer(offerOptions);
+      console.log("[ConnectionEstablisher] [OfferCreation] Creating SDP offer with options:", offerOptions);
+      let offer: RTCSessionDescriptionInit;
+      try {
+        offer = await pc.createOffer(offerOptions);
+        console.log("[ConnectionEstablisher] [OfferCreation] Successfully created offer");
+      } catch (offerError) {
+        console.error("[ConnectionEstablisher] [OfferCreationError] Failed to create offer:", offerError);
+        throw new Error(`Failed to create WebRTC offer: ${offerError.message}`);
+      }
 
-      // Set preferred audio codec if needed
-      // This is commented out but could be enabled for specific codec preferences
-      // offer.sdp = this.setPreferredAudioCodec(offer.sdp, 'opus');
-
-      console.log("[ConnectionEstablisher] Setting local description");
-      await pc.setLocalDescription(offer);
+      // Set local description
+      console.log("[ConnectionEstablisher] [LocalDescription] Setting local description");
+      try {
+        await pc.setLocalDescription(offer);
+        console.log("[ConnectionEstablisher] [LocalDescription] Local description set successfully");
+      } catch (sdpError) {
+        console.error("[ConnectionEstablisher] [LocalDescriptionError] Failed to set local description:", sdpError);
+        throw new Error(`Failed to set local description: ${sdpError.message}`);
+      }
       
       if (!pc.localDescription || !pc.localDescription.sdp) {
-        throw new Error("Failed to set local description");
+        console.error("[ConnectionEstablisher] [LocalDescriptionError] No SDP in local description");
+        throw new Error("Failed to set local description - no SDP available");
       }
 
       // Request the API endpoint with the SDP offer
       const endpoint = `https://api.openai.com/v1/realtime?model=${options.model}`;
-      console.log(`[ConnectionEstablisher] Sending SDP offer to ${endpoint}`);
+      console.log(`[ConnectionEstablisher] [ApiRequest] Sending SDP offer to ${endpoint}`);
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/sdp"
-        },
-        body: pc.localDescription.sdp
-      });
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/sdp"
+          },
+          body: pc.localDescription.sdp
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[ConnectionEstablisher] [ApiRequestError] API request failed with status ${response.status}:`, errorText);
+          throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+        }
+
+        // Get the SDP answer from the response
+        const answerSdp = await response.text();
+        console.log("[ConnectionEstablisher] [ApiRequest] Received SDP answer from API");
+
+        // Create and set remote description
+        const answerDesc = new RTCSessionDescription({
+          type: "answer",
+          sdp: answerSdp
+        });
+
+        console.log("[ConnectionEstablisher] [RemoteDescription] Setting remote description");
+        await pc.setRemoteDescription(answerDesc);
+        console.log("[ConnectionEstablisher] [RemoteDescription] Remote description set successfully");
+
+      } catch (apiError) {
+        console.error("[ConnectionEstablisher] [ApiRequestError] Error in API communication:", apiError);
+        throw apiError;
       }
 
-      // Get the SDP answer from the response
-      const answerSdp = await response.text();
-      console.log("[ConnectionEstablisher] Received SDP answer from API");
-
-      // Create and set remote description
-      const answerDesc = new RTCSessionDescription({
-        type: "answer",
-        sdp: answerSdp
-      });
-
-      console.log("[ConnectionEstablisher] Setting remote description");
-      await pc.setRemoteDescription(answerDesc);
-      console.log("[ConnectionEstablisher] Remote description set successfully");
-
+      console.log("[ConnectionEstablisher] Connection established successfully");
       return { pc, dc };
     } catch (error) {
-      console.error("[ConnectionEstablisher] Error establishing connection:", error);
+      console.error("[ConnectionEstablisher] [ConnectionError] Error establishing connection:", error);
+      console.error("[ConnectionEstablisher] [ConnectionError] Stack trace:", error?.stack);
       callbacks.onError(error);
       return null;
     }

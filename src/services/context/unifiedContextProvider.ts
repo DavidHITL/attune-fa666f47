@@ -15,14 +15,20 @@ export async function getMinimalInstructions(
     activeMode: 'text' | 'voice';
   }
 ): Promise<string> {
-  // For a quick connection, just add some minimal context
-  // This ensures the connection isn't blocked by heavy context loading
-  console.log(`[UnifiedContext] Phase 1: Getting minimal instructions for ${params.userId || 'anonymous'}`);
-  
-  // Return the basic instructions with a note about pending context
-  return params.userId 
-    ? `${baseInstructions}\n\nAdditional context for user ${params.userId.substring(0, 8)}... will be loaded shortly.`
-    : baseInstructions;
+  try {
+    // For a quick connection, just add some minimal context
+    // This ensures the connection isn't blocked by heavy context loading
+    console.log(`[UnifiedContext] [Phase1] Getting minimal instructions for ${params.userId || 'anonymous'}`);
+    
+    // Return the basic instructions with a note about pending context
+    return params.userId 
+      ? `${baseInstructions}\n\nAdditional context for user ${params.userId.substring(0, 8)}... will be loaded shortly.`
+      : baseInstructions;
+  } catch (error) {
+    console.error("[UnifiedContext] [ContextLoadError] [Phase1] Error getting minimal instructions:", error);
+    // Even on error, return something rather than failing
+    return baseInstructions;
+  }
 }
 
 /**
@@ -39,14 +45,16 @@ export async function getUnifiedEnhancedInstructions(
   }
 ): Promise<string> {
   try {
-    console.log(`[UnifiedContext] Phase 2: Loading full context for ${params.userId || 'anonymous'}`);
+    console.log(`[UnifiedContext] [Phase2] Loading full context for ${params.userId || 'anonymous'}`);
     
     // Validate userId before proceeding - but don't block the process
     if (!params.userId) {
-      console.warn("[UnifiedContext] Missing userId in params - using basic instructions without context");
+      console.warn("[UnifiedContext] [ContextLoadError] [Phase2] Missing userId in params - using basic instructions without context");
       // Return original instructions if no userId without throwing error
       return baseInstructions;
     }
+    
+    console.log(`[UnifiedContext] [Phase2] Beginning context enhancement for user ${params.userId}`);
     
     // Use the enhanceInstructionsWithContext function to add context to the instructions
     // Add a timeout to prevent blocking if context enhancement takes too long
@@ -55,7 +63,7 @@ export async function getUnifiedEnhancedInstructions(
     // Set a timeout to prevent blocking
     const timeoutPromise = new Promise<string>((resolve) => {
       setTimeout(() => {
-        console.warn("[UnifiedContext] Context enhancement timed out, using basic instructions");
+        console.warn("[UnifiedContext] [ContextLoadError] [Phase2] Context enhancement timed out, using basic instructions");
         resolve(baseInstructions);
       }, 2500); // 2.5 second timeout
     });
@@ -64,17 +72,17 @@ export async function getUnifiedEnhancedInstructions(
     const enhancedInstructions = await Promise.race([enhancementPromise, timeoutPromise]);
     
     // Log that we enhanced the instructions for this user
-    console.log(`[UnifiedContext] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
+    console.log(`[UnifiedContext] [Phase2] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
     
     // Log context verification without awaiting it
     logContextVerification(params, baseInstructions).catch(err => {
       // Don't let logging errors disrupt the main flow
-      console.error("[UnifiedContext] Error in context verification logging:", err);
+      console.error("[UnifiedContext] [ContextLoadError] Error in context verification logging:", err);
     });
     
     return enhancedInstructions;
   } catch (error) {
-    console.error("[UnifiedContext] Error enhancing instructions with unified context:", error);
+    console.error("[UnifiedContext] [ContextLoadError] [Phase2] Error enhancing instructions with unified context:", error);
     // Return the original instructions if enhancement fails
     return baseInstructions;
   }
@@ -202,33 +210,38 @@ export async function updateSessionWithFullContext(
 ): Promise<boolean> {
   try {
     if (dataChannel.readyState !== 'open') {
-      console.warn("[UnifiedContext] Cannot update context: Data channel not open");
+      console.warn("[UnifiedContext] [DataChannelError] Cannot update context: Data channel not open, state:", dataChannel.readyState);
       return false;
     }
     
-    console.log("[UnifiedContext] Data channel is open, loading full context update");
+    console.log("[UnifiedContext] [Phase2] Data channel is open, loading full context update");
     
-    // Get the enhanced instructions with full context
-    const fullEnhancedInstructions = await getUnifiedEnhancedInstructions(
-      baseInstructions,
-      params
-    );
-    
-    // Send the context update message through the data channel
-    const contextUpdateMessage = {
-      type: "session.update",
-      session: {
-        instructions: fullEnhancedInstructions
-      }
-    };
-    
-    console.log("[UnifiedContext] Sending context update through data channel");
-    dataChannel.send(JSON.stringify(contextUpdateMessage));
-    
-    console.log("[UnifiedContext] Full context update sent successfully");
-    return true;
+    try {
+      // Get the enhanced instructions with full context
+      const fullEnhancedInstructions = await getUnifiedEnhancedInstructions(
+        baseInstructions,
+        params
+      );
+      
+      // Send the context update message through the data channel
+      const contextUpdateMessage = {
+        type: "session.update",
+        session: {
+          instructions: fullEnhancedInstructions
+        }
+      };
+      
+      console.log("[UnifiedContext] [Phase2] Sending context update through data channel");
+      dataChannel.send(JSON.stringify(contextUpdateMessage));
+      
+      console.log("[UnifiedContext] [Phase2] Full context update sent successfully");
+      return true;
+    } catch (error) {
+      console.error("[UnifiedContext] [ContextLoadError] [Phase2] Error loading and sending full context:", error);
+      return false;
+    }
   } catch (error) {
-    console.error("[UnifiedContext] Error updating session with full context:", error);
+    console.error("[UnifiedContext] [DataChannelError] Error updating session with full context:", error);
     return false;
   }
 }
