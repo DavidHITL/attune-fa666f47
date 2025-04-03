@@ -1,5 +1,6 @@
 import { TextMessageSender } from "./TextMessageSender";
 import { AudioSender } from "./AudioSender";
+import { updateSessionWithFullContext } from "@/services/context/unifiedContextProvider";
 
 /**
  * Handles data channel operations
@@ -14,10 +15,26 @@ export class DataChannelHandler {
   private readonly MIN_COMMIT_INTERVAL = 1500; // Minimum ms between commits
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3;
+  private userId?: string;
+  private baseInstructions?: string;
 
   constructor() {
     this.dataChannelReady = false;
     this.dataChannel = null;
+  }
+  
+  /**
+   * Set user ID for context updates
+   */
+  setUserId(userId?: string): void {
+    this.userId = userId;
+  }
+  
+  /**
+   * Set base instructions for context updates
+   */
+  setBaseInstructions(instructions?: string): void {
+    this.baseInstructions = instructions;
   }
   
   /**
@@ -99,13 +116,76 @@ export class DataChannelHandler {
         
         // Reset reconnect attempts on successful opening
         this.reconnectAttempts = 0;
+        
+        // If we have user ID and base instructions, trigger Phase 2 context loading
+        if (this.userId && this.baseInstructions && dataChannel.label === 'data') {
+          console.log('[DataChannelHandler] Data channel open event - triggering context update');
+          this.initiateContextUpdate(dataChannel);
+        }
+      };
+      
+      // Add message event handler
+      dataChannel.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'session.created' || message.type === 'session.updated') {
+            console.log(`[DataChannelHandler] Received ${message.type} - session is ready`);
+            
+            // If we haven't done the context update yet and we have user info, do it now
+            if (this.userId && this.baseInstructions && dataChannel.label === 'data') {
+              // Wait a brief moment to ensure session is fully initialized
+              setTimeout(() => {
+                this.initiateContextUpdate(dataChannel);
+              }, 500);
+            }
+          }
+        } catch (error) {
+          // If we can't parse the message as JSON, just ignore it
+        }
       };
     } else if (dataChannel && dataChannel.readyState === 'open') {
       // If the channel is already open, mark it as ready immediately
       console.log(`[DataChannelHandler] Data channel '${dataChannel.label}' already open`);
       this.dataChannelReady = true;
       this.reconnectAttempts = 0;
+      
+      // If we have user ID and base instructions, trigger Phase 2 context loading
+      if (this.userId && this.baseInstructions && dataChannel.label === 'data') {
+        console.log('[DataChannelHandler] Data channel already open - triggering immediate context update');
+        this.initiateContextUpdate(dataChannel);
+      }
     }
+  }
+  
+  /**
+   * Initiate context update for Phase 2
+   */
+  private initiateContextUpdate(dataChannel: RTCDataChannel): void {
+    if (!this.userId || !this.baseInstructions) return;
+    
+    // Only update context once
+    const userId = this.userId;
+    const baseInstructions = this.baseInstructions;
+    
+    // Clear these values so we don't try to update again
+    this.userId = undefined;
+    this.baseInstructions = undefined;
+    
+    console.log('[DataChannelHandler] Initiating context update (Phase 2)');
+    
+    // Update session with full context
+    updateSessionWithFullContext(
+      dataChannel,
+      baseInstructions,
+      {
+        userId: userId,
+        activeMode: 'voice',
+        sessionStarted: true
+      }
+    ).catch(error => {
+      console.error('[DataChannelHandler] Error during context update:', error);
+      // Don't propagate the error - this is a background operation
+    });
   }
   
   /**
@@ -253,5 +333,7 @@ export class DataChannelHandler {
     this.dataChannel = null;
     this.dataChannelReady = false;
     this.reconnectAttempts = 0;
+    this.userId = undefined;
+    this.baseInstructions = undefined;
   }
 }

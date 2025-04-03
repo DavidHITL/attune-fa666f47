@@ -1,4 +1,3 @@
-
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
@@ -77,6 +76,13 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.timeoutManager.clearTimeout();
     this.dataChannelHandler.setDataChannelReady(false);
     
+    // Store user context info in the data channel handler for Phase 2 loading
+    if (this.options.userId && this.options.instructions) {
+      console.log("[WebRTCConnectionManager] Setting userId and instructions for Phase 2 context loading");
+      this.dataChannelHandler.setUserId(this.options.userId);
+      this.dataChannelHandler.setBaseInstructions(this.options.instructions);
+    }
+    
     // Store the audio track for potential reconnection
     this.reconnectionHandler.setAudioTrack(audioTrack);
     
@@ -148,7 +154,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     const dc = this.dataChannelHandler.isDataChannelReady() ? 
                 this.dataChannelHandler.getDataChannel() : 
                 null;
-                
+              
     this.sessionManager.configureSession(pc, dc, this.options);
   }
 

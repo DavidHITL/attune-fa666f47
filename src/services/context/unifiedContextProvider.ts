@@ -5,18 +5,42 @@ import { enhanceInstructionsWithContext } from "./enhanceInstructions";
 import { fetchUserContext } from "./index";
 
 /**
+ * Get minimal instructions for initial connection
+ * This is phase 1 - fast and lightweight instructions for quick connection
+ */
+export async function getMinimalInstructions(
+  baseInstructions: string,
+  params: {
+    userId?: string;
+    activeMode: 'text' | 'voice';
+  }
+): Promise<string> {
+  // For a quick connection, just add some minimal context
+  // This ensures the connection isn't blocked by heavy context loading
+  console.log(`[UnifiedContext] Phase 1: Getting minimal instructions for ${params.userId || 'anonymous'}`);
+  
+  // Return the basic instructions with a note about pending context
+  return params.userId 
+    ? `${baseInstructions}\n\nAdditional context for user ${params.userId.substring(0, 8)}... will be loaded shortly.`
+    : baseInstructions;
+}
+
+/**
  * Get unified enhanced instructions with context
+ * This is phase 2 - full context enrichment once connection is established
  */
 export async function getUnifiedEnhancedInstructions(
   baseInstructions: string,
   params: {
-    userId: string;
+    userId?: string;
     activeMode: 'text' | 'voice';
     sessionStarted: boolean;
     sessionProgress?: number;
   }
 ): Promise<string> {
   try {
+    console.log(`[UnifiedContext] Phase 2: Loading full context for ${params.userId || 'anonymous'}`);
+    
     // Validate userId before proceeding - but don't block the process
     if (!params.userId) {
       console.warn("[UnifiedContext] Missing userId in params - using basic instructions without context");
@@ -62,7 +86,7 @@ export async function getUnifiedEnhancedInstructions(
 export async function trackModeTransition(
   fromMode: string,
   toMode: string,
-  userId: string,
+  userId?: string,
   transcript?: string
 ): Promise<void> {
   try {
@@ -86,7 +110,7 @@ export async function trackModeTransition(
  */
 export async function logContextVerification(
   params: {
-    userId: string;
+    userId?: string;
     activeMode: 'text' | 'voice';
     sessionStarted: boolean;
     sessionProgress?: number;
@@ -131,7 +155,7 @@ export async function logContextVerification(
  * Get a summary of recent context
  */
 export async function getRecentContextSummary(
-  userId: string
+  userId?: string
 ): Promise<string | null> {
   try {
     if (!userId) {
@@ -160,5 +184,51 @@ export async function getRecentContextSummary(
   } catch (error) {
     console.error("[UnifiedContext] Error getting context summary:", error);
     return null;
+  }
+}
+
+/**
+ * Update session context after connection is established
+ * This sends a context update message through the data channel
+ */
+export async function updateSessionWithFullContext(
+  dataChannel: RTCDataChannel,
+  baseInstructions: string,
+  params: {
+    userId?: string;
+    activeMode: 'text' | 'voice';
+    sessionStarted: boolean;
+  }
+): Promise<boolean> {
+  try {
+    if (dataChannel.readyState !== 'open') {
+      console.warn("[UnifiedContext] Cannot update context: Data channel not open");
+      return false;
+    }
+    
+    console.log("[UnifiedContext] Data channel is open, loading full context update");
+    
+    // Get the enhanced instructions with full context
+    const fullEnhancedInstructions = await getUnifiedEnhancedInstructions(
+      baseInstructions,
+      params
+    );
+    
+    // Send the context update message through the data channel
+    const contextUpdateMessage = {
+      type: "session.update",
+      session: {
+        instructions: fullEnhancedInstructions
+      }
+    };
+    
+    console.log("[UnifiedContext] Sending context update through data channel");
+    dataChannel.send(JSON.stringify(contextUpdateMessage));
+    
+    console.log("[UnifiedContext] Full context update sent successfully");
+    return true;
+  } catch (error) {
+    console.error("[UnifiedContext] Error updating session with full context:", error);
+    return false;
   }
 }

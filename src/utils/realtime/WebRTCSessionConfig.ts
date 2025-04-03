@@ -1,6 +1,6 @@
 
 import { WebRTCOptions } from "./WebRTCTypes";
-import { getUnifiedEnhancedInstructions } from "@/services/context/unifiedContextProvider";
+import { getMinimalInstructions, getUnifiedEnhancedInstructions, updateSessionWithFullContext } from "@/services/context/unifiedContextProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { prepareContextData } from "@/services/response/contextPreparation";
 
@@ -31,9 +31,10 @@ async function getBaseInstructions(): Promise<string> {
 
 /**
  * Configure the WebRTC session after connection is established
+ * Phase 1: Fast connection with minimal context
  */
 export async function configureSession(dc: RTCDataChannel, options: WebRTCOptions): Promise<void> {
-  console.log("[WebRTCSessionConfig] Configuring session");
+  console.log("[WebRTCSessionConfig] Phase 1: Configuring initial session");
   
   if (dc.readyState !== "open") {
     console.error(`[WebRTCSessionConfig] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
@@ -44,98 +45,25 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     // Get base instructions from configuration
     const baseInstructions = await getBaseInstructions();
     
-    // Initialize with base instructions and prepare to enhance if userId is available
-    let enhancedInstructions = options.instructions || baseInstructions;
-    let contextData = null;
-    let userIdPresent = !!options.userId;
-    
-    // Log userId availability
-    if (!userIdPresent) {
-      console.warn("[WebRTCSessionConfig] No userId provided, using basic instructions without context.");
-    } else {
-      console.log(`[WebRTCSessionConfig] Using userId for enhanced instructions: ${options.userId}`);
-    }
-    
-    // Safely attempt to enhance instructions if userId is available
-    // This approach prevents blocking if context loading fails
-    if (userIdPresent) {
-      try {
-        // Create a timeout promise that resolves after 3 seconds to prevent hanging
-        const timeoutPromise = new Promise<null>((resolve) => {
-          setTimeout(() => resolve(null), 3000);
-        });
-        
-        // Prepare the context data with timeout protection
-        const contextPromise = prepareContextData(options.userId!);
-        
-        // Race the context loading against the timeout
-        contextData = await Promise.race([contextPromise, timeoutPromise])
-          .catch(err => {
-            console.warn("[WebRTCSessionConfig] Context preparation issue:", err.message);
-            return null; // Continue without context if it times out or fails
-          });
-        
-        if (contextData === null) {
-          console.warn("[WebRTCSessionConfig] Context preparation timed out or failed, proceeding with basic instructions");
-        }
-        
-        // Only enhance if we have a valid userId (even if context failed)
-        try {
-          const enhancedPromise = getUnifiedEnhancedInstructions(
-            enhancedInstructions,
-            {
-              userId: options.userId!,
-              activeMode: 'voice',
-              sessionStarted: true
-            }
-          );
-          
-          // Apply a timeout to prevent blocking
-          const instructionTimeoutPromise = new Promise<string>((resolve) => {
-            setTimeout(() => resolve(enhancedInstructions), 2000); // Use original instructions after 2s timeout
-          });
-          
-          enhancedInstructions = await Promise.race([enhancedPromise, instructionTimeoutPromise])
-            .catch(err => {
-              console.warn("[WebRTCSessionConfig] Failed to enhance instructions:", err);
-              return enhancedInstructions; // Fall back to base instructions
-            });
-        } catch (enhanceError) {
-          // Log but continue if context enhancement fails
-          console.error("[WebRTCSessionConfig] Error during instruction enhancement:", enhanceError);
-        }
-        
-        console.log("[WebRTCSessionConfig] Context preparation completed");
-      } catch (contextError) {
-        // Log but continue if context enhancement fails
-        console.error("[WebRTCSessionConfig] Error during context processing:", contextError);
+    // Get minimal instructions for fast initial connection
+    // This is Phase 1 - lightweight context for quick connection
+    const minimalInstructions = await getMinimalInstructions(
+      baseInstructions,
+      {
+        userId: options.userId,
+        activeMode: 'voice'
       }
-    }
+    );
     
-    // Build the context payload for debugging and verification
-    const contextPayload = {
-      instructions: enhancedInstructions,
-      hasFullContext: !!contextData,
-      contextStats: contextData ? {
-        messageCount: contextData.recentMessages?.length || 0,
-        therapyConceptCount: contextData.therapyConcepts?.length || 0,
-        therapySourceCount: contextData.therapySources?.length || 0,
-        hasUserDetails: !!contextData.userDetails,
-        hasCriticalInformation: Array.isArray(contextData.criticalInformation) && contextData.criticalInformation.length > 0,
-        hasAnalysisResults: !!contextData.analysisResults
-      } : null
-    };
+    console.log("[WebRTCSessionConfig] Sending initial session configuration with minimal context");
     
-    // Log the context payload for debugging (with sensitive data removed)
-    console.log("[WebRTCSessionConfig] Final context payload:", JSON.stringify(contextPayload, null, 2));
-    
-    // Send session configuration to OpenAI
-    const sessionConfig = {
-      event_id: `event_${Date.now()}`,
+    // Send session configuration with minimal context to OpenAI
+    const initialSessionConfig = {
+      event_id: `event_initial_${Date.now()}`,
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        instructions: enhancedInstructions, // Using the enhanced instructions with unified context
+        instructions: minimalInstructions,
         voice: options.voice || "alloy",
         input_audio_format: "opus", 
         output_audio_format: "pcm16", 
@@ -148,34 +76,78 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
           prefix_padding_ms: 300,
           silence_duration_ms: 1000
         },
-        // Increase temperature slightly to ensure personality consistency
         temperature: 0.75,
-        // Add priority directive for context maintenance
         priority_hints: [
           "Maintain consistent awareness of user details across the conversation",
-          "Remember previous messages regardless of text or voice interface used",
-          "Maintain context continuity between text and voice conversations with the same user",
-          "Apply insights from previous pattern analysis to current interaction",
-          "Prioritize remembering personal names and details mentioned in previous conversations",
-          "Always keep track of conversation history and reference it when relevant"
+          "Remember previous messages regardless of text or voice interface used"
         ]
       }
     };
     
-    console.log("[WebRTCSessionConfig] Sending session configuration with context stats:", 
-      contextData ? `${contextData.recentMessages?.length || 0} messages, ` +
-      `${(contextData.therapyConcepts?.length || 0) + (contextData.therapySources?.length || 0)} knowledge entries` : 
-      "No context data available");
+    // Send the initial configuration
+    dc.send(JSON.stringify(initialSessionConfig));
+    console.log("[WebRTCSessionConfig] Initial session configuration sent successfully");
     
-    // Send the configuration
-    dc.send(JSON.stringify(sessionConfig));
-    console.log("[WebRTCSessionConfig] Session configuration sent successfully");
+    // Listen for data channel open event to trigger Phase 2
+    // Set up event listener for full context update when data channel is confirmed working
+    console.log("[WebRTCSessionConfig] Setting up Phase 2 context loading");
+    
+    // Wait a moment before loading the full context to ensure the connection is stable
+    setTimeout(() => {
+      loadFullContextPhase(dc, baseInstructions, options);
+    }, 1000);
     
     // Success
-    console.log("[WebRTCSessionConfig] Session configuration completed");
+    console.log("[WebRTCSessionConfig] Phase 1 configuration completed");
     return Promise.resolve();
   } catch (error) {
-    console.error("[WebRTCSessionConfig] Error configuring session:", error);
+    console.error("[WebRTCSessionConfig] Error in Phase 1 session configuration:", error);
     return Promise.reject(error);
+  }
+}
+
+/**
+ * Phase 2: Full context loading once data channel is confirmed working
+ */
+async function loadFullContextPhase(
+  dc: RTCDataChannel, 
+  baseInstructions: string,
+  options: WebRTCOptions
+): Promise<void> {
+  try {
+    console.log("[WebRTCSessionConfig] Phase 2: Loading full context");
+    
+    if (dc.readyState !== 'open') {
+      console.warn("[WebRTCSessionConfig] Phase 2 aborted: Data channel no longer open");
+      return;
+    }
+    
+    // Verify we have a userId before proceeding with context loading
+    if (!options.userId) {
+      console.log("[WebRTCSessionConfig] No userId available for Phase 2, skipping full context");
+      return;
+    }
+    
+    console.log(`[WebRTCSessionConfig] Phase 2: Loading full context for user: ${options.userId}`);
+    
+    // Update the session with full context
+    const success = await updateSessionWithFullContext(
+      dc,
+      baseInstructions,
+      {
+        userId: options.userId,
+        activeMode: 'voice',
+        sessionStarted: true
+      }
+    );
+    
+    if (success) {
+      console.log("[WebRTCSessionConfig] Phase 2 completed: Full context loaded and sent");
+    } else {
+      console.warn("[WebRTCSessionConfig] Phase 2 completed with warnings: Some context may not have been loaded");
+    }
+  } catch (error) {
+    console.error("[WebRTCSessionConfig] Error in Phase 2 context loading:", error);
+    // Don't throw here - this is a background task that shouldn't break the connection
   }
 }
