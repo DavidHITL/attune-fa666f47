@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
@@ -15,7 +16,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   private connectionEstablisher: WebRTCConnectionEstablisher;
   private connectionStateManager: ConnectionStateManager;
   private dataChannelHandler: DataChannelHandler;
-  private reconnectionHandler: ConnectionReconnectionHandler(options);
+  private reconnectionHandler: ConnectionReconnectionHandler;
   private timeoutManager: ConnectionTimeoutManager;
   private audioManager: AudioConnectionManager;
   private messageSender: MessageSender;
