@@ -231,7 +231,10 @@ export async function updateSessionWithFullContext(
       // Get the enhanced instructions with full context
       const fullEnhancedInstructions = await getUnifiedEnhancedInstructions(
         baseInstructions,
-        params
+        {
+          ...params,
+          sessionProgress: 0
+        }
       );
       
       // Send the context update message through the data channel
@@ -242,11 +245,17 @@ export async function updateSessionWithFullContext(
         }
       };
       
-      console.log("[UnifiedContext] [Phase2] Sending context update through data channel");
-      dataChannel.send(JSON.stringify(contextUpdateMessage));
-      
-      console.log("[UnifiedContext] [Phase2] Full context update sent successfully");
-      return true;
+      // Verify the channel is still open before attempting to send
+      if (dataChannel.readyState === 'open') {
+        console.log("[UnifiedContext] [Phase2] Sending context update through data channel");
+        dataChannel.send(JSON.stringify(contextUpdateMessage));
+        
+        console.log("[UnifiedContext] [Phase2] Full context update sent successfully");
+        return true;
+      } else {
+        console.warn(`[UnifiedContext] [DataChannelError] Data channel closed (${dataChannel.readyState}) before context could be sent`);
+        return false;
+      }
     } catch (error) {
       console.error("[UnifiedContext] [ContextLoadError] [Phase2] Error loading and sending full context:", error);
       return false;

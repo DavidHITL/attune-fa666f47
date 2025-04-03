@@ -1,4 +1,3 @@
-
 import { WebRTCOptions } from "./WebRTCTypes";
 import { getMinimalInstructions, getUnifiedEnhancedInstructions, updateSessionWithFullContext } from "@/services/context/unifiedContextProvider";
 import { supabase } from "@/integrations/supabase/client";
@@ -96,24 +95,19 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     };
     
     try {
-      // Send the initial configuration
-      dc.send(JSON.stringify(initialSessionConfig));
-      console.log("[WebRTCSessionConfig] Phase 1: Initial session configuration sent successfully");
+      // Double-check that the data channel is still open before sending
+      if (dc.readyState === "open") {
+        dc.send(JSON.stringify(initialSessionConfig));
+        console.log("[WebRTCSessionConfig] Phase 1: Initial session configuration sent successfully");
+      } else {
+        console.error(`[WebRTCSessionConfig] [DataChannelError] Data channel state changed to ${dc.readyState} before sending initial config`);
+        throw new Error(`Data channel state changed to ${dc.readyState} before sending initial config`);
+      }
     } catch (error) {
       console.error("[WebRTCSessionConfig] [DataChannelError] Phase 1: Error sending initial configuration:", error);
       throw error;
     }
     
-    // Listen for data channel open event to trigger Phase 2
-    // Set up event listener for full context update when data channel is confirmed working
-    console.log("[WebRTCSessionConfig] Phase 1: Setting up Phase 2 context loading");
-    
-    // Wait a moment before loading the full context to ensure the connection is stable
-    setTimeout(() => {
-      loadFullContextPhase(dc, baseInstructions, options);
-    }, 1000);
-    
-    // Success
     console.log("[WebRTCSessionConfig] Phase 1: Configuration completed");
     return Promise.resolve();
   } catch (error) {
@@ -124,51 +118,13 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
 
 /**
  * Phase 2: Full context loading once data channel is confirmed working
+ * This is no longer used as we moved this to the DataChannelHandler
+ * to ensure proper synchronization with the data channel opening event
  */
 async function loadFullContextPhase(
   dc: RTCDataChannel, 
   baseInstructions: string,
   options: WebRTCOptions
 ): Promise<void> {
-  try {
-    console.log("[WebRTCSessionConfig] Phase 2: Loading full context");
-    
-    if (dc.readyState !== 'open') {
-      console.warn("[WebRTCSessionConfig] [DataChannelError] Phase 2: Aborted - Data channel no longer open");
-      return;
-    }
-    
-    // Verify we have a userId before proceeding with context loading
-    if (!options.userId) {
-      console.log("[WebRTCSessionConfig] [UserIdMissing] Phase 2: No userId available, skipping full context");
-      return;
-    }
-    
-    console.log(`[WebRTCSessionConfig] Phase 2: Loading full context for user: ${options.userId}`);
-    
-    try {
-      // Update the session with full context
-      const success = await updateSessionWithFullContext(
-        dc,
-        baseInstructions,
-        {
-          userId: options.userId,
-          activeMode: 'voice',
-          sessionStarted: true
-        }
-      );
-      
-      if (success) {
-        console.log("[WebRTCSessionConfig] Phase 2: Full context loaded and sent successfully");
-      } else {
-        console.warn("[WebRTCSessionConfig] [ContextLoadWarning] Phase 2: Some context may not have been loaded");
-      }
-    } catch (contextError) {
-      console.error("[WebRTCSessionConfig] [ContextLoadError] Phase 2: Error loading context:", contextError);
-      // Don't throw here - this is a background task that shouldn't break the connection
-    }
-  } catch (error) {
-    console.error("[WebRTCSessionConfig] [ContextLoadError] Phase 2: Error in context loading:", error);
-    // Don't throw here - this is a background task that shouldn't break the connection
-  }
+  console.log("[WebRTCSessionConfig] Phase 2: This method is deprecated - phase 2 loading is now handled by DataChannelHandler");
 }
