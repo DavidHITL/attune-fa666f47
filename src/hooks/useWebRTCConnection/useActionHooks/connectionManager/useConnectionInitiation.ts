@@ -23,6 +23,12 @@ export function useConnectionInitiation(
     
     try {
       console.log("[useConnectionInitiation] Starting connection process");
+      if (options.userId) {
+        console.log(`[useConnectionInitiation] Using userId: ${options.userId}`);
+      } else {
+        console.log("[useConnectionInitiation] No userId available, connecting anonymously");
+      }
+      
       setIsConnecting(true);
       
       // Create a new WebRTC connector with proper options
@@ -71,7 +77,8 @@ export function useConnectionInitiation(
     handleConnectionError,
     createAndConfigureConnector,
     connectorRef,
-    options.enableMicrophone
+    options.enableMicrophone,
+    options.userId
   ]);
 
   // Helper function to request microphone access

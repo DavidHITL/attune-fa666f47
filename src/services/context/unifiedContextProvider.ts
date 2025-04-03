@@ -20,10 +20,14 @@ export async function getMinimalInstructions(
     // This ensures the connection isn't blocked by heavy context loading
     console.log(`[UnifiedContext] [Phase1] Getting minimal instructions for ${params.userId || 'anonymous'}`);
     
+    // If we have a userId, add a slight enhancement to the base instructions
+    if (params.userId) {
+      console.log(`[UnifiedContext] [Phase1] Adding user identifier ${params.userId.substring(0, 8)}... to instructions`);
+      return `${baseInstructions}\n\nYou are speaking with user ${params.userId.substring(0, 8)}... Additional context will be loaded shortly.`;
+    }
+    
     // Return the basic instructions with a note about pending context
-    return params.userId 
-      ? `${baseInstructions}\n\nAdditional context for user ${params.userId.substring(0, 8)}... will be loaded shortly.`
-      : baseInstructions;
+    return baseInstructions;
   } catch (error) {
     console.error("[UnifiedContext] [ContextLoadError] [Phase1] Error getting minimal instructions:", error);
     // Even on error, return something rather than failing
@@ -212,6 +216,13 @@ export async function updateSessionWithFullContext(
     if (dataChannel.readyState !== 'open') {
       console.warn("[UnifiedContext] [DataChannelError] Cannot update context: Data channel not open, state:", dataChannel.readyState);
       return false;
+    }
+    
+    // Check if we have a userId
+    if (!params.userId) {
+      console.warn("[UnifiedContext] [ContextLoadWarning] No userId provided for context update");
+    } else {
+      console.log(`[UnifiedContext] [Phase2] Loading full context for user: ${params.userId}`);
     }
     
     console.log("[UnifiedContext] [Phase2] Data channel is open, loading full context update");

@@ -48,6 +48,13 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     console.log("[WebRTCSessionConfig] Phase 1: Fetching base instructions");
     const baseInstructions = await getBaseInstructions();
     
+    // Log if we have a userId for context
+    if (options.userId) {
+      console.log(`[WebRTCSessionConfig] Phase 1: Using userId ${options.userId} for context enrichment`);
+    } else {
+      console.log("[WebRTCSessionConfig] Phase 1: No userId available, using basic context");
+    }
+    
     // Get minimal instructions for fast initial connection
     // This is Phase 1 - lightweight context for quick connection
     console.log("[WebRTCSessionConfig] Phase 1: Getting minimal instructions");

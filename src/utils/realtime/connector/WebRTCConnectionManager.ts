@@ -39,6 +39,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
         model: options.model,
         voice: options.voice,
         hasInstructions: !!options.instructions,
+        userId: options.userId ? `${options.userId.substring(0, 8)}...` : 'none',
         hasCallbacks: {
           onMessage: !!options.onMessage,
           onConnectionStateChange: !!options.onConnectionStateChange,
