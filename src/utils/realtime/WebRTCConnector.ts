@@ -12,6 +12,18 @@ export class WebRTCConnector {
   private connectionManager: IConnectionManager;
 
   constructor(options: WebRTCOptions) {
+    // Validate userId if provided
+    if (options.userId !== undefined && (!options.userId || options.userId.trim() === '')) {
+      console.warn("[WebRTCConnector] Invalid userId provided (empty string) - will proceed without user context");
+      options.userId = undefined;
+    }
+    
+    if (options.userId) {
+      console.log(`[WebRTCConnector] Initializing with userId: ${options.userId.substring(0, 8)}...`);
+    } else {
+      console.log("[WebRTCConnector] Initializing without userId (guest mode)");
+    }
+    
     this.connectionManager = new WebRTCConnectionManager(options);
   }
 
@@ -29,11 +41,21 @@ export class WebRTCConnector {
         }
         
         console.log("[WebRTCConnector] Connecting with ephemeral API key");
+        
+        // Log userId for debugging connection issues
+        const options = this.getOptions();
+        if (options.userId) {
+          console.log(`[WebRTCConnector] Using userId in connection: ${options.userId.substring(0, 8)}...`);
+        } else {
+          console.log("[WebRTCConnector] Connecting without userId (guest mode)");
+        }
+        
         return this.connectionManager.connect(apiKey, audioTrack);
       }, {
         model: this.getOptions().model,
         voice: this.getOptions().voice,
-        instructions: this.getOptions().instructions
+        instructions: this.getOptions().instructions,
+        userId: this.getOptions().userId // Pass userId to ephemeral key service for logging
       });
     } catch (error) {
       console.error("[WebRTCConnector] Error connecting:", error);

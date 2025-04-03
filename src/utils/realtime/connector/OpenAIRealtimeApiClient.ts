@@ -14,12 +14,14 @@ export class OpenAIRealtimeApiClient {
    * @param localDescription WebRTC local SDP description 
    * @param apiKey Ephemeral API key for OpenAI authentication
    * @param model OpenAI model to use for the realtime session
+   * @param userId Optional user ID to include in the request for tracking
    * @returns Promise with the result containing success status and answer SDP
    */
   static async sendOffer(
     localDescription: RTCSessionDescription,
     apiKey: string,
-    model: string
+    model: string,
+    userId?: string
   ): Promise<OfferResult> {
     console.log("[WebRTC] Sending offer to OpenAI Realtime API via Edge Function");
     
@@ -33,15 +35,20 @@ export class OpenAIRealtimeApiClient {
     
     try {
       // Verify API key
-      if (!apiKey || apiKey.trim() === '') {
-        console.error("[WebRTC] Empty or invalid API key provided");
+      if (!apiKey || apiKey.trim() === '' || apiKey.length < 20) {
+        console.error("[WebRTC] Invalid or empty ephemeral API key provided");
         return {
           success: false,
-          error: "Invalid or empty API key"
+          error: "Invalid or empty ephemeral API key"
         };
       }
       
       console.log(`[WebRTC] Using ephemeral API key: ${apiKey.substring(0, 5)}..., length: ${apiKey.length}`);
+      
+      // Log userId if available (for debugging)
+      if (userId) {
+        console.log(`[WebRTC] Request includes userId: ${userId.substring(0, 8)}...`);
+      }
       
       // Ensure model is properly set
       const actualModel = model || "gpt-4o-realtime-preview-2024-12-17";
@@ -60,7 +67,8 @@ export class OpenAIRealtimeApiClient {
         body: {
           sdp: localDescription.sdp,
           apiKey: apiKey,
-          model: actualModel
+          model: actualModel,
+          userId: userId // Pass userId if available
         }
       });
       

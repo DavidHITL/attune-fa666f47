@@ -14,23 +14,47 @@ serve(async (req: Request) => {
 
   try {
     // Extract parameters from request
-    const { sdp, apiKey, model } = await req.json();
+    const { sdp, apiKey, model, userId } = await req.json();
     
-    if (!sdp || !apiKey || !model) {
-      console.error("[webrtc-sdp-exchange] Missing required parameters");
+    // Validate required parameters
+    if (!sdp) {
+      console.error("[webrtc-sdp-exchange] Missing SDP in request");
       return new Response(
-        JSON.stringify({ error: "Missing required parameters" }),
+        JSON.stringify({ error: "Missing SDP in request" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!apiKey) {
+      console.error("[webrtc-sdp-exchange] Missing API key in request");
+      return new Response(
+        JSON.stringify({ error: "Missing API key in request" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!model) {
+      console.error("[webrtc-sdp-exchange] Missing model parameter in request");
+      return new Response(
+        JSON.stringify({ error: "Missing model parameter" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate API key
+    // Validate API key format
     if (apiKey.trim() === "" || apiKey.length < 20) {
       console.error("[webrtc-sdp-exchange] Invalid API key format");
       return new Response(
         JSON.stringify({ error: "Invalid API key format" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Log the userId if available (for debugging)
+    if (userId) {
+      console.log(`[webrtc-sdp-exchange] Request for user: ${userId.substring(0, 8)}...`);
+    } else {
+      console.log("[webrtc-sdp-exchange] No user ID provided (guest session)");
     }
 
     console.log(`[webrtc-sdp-exchange] Processing SDP exchange request for model: ${model}`);

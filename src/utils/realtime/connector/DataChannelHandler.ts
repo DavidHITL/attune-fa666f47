@@ -21,6 +21,8 @@ export class DataChannelHandler {
   private baseInstructions?: string;
   private contextUpdateSent: boolean = false;
   private channelClosingIntentionally: boolean = false;
+  private contextUpdateAttempts: number = 0;
+  private maxContextUpdateAttempts: number = 2;
 
   constructor() {
     this.dataChannelReady = false;
@@ -31,6 +33,11 @@ export class DataChannelHandler {
    * Set user ID for context updates
    */
   setUserId(userId?: string): void {
+    if (!userId) {
+      console.warn("[DataChannelHandler] Setting empty userId for context updates");
+    } else {
+      console.log(`[DataChannelHandler] Setting userId ${userId.substring(0, 8)}... for context updates`);
+    }
     this.userId = userId;
   }
   
@@ -38,6 +45,11 @@ export class DataChannelHandler {
    * Set base instructions for context updates
    */
   setBaseInstructions(instructions?: string): void {
+    if (!instructions) {
+      console.warn("[DataChannelHandler] Setting empty baseInstructions for context updates");
+    } else {
+      console.log("[DataChannelHandler] Setting baseInstructions for context updates");
+    }
     this.baseInstructions = instructions;
   }
   
@@ -46,6 +58,7 @@ export class DataChannelHandler {
    */
   resetContextUpdateStatus(): void {
     this.contextUpdateSent = false;
+    this.contextUpdateAttempts = 0;
   }
   
   /**
@@ -66,6 +79,7 @@ export class DataChannelHandler {
     this.dataChannel = dataChannel;
     this.onError = onError || null;
     this.reconnectAttempts = 0;
+    this.contextUpdateAttempts = 0;
     
     // Clear any existing timeout
     if (this.dataChannelOpenTimeout) {
@@ -132,8 +146,13 @@ export class DataChannelHandler {
         // Reset reconnect attempts on successful opening
         this.reconnectAttempts = 0;
         
+        // Verify we have user context before attempting to send it
+        if (!this.userId) {
+          console.warn("[DataChannelHandler] No userId available for context update - continuing with limited context");
+        }
+        
         // If we have user ID and base instructions, trigger Phase 2 context loading
-        if (this.userId && this.baseInstructions && dataChannel.label === 'data' && !this.contextUpdateSent) {
+        if (this.baseInstructions && dataChannel.label === 'data' && !this.contextUpdateSent) {
           console.log('[DataChannelHandler] Data channel open event - triggering context update');
           this.initiateContextUpdate(dataChannel);
         }
@@ -147,7 +166,7 @@ export class DataChannelHandler {
             console.log(`[DataChannelHandler] Received ${message.type} - session is ready`);
             
             // If we haven't done the context update yet and we have user info, do it now
-            if (!this.contextUpdateSent && this.userId && this.baseInstructions && dataChannel.label === 'data') {
+            if (!this.contextUpdateSent && this.baseInstructions && dataChannel.label === 'data') {
               // Wait a brief moment to ensure session is fully initialized
               setTimeout(() => {
                 this.initiateContextUpdate(dataChannel);
@@ -164,8 +183,13 @@ export class DataChannelHandler {
       this.dataChannelReady = true;
       this.reconnectAttempts = 0;
       
+      // Verify we have user context before attempting to send it
+      if (!this.userId) {
+        console.warn("[DataChannelHandler] No userId available for context update - continuing with limited context");
+      }
+      
       // If we have user ID and base instructions, trigger Phase 2 context loading
-      if (this.userId && this.baseInstructions && dataChannel.label === 'data' && !this.contextUpdateSent) {
+      if (this.baseInstructions && dataChannel.label === 'data' && !this.contextUpdateSent) {
         console.log('[DataChannelHandler] Data channel already open - triggering immediate context update');
         this.initiateContextUpdate(dataChannel);
       }
@@ -176,15 +200,34 @@ export class DataChannelHandler {
    * Initiate context update for Phase 2
    */
   private initiateContextUpdate(dataChannel: RTCDataChannel): void {
-    if (!this.userId || !this.baseInstructions || this.contextUpdateSent) {
+    // Increment attempt counter
+    this.contextUpdateAttempts++;
+    
+    if (this.contextUpdateAttempts > this.maxContextUpdateAttempts) {
+      console.error(`[DataChannelHandler] Exceeded max context update attempts (${this.maxContextUpdateAttempts})`);
+      return;
+    }
+    
+    if (!this.baseInstructions) {
+      console.error("[DataChannelHandler] Cannot send context update - missing base instructions");
+      return;
+    }
+    
+    if (this.contextUpdateSent) {
+      console.log("[DataChannelHandler] Context update already sent - skipping");
       return;
     }
     
     // Mark that we're sending the context update
-    const userId = this.userId;
+    const userId = this.userId; // May be undefined for guest sessions
     const baseInstructions = this.baseInstructions;
     
     console.log('[DataChannelHandler] Initiating context update (Phase 2)');
+    if (userId) {
+      console.log(`[DataChannelHandler] Using userId: ${userId.substring(0, 8)}... for context enrichment`);
+    } else {
+      console.log('[DataChannelHandler] No userId available - using base instructions only');
+    }
     
     // Use a try-catch block to handle potential errors during context update
     try {
@@ -204,10 +247,34 @@ export class DataChannelHandler {
           this.contextUpdateSent = true;
         } else {
           console.error('[DataChannelHandler] Context update failed');
+          
+          // Retry if we haven't exceeded max attempts
+          if (this.contextUpdateAttempts < this.maxContextUpdateAttempts) {
+            console.log(`[DataChannelHandler] Will retry context update (attempt ${this.contextUpdateAttempts}/${this.maxContextUpdateAttempts})`);
+            
+            // Wait a moment before retrying
+            setTimeout(() => {
+              if (dataChannel.readyState === 'open') {
+                this.initiateContextUpdate(dataChannel);
+              }
+            }, 1000);
+          }
         }
       }).catch(error => {
         console.error('[DataChannelHandler] Error during context update:', error);
         // Don't propagate the error - this is a background operation
+        
+        // Retry if we haven't exceeded max attempts
+        if (this.contextUpdateAttempts < this.maxContextUpdateAttempts) {
+          console.log(`[DataChannelHandler] Will retry context update after error (attempt ${this.contextUpdateAttempts}/${this.maxContextUpdateAttempts})`);
+          
+          // Wait a moment before retrying
+          setTimeout(() => {
+            if (dataChannel.readyState === 'open') {
+              this.initiateContextUpdate(dataChannel);
+            }
+          }, 1000);
+        }
       });
     } catch (error) {
       console.error('[DataChannelHandler] Exception during context update initiation:', error);

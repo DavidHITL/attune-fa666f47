@@ -35,6 +35,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioPlaybackManager = useRef<AudioPlaybackManager | null>(null);
   const [contextLoaded, setContextLoaded] = useState(false);
+  const [contextLoadError, setContextLoadError] = useState<string | null>(null);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const maxConnectionAttempts = 3;
   
@@ -53,24 +54,40 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     };
   }, []);
 
-  // Pre-load user context before connection
-  useEffect(() => {
-    const preloadUserContext = async () => {
-      if (user?.id && !contextLoaded) {
+  // Ensure we continue even if context loading fails after timeout
+  const loadContextWithTimeout = useCallback(async () => {
+    if (!user?.id) {
+      console.log("[VoiceChat] No user ID available, proceeding as guest");
+      setContextLoaded(true);
+      return;
+    }
+    
+    try {
+      // Create a timeout promise to ensure we don't block forever
+      const timeoutPromise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          console.warn("[VoiceChat] Context loading timed out, proceeding anyway");
+          setContextLoadError("Context loading timed out");
+          resolve();
+        }, 5000); // 5 second timeout
+      });
+      
+      // Create the actual context loading promise
+      const loadPromise = async () => {
         try {
-          console.log(`[VoiceChat] Preloading user context for voice mode with userId: ${user.id}`);
+          console.log(`[VoiceChat] Preloading user context with userId: ${user.id}`);
           
-          // Get context summary
+          // Get context summary first (fast operation)
           const contextSummary = await getRecentContextSummary(user.id);
           if (contextSummary) {
             console.log("[VoiceChat] Context summary:", contextSummary);
           }
           
-          // Check if user has analysis results
+          // Check if user has analysis results (fast operation)
           const hasAnalysis = await doesAnalysisExist(user.id);
           console.log("[VoiceChat] User has analysis results:", hasAnalysis);
           
-          // Load full context
+          // Load full context (potentially slower)
           const userContext = await fetchUserContext(user.id);
           if (userContext) {
             console.log("[VoiceChat] User context loaded successfully:", {
@@ -80,36 +97,53 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
               knowledgeEntries: userContext.knowledgeEntries?.length || 0
             });
             
-            // Mark context as loaded
-            setContextLoaded(true);
-            
             // Show toast if we have previous context
             if (userContext.recentMessages && userContext.recentMessages.length > 0) {
               toast.success(`Loaded context from ${userContext.recentMessages.length} previous messages`);
             }
           } else {
-            // If no context was loaded, still mark as loaded to proceed
-            console.log("[VoiceChat] No user context available, proceeding anyway");
-            setContextLoaded(true);
+            console.log("[VoiceChat] No user context available");
+            setContextLoadError("No context available for user");
           }
         } catch (error) {
-          console.error("[VoiceChat] Error preloading user context:", error);
-          // Even on error, mark as loaded to allow the user to continue
-          setContextLoaded(true);
+          console.error("[VoiceChat] Error loading context:", error);
+          setContextLoadError(error instanceof Error ? error.message : "Unknown error loading context");
+          throw error;
         }
-      } else if (!user?.id) {
-        // No user, but still mark as loaded to proceed
-        console.log("[VoiceChat] No user ID available, proceeding without context");
-        setContextLoaded(true);
-      }
-    };
-    
-    preloadUserContext();
-  }, [user?.id, contextLoaded]);
+      };
+      
+      // Race between timeout and loading
+      await Promise.race([loadPromise(), timeoutPromise]);
+      
+      // Mark context as loaded regardless of outcome
+      // This ensures we can proceed even with partial or no context
+      setContextLoaded(true);
+    } catch (error) {
+      // Final fallback - proceed even if everything fails
+      console.error("[VoiceChat] Critical error in context loading:", error);
+      setContextLoaded(true); 
+      setContextLoadError("Failed to load user context");
+    }
+  }, [user?.id]);
+
+  // Pre-load user context before connection
+  useEffect(() => {
+    if (!contextLoaded) {
+      loadContextWithTimeout();
+    }
+  }, [contextLoaded, loadContextWithTimeout]);
 
   // Handle reconnection attempts
-  const handleConnectionError = useCallback(() => {
-    if (connectionAttempts < maxConnectionAttempts) {
+  const handleConnectionError = useCallback((error: any) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Check for userId related errors
+    if (errorMessage.includes("userId") || errorMessage.includes("context")) {
+      toast.error("Connection error: Unable to load user context");
+      console.error("[VoiceChat] Context-related error:", errorMessage);
+    } 
+    // Handle other connection errors
+    else if (connectionAttempts < maxConnectionAttempts) {
       const newAttemptCount = connectionAttempts + 1;
       setConnectionAttempts(newAttemptCount);
       toast.warning(`Connection failed. Attempting to reconnect (${newAttemptCount}/${maxConnectionAttempts})...`);
@@ -142,11 +176,19 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
   } = useWebRTCConnection({
     instructions: systemPrompt || "You are a helpful, conversational AI assistant. Maintain context from previous text chats.", 
     voice,
-    userId: user?.id, // Ensure userId is properly passed
-    autoConnect: contextLoaded && connectionAttempts === 0, // Only auto-connect after context is loaded and on first attempt
+    userId: user?.id, // Only pass userId if we have a logged in user
+    autoConnect: contextLoaded && connectionAttempts === 0 && !contextLoadError, // Auto-connect only when context is ready
     enableMicrophone: false,
     onError: handleConnectionError
   });
+
+  // Show warning if user tries to connect without userId
+  useEffect(() => {
+    if (contextLoaded && !user?.id && !connectionAttempts) {
+      console.warn("[VoiceChat] User is not logged in, continuing as guest");
+      toast.warning("Connecting in guest mode. Log in for personalized experience.");
+    }
+  }, [contextLoaded, connectionAttempts, user?.id]);
 
   // Log that we're entering voice mode when component mounts
   useEffect(() => {
@@ -164,10 +206,11 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
           sessionStarted: true
         }, systemPrompt, {
           contextLoaded,
-          connectionInitiated: new Date().toISOString()
+          connectionInitiated: new Date().toISOString(),
+          contextLoadError: contextLoadError || undefined
         });
       } else {
-        console.log("[VoiceChat] No user ID available for voice mode");
+        console.log("[VoiceChat] No user ID available for voice mode - using guest mode");
       }
     };
     
@@ -182,7 +225,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
         trackModeTransition('voice', 'text', user.id, currentTranscript).catch(console.error);
       }
     };
-  }, [user?.id, systemPrompt, currentTranscript, contextLoaded]);
+  }, [user?.id, systemPrompt, currentTranscript, contextLoaded, contextLoadError]);
 
   // Connect the audio playback manager to the WebRTC connection
   useEffect(() => {
@@ -229,30 +272,6 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
     }
   };
 
-  // Setup error handling for WebRTC errors
-  useEffect(() => {
-    // Add global error handler for WebRTC errors
-    const handleWebRTCError = (event: CustomEvent) => {
-      console.error("[VoiceChat] WebRTC error:", event.detail.error);
-      
-      // Show more helpful error message
-      if (event.detail.error.message?.includes("configuration timed out")) {
-        toast.error("Connection timed out. Please try again.");
-      } else if (event.detail.error.message?.includes("closed unexpectedly")) {
-        toast.error("Connection was closed unexpectedly. Please try again.");
-      } else {
-        toast.error(`Connection error: ${event.detail.error.message || "Unknown error"}`);
-      }
-    };
-
-    // Add event listener for custom WebRTC errors
-    window.addEventListener("webrtc-error", handleWebRTCError as EventListener);
-
-    return () => {
-      window.removeEventListener("webrtc-error", handleWebRTCError as EventListener);
-    };
-  }, []);
-
   return (
     <div className="flex flex-col space-y-4 w-full max-w-xl mx-auto p-4 bg-white rounded-lg shadow-md">
       {/* Loading indicator while context is loading */}
@@ -260,6 +279,20 @@ const VoiceChat: React.FC<VoiceChatProps> = ({
         <div className="flex justify-center items-center py-2">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
           <span className="ml-2 text-sm text-gray-600">Loading conversation context...</span>
+        </div>
+      )}
+      
+      {/* Context loading error message */}
+      {contextLoadError && contextLoaded && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-2 rounded-md text-sm">
+          <p>Continuing with limited context: {contextLoadError}</p>
+        </div>
+      )}
+      
+      {/* Guest mode warning */}
+      {contextLoaded && !user?.id && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded-md text-sm">
+          <p>Guest mode: Log in for a personalized experience.</p>
         </div>
       )}
       

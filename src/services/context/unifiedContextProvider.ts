@@ -1,3 +1,4 @@
+
 // Import only parts being modified to fix the userId error
 import { MessageMetadata } from "@/services/messages/messageUtils";
 import { enhanceInstructionsWithContext } from "./enhanceInstructions";
@@ -17,16 +18,15 @@ export async function getMinimalInstructions(
   try {
     // For a quick connection, just add some minimal context
     // This ensures the connection isn't blocked by heavy context loading
-    console.log(`[UnifiedContext] [Phase1] Getting minimal instructions for ${params.userId || 'anonymous'}`);
-    
-    // If we have a userId, add a slight enhancement to the base instructions
     if (params.userId) {
-      console.log(`[UnifiedContext] [Phase1] Adding user identifier ${params.userId.substring(0, 8)}... to instructions`);
+      console.log(`[UnifiedContext] [Phase1] Getting minimal instructions for user: ${params.userId.substring(0, 8)}...`);
+      // If we have a userId, add a slight enhancement to the base instructions
       return `${baseInstructions}\n\nYou are speaking with user ${params.userId.substring(0, 8)}... Additional context will be loaded shortly.`;
+    } else {
+      console.log(`[UnifiedContext] [Phase1] Getting minimal instructions for guest session (no userId)`);
+      // Return the basic instructions with a note about guest session
+      return `${baseInstructions}\n\nThis is a guest session with limited context.`;
     }
-    
-    // Return the basic instructions with a note about pending context
-    return baseInstructions;
   } catch (error) {
     console.error("[UnifiedContext] [ContextLoadError] [Phase1] Error getting minimal instructions:", error);
     // Even on error, return something rather than failing
@@ -48,42 +48,40 @@ export async function getUnifiedEnhancedInstructions(
   }
 ): Promise<string> {
   try {
-    console.log(`[UnifiedContext] [Phase2] Loading full context for ${params.userId || 'anonymous'}`);
-    
-    // Validate userId before proceeding - but don't block the process
-    if (!params.userId) {
-      console.warn("[UnifiedContext] [ContextLoadError] [Phase2] Missing userId in params - using basic instructions without context");
-      // Return original instructions if no userId without throwing error
-      return baseInstructions;
+    if (params.userId) {
+      console.log(`[UnifiedContext] [Phase2] Loading full context for user: ${params.userId.substring(0, 8)}...`);
+      
+      // Use the enhanceInstructionsWithContext function to add context to the instructions
+      // Add a timeout to prevent blocking if context enhancement takes too long
+      const enhancementPromise = enhanceInstructionsWithContext(baseInstructions, params.userId);
+      
+      // Set a timeout to prevent blocking
+      const timeoutPromise = new Promise<string>((resolve) => {
+        setTimeout(() => {
+          console.warn("[UnifiedContext] [ContextLoadError] [Phase2] Context enhancement timed out, using basic instructions");
+          resolve(baseInstructions);
+        }, 3000); // 3 second timeout (increased from 2.5s)
+      });
+      
+      // Race the enhancement against the timeout
+      const enhancedInstructions = await Promise.race([enhancementPromise, timeoutPromise]);
+      
+      // Log that we enhanced the instructions for this user
+      console.log(`[UnifiedContext] [Phase2] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
+      
+      // Log context verification without awaiting it
+      logContextVerification(params, baseInstructions).catch(err => {
+        // Don't let logging errors disrupt the main flow
+        console.error("[UnifiedContext] [ContextLoadError] Error in context verification logging:", err);
+      });
+      
+      return enhancedInstructions;
+    } else {
+      console.log("[UnifiedContext] [Phase2] No userId provided, using base instructions for guest mode");
+      
+      // For guest users without userId, just use the base instructions
+      return `${baseInstructions}\n\nThis is a guest session with limited personalization.`;
     }
-    
-    console.log(`[UnifiedContext] [Phase2] Beginning context enhancement for user ${params.userId}`);
-    
-    // Use the enhanceInstructionsWithContext function to add context to the instructions
-    // Add a timeout to prevent blocking if context enhancement takes too long
-    const enhancementPromise = enhanceInstructionsWithContext(baseInstructions, params.userId);
-    
-    // Set a timeout to prevent blocking
-    const timeoutPromise = new Promise<string>((resolve) => {
-      setTimeout(() => {
-        console.warn("[UnifiedContext] [ContextLoadError] [Phase2] Context enhancement timed out, using basic instructions");
-        resolve(baseInstructions);
-      }, 2500); // 2.5 second timeout
-    });
-    
-    // Race the enhancement against the timeout
-    const enhancedInstructions = await Promise.race([enhancementPromise, timeoutPromise]);
-    
-    // Log that we enhanced the instructions for this user
-    console.log(`[UnifiedContext] [Phase2] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
-    
-    // Log context verification without awaiting it
-    logContextVerification(params, baseInstructions).catch(err => {
-      // Don't let logging errors disrupt the main flow
-      console.error("[UnifiedContext] [ContextLoadError] Error in context verification logging:", err);
-    });
-    
-    return enhancedInstructions;
   } catch (error) {
     console.error("[UnifiedContext] [ContextLoadError] [Phase2] Error enhancing instructions with unified context:", error);
     // Return the original instructions if enhancement fails
@@ -218,14 +216,14 @@ export async function updateSessionWithFullContext(
       return false;
     }
     
-    // Check if we have a userId
-    if (!params.userId) {
-      console.warn("[UnifiedContext] [ContextLoadWarning] No userId provided for context update");
-    } else {
-      console.log(`[UnifiedContext] [Phase2] Loading full context for user: ${params.userId}`);
-    }
-    
     console.log("[UnifiedContext] [Phase2] Data channel is open, loading full context update");
+    
+    // Log whether we have a userId for context enrichment
+    if (params.userId) {
+      console.log(`[UnifiedContext] [Phase2] Loading full context for user: ${params.userId.substring(0, 8)}...`);
+    } else {
+      console.log("[UnifiedContext] [Phase2] No userId available - proceeding with guest session");
+    }
     
     try {
       // Get the enhanced instructions with full context
@@ -250,6 +248,8 @@ export async function updateSessionWithFullContext(
       if (dataChannel.readyState === 'open') {
         try {
           console.log("[UnifiedContext] [Phase2] Sending context update through data channel");
+          console.log("[UnifiedContext] [Phase2] Context size:", fullEnhancedInstructions.length, "characters");
+          
           dataChannel.send(JSON.stringify(contextUpdateMessage));
           
           // Create a promise that resolves on message acknowledgement or timeout
@@ -263,7 +263,7 @@ export async function updateSessionWithFullContext(
                 console.warn("[UnifiedContext] [Phase2] Data channel closed after sending context");
                 resolve(false);
               }
-            }, 500); // Small delay to ensure message is processed
+            }, 1000); // Increased delay to ensure message is processed
             
             // Also listen for a message that might indicate success
             const messageHandler = (event: MessageEvent) => {
@@ -286,7 +286,7 @@ export async function updateSessionWithFullContext(
               // Remove listener after timeout
               setTimeout(() => {
                 dataChannel.removeEventListener('message', messageHandler);
-              }, 2000);
+              }, 3000); // Increased timeout
             }
           });
           
