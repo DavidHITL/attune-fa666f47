@@ -8,7 +8,9 @@ export function useConnectionSetup(
   options: UseWebRTCConnectionOptions,
   setIsConnected: (isConnected: boolean) => void,
   setIsConnecting: (isConnecting: boolean) => void,
-  audioTrackRef: React.MutableRefObject<MediaStreamTrack | null>
+  audioTrackRef: React.MutableRefObject<MediaStreamTrack | null>,
+  handleConnectionStateChange: (state: RTCPeerConnectionState) => void,
+  handleConnectionError: (error: any) => void
 ) {
   // Initialize connector
   const initializeConnector = useCallback(() => {
@@ -23,25 +25,22 @@ export function useConnectionSetup(
           onMessage: options.onMessage,
           onConnectionStateChange: (state: RTCPeerConnectionState) => {
             console.log(`[useConnectionSetup] Connection state changed to: ${state}`);
+            handleConnectionStateChange(state);
             setIsConnected(state === "connected");
             setIsConnecting(state === "connecting");
-            
-            if (options.onError) {
-              // Forward the connection state change to the provided callback if it exists
-              options.onError(new Error(`Connection state changed to: ${state}`));
-            }
           },
-          onError: options.onError
+          onError: handleConnectionError
         });
         
         return true;
       } catch (error) {
         console.error("[useConnectionSetup] Error initializing WebRTCConnector:", error);
+        handleConnectionError(error);
         return false;
       }
     }
     return true;
-  }, [connectorRef, options, setIsConnected, setIsConnecting]);
+  }, [connectorRef, options, setIsConnected, setIsConnecting, handleConnectionStateChange, handleConnectionError]);
 
   const connect = useCallback(async () => {
     console.log("[useConnectionSetup] Connecting to WebRTC server");
@@ -65,10 +64,11 @@ export function useConnectionSetup(
       return success;
     } catch (error) {
       console.error("[useConnectionSetup] Error connecting:", error);
+      handleConnectionError(error);
       setIsConnecting(false);
       return false;
     }
-  }, [connectorRef, setIsConnecting, initializeConnector, audioTrackRef]);
+  }, [connectorRef, setIsConnecting, initializeConnector, audioTrackRef, handleConnectionError]);
 
   return { connect, initializeConnector };
 }

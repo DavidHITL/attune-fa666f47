@@ -72,13 +72,15 @@ export function useConnectionManager(
     }
   }, [options, handleMessage, handleConnectionStateChange, handleConnectionError]);
 
-  // Use connection setup hook
+  // Use connection setup hook - pass the necessary 7 arguments
   const { connect: setupConnect } = useConnectionSetup(
     connectorRef,
     options,
     setIsConnected,
     setIsConnecting,
-    audioTrackRef
+    audioTrackRef,
+    handleConnectionStateChange,  // added missing argument
+    handleConnectionError        // added as a named argument for clarity
   );
 
   // Use connection initiation hook
