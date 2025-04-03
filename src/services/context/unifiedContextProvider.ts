@@ -2,6 +2,7 @@
 // Import only parts being modified to fix the userId error
 import { MessageMetadata } from "@/services/messages/messageUtils";
 import { enhanceInstructionsWithContext } from "./enhanceInstructions";
+import { fetchUserContext } from "./index";
 
 /**
  * Get unified enhanced instructions with context
@@ -16,18 +17,25 @@ export async function getUnifiedEnhancedInstructions(
   }
 ): Promise<string> {
   try {
+    // Validate userId before proceeding
+    if (!params.userId) {
+      console.error("[UnifiedContext] Missing userId in params - cannot enhance instructions with context");
+      // Return original instructions if no userId
+      return baseInstructions;
+    }
+    
     // Use the enhanceInstructionsWithContext function to add context to the instructions
     const enhancedInstructions = await enhanceInstructionsWithContext(baseInstructions, params.userId);
     
     // Log that we enhanced the instructions for this user
-    console.log(`Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
+    console.log(`[UnifiedContext] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
     
     // Log context verification
     await logContextVerification(params, baseInstructions);
     
     return enhancedInstructions;
   } catch (error) {
-    console.error("Error enhancing instructions with unified context:", error);
+    console.error("[UnifiedContext] Error enhancing instructions with unified context:", error);
     // Return the original instructions if enhancement fails
     return baseInstructions;
   }
@@ -43,12 +51,17 @@ export async function trackModeTransition(
   transcript?: string
 ): Promise<void> {
   try {
-    console.log(`Mode transition from ${fromMode} to ${toMode} for user ${userId}`);
+    if (!userId) {
+      console.error("[UnifiedContext] Cannot track mode transition: No userId provided");
+      return;
+    }
+    
+    console.log(`[UnifiedContext] Mode transition from ${fromMode} to ${toMode} for user ${userId}`);
     
     // Additional implementation can be added as needed
     
   } catch (error) {
-    console.error("Error tracking mode transition:", error);
+    console.error("[UnifiedContext] Error tracking mode transition:", error);
   }
 }
 
@@ -66,11 +79,28 @@ export async function logContextVerification(
   additionalContext?: Record<string, any>
 ): Promise<void> {
   try {
-    // Implementation logic for logging context verification
-    console.log(`Context verification for ${params.userId} in ${params.activeMode} mode`);
+    if (!params.userId) {
+      console.error("[UnifiedContext] Cannot log context verification: No userId provided");
+      return;
+    }
+    
+    // Fetch context to verify what was loaded
+    const contextData = await fetchUserContext(params.userId);
+    
+    // Log context verification with detailed information
+    console.log(`[UnifiedContext] Context verification for ${params.userId} in ${params.activeMode} mode:`, {
+      hasContext: !!contextData,
+      messageCount: contextData?.recentMessages?.length || 0,
+      hasInstructions: !!contextData?.userInstructions,
+      knowledgeEntryCount: contextData?.knowledgeEntries?.length || 0,
+      hasUserDetails: !!contextData?.userDetails,
+      hasCriticalInfo: Array.isArray(contextData?.criticalInformation) && contextData?.criticalInformation.length > 0,
+      hasAnalysisResults: !!contextData?.analysisResults,
+      ...additionalContext
+    });
     
   } catch (error) {
-    console.error("Error logging context verification:", error);
+    console.error("[UnifiedContext] Error logging context verification:", error);
   }
 }
 
@@ -81,10 +111,22 @@ export async function getRecentContextSummary(
   userId: string
 ): Promise<string | null> {
   try {
-    // Implementation for getting context summary
-    return `Context summary for user ${userId}`;
+    if (!userId) {
+      console.error("[UnifiedContext] Cannot get context summary: No userId provided");
+      return null;
+    }
+    
+    const contextData = await fetchUserContext(userId);
+    if (!contextData) {
+      return "No context available.";
+    }
+    
+    return `Context summary: ${contextData.recentMessages.length} messages, ` +
+      `${contextData.knowledgeEntries?.length || 0} knowledge entries, ` +
+      `${contextData.userDetails ? "has user details" : "no user details"}, ` +
+      `${contextData.analysisResults ? "has analysis" : "no analysis"}`;
   } catch (error) {
-    console.error("Error getting context summary:", error);
+    console.error("[UnifiedContext] Error getting context summary:", error);
     return null;
   }
 }

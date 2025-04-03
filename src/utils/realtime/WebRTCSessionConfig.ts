@@ -2,6 +2,7 @@
 import { WebRTCOptions } from "./WebRTCTypes";
 import { getUnifiedEnhancedInstructions } from "@/services/context/unifiedContextProvider";
 import { supabase } from "@/integrations/supabase/client";
+import { prepareContextData } from "@/services/response/contextPreparation";
 
 /**
  * Get base instructions from AI configuration table
@@ -45,22 +46,48 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     
     // Check if we have a userId before attempting to get enhanced instructions
     if (!options.userId) {
-      console.warn("[WebRTCSessionConfig] No userId provided, using base instructions only");
+      console.error("[WebRTCSessionConfig] No userId provided, cannot load full context. Using basic instructions only.");
     } else {
       console.log(`[WebRTCSessionConfig] Using userId for enhanced instructions: ${options.userId}`);
     }
     
-    // Enhance instructions with context, using unified context provider
-    const enhancedInstructions = await getUnifiedEnhancedInstructions(
-      options.instructions || baseInstructions,
-      {
-        userId: options.userId,
-        activeMode: 'voice',
-        sessionStarted: true
-      }
-    );
-
-    console.log("[WebRTCSessionConfig] Using enhanced instructions with unified context");
+    // Prepare the full context data if userId is available
+    let contextData = null;
+    let enhancedInstructions = baseInstructions;
+    
+    if (options.userId) {
+      // Fetch and prepare the full context data
+      contextData = await prepareContextData(options.userId);
+      
+      // Enhance instructions with context using unified context provider
+      enhancedInstructions = await getUnifiedEnhancedInstructions(
+        options.instructions || baseInstructions,
+        {
+          userId: options.userId,
+          activeMode: 'voice',
+          sessionStarted: true
+        }
+      );
+      
+      console.log("[WebRTCSessionConfig] Successfully loaded enhanced instructions with full context");
+    }
+    
+    // Build the context payload for debugging and verification
+    const contextPayload = {
+      instructions: enhancedInstructions,
+      hasFullContext: !!contextData,
+      contextStats: contextData ? {
+        messageCount: contextData.recentMessages?.length || 0,
+        therapyConceptCount: contextData.therapyConcepts?.length || 0,
+        therapySourceCount: contextData.therapySources?.length || 0,
+        hasUserDetails: !!contextData.userDetails,
+        hasCriticalInformation: Array.isArray(contextData.criticalInformation) && contextData.criticalInformation.length > 0,
+        hasAnalysisResults: !!contextData.analysisResults
+      } : null
+    };
+    
+    // Log the context payload for debugging (with sensitive data removed)
+    console.log("[WebRTCSessionConfig] Final context payload:", JSON.stringify(contextPayload, null, 2));
     
     // Send session configuration to OpenAI
     const sessionConfig = {
@@ -95,7 +122,10 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
       }
     };
     
-    console.log("[WebRTCSessionConfig] Sending session configuration with enhanced context");
+    console.log("[WebRTCSessionConfig] Sending session configuration with context stats:", 
+      contextData ? `${contextData.recentMessages?.length || 0} messages, ` +
+      `${(contextData.therapyConcepts?.length || 0) + (contextData.therapySources?.length || 0)} knowledge entries` : 
+      "No context data available");
     
     // Send the configuration
     dc.send(JSON.stringify(sessionConfig));

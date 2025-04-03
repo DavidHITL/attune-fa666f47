@@ -14,15 +14,18 @@ export const prepareContextData = async (userId?: string): Promise<ApiContextDat
     userId = session?.user?.id;
     
     if (!userId) {
-      console.log("[contextPreparation] No user ID available");
+      console.error("[contextPreparation] No valid userId available for context preparation");
       return null;
     }
   }
+  
+  console.log(`[contextPreparation] Preparing context data for user: ${userId}`);
   
   // Fetch context data for the AI using the userId
   const contextData = await fetchUserContext(userId);
   
   if (!contextData) {
+    console.warn(`[contextPreparation] Failed to retrieve context data for user: ${userId}`);
     return null;
   }
   
@@ -35,10 +38,11 @@ export const prepareContextData = async (userId?: string): Promise<ApiContextDat
   }, undefined, {
     contextDataSize: JSON.stringify(contextData).length,
     messageCount: contextData.recentMessages.length,
-    knowledgeEntries: contextData.knowledgeEntries?.length || 0
+    knowledgeEntries: contextData.knowledgeEntries?.length || 0,
+    contextSource: "API context preparation"
   });
   
-  // Log context data being used (helpful for debugging)
+  // Log detailed context data being used (helpful for debugging)
   console.log("[contextPreparation] Context data prepared:", {
     historyLength: contextData.recentMessages.length,
     hasInstructions: !!contextData.userInstructions,

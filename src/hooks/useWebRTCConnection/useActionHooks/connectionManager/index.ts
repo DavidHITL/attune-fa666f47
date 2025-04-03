@@ -72,7 +72,7 @@ export function useConnectionManager(
     }
   }, [options, handleMessage, handleConnectionStateChange, handleConnectionError]);
 
-  // Use connection setup hook - pass all 7 required arguments
+  // Use connection setup hook - explicitly pass all 7 required arguments
   const { connect: setupConnect, initializeConnector } = useConnectionSetup(
     connectorRef,
     options,
