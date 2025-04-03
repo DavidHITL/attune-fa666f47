@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
@@ -133,7 +134,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * Handle connection state changes and trigger reconnection if needed
    * @param state The new connection state
    */
-  private handleConnectionStateChange(state: RTCPeerConnectionState): void {
+  protected handleConnectionStateChange(state: RTCPeerConnectionState): void {
     console.log("[WebRTCConnectionManager] [ConnectionState] Connection state changed:", state);
     this.connectionStateManager.setConnectionState(state);
     
@@ -196,7 +197,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   /**
    * Handle errors in the WebRTC connection
    */
-  private handleError(error: any): void {
+  protected handleError(error: any): void {
     console.error("[WebRTCConnectionManager] [ConnectionError] Error occurred:", error);
     
     // Dispatch custom error event for global handling
