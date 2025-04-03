@@ -42,6 +42,8 @@ export interface UseWebRTCConnectionOptions {
   autoConnect?: boolean;
   enableMicrophone?: boolean;
   onError?: (error: Error) => void;
+  onMessage?: (event: MessageEvent) => void;
+  onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
 }
 
 // Define the result type for the useWebRTCConnection hook

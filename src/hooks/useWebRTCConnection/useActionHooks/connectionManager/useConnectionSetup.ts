@@ -21,15 +21,14 @@ export function useConnectionSetup(
           instructions: options.instructions,
           userId: options.userId,
           onMessage: options.onMessage,
-          // Previously we were using onTrack which doesn't exist in UseWebRTCConnectionOptions
-          // Handle this consistently with how it's used elsewhere
           onConnectionStateChange: (state: RTCPeerConnectionState) => {
             console.log(`[useConnectionSetup] Connection state changed to: ${state}`);
             setIsConnected(state === "connected");
             setIsConnecting(state === "connecting");
             
-            if (options.onConnectionStateChange) {
-              options.onConnectionStateChange(state);
+            if (options.onError) {
+              // Forward the connection state change to the provided callback if it exists
+              options.onError(new Error(`Connection state changed to: ${state}`));
             }
           },
           onError: options.onError
