@@ -1,6 +1,8 @@
+
 import { TextMessageSender } from "./TextMessageSender";
 import { AudioSender } from "./AudioSender";
 import { updateSessionWithFullContext } from "@/services/context/unifiedContextProvider";
+import { debounce } from "@/utils/debounce";
 
 /**
  * Handles data channel operations
@@ -17,6 +19,8 @@ export class DataChannelHandler {
   private maxReconnectAttempts: number = 3;
   private userId?: string;
   private baseInstructions?: string;
+  private contextUpdateSent: boolean = false;
+  private channelClosingIntentionally: boolean = false;
 
   constructor() {
     this.dataChannelReady = false;
@@ -38,6 +42,13 @@ export class DataChannelHandler {
   }
   
   /**
+   * Reset the context update status
+   */
+  resetContextUpdateStatus(): void {
+    this.contextUpdateSent = false;
+  }
+  
+  /**
    * Set the data channel
    */
   setDataChannel(dataChannel: RTCDataChannel | null, onError?: (error: any) => void): void {
@@ -50,6 +61,8 @@ export class DataChannelHandler {
       return;
     }
     
+    // Reset channel closing flag when setting a new channel
+    this.channelClosingIntentionally = false;
     this.dataChannel = dataChannel;
     this.onError = onError || null;
     this.reconnectAttempts = 0;
@@ -83,24 +96,26 @@ export class DataChannelHandler {
       
       dataChannel.onclose = () => {
         // Check if closure was unexpected
-        const wasUnexpected = this.dataChannelReady;
-        console.warn(`[DataChannelHandler] Data channel '${dataChannel.label}' closed ${wasUnexpected ? 'unexpectedly' : 'as expected'}`);
+        const wasIntentional = this.channelClosingIntentionally;
+        console.warn(`[DataChannelHandler] Data channel '${dataChannel.label}' closed ${wasIntentional ? 'intentionally' : 'unexpectedly'}`);
         
         this.dataChannelReady = false;
         
-        // Only report as error if it was previously ready
-        if (wasUnexpected) {
+        // Only report as error if it was not an intentional closure and was previously ready
+        if (!wasIntentional && this.dataChannelReady) {
           if (this.onError) {
             this.onError(new Error(`Data channel '${dataChannel.label}' closed unexpectedly`));
           }
-        } else if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        } else if (!wasIntentional && this.reconnectAttempts < this.maxReconnectAttempts) {
           // Attempt to recover if we haven't exceeded max attempts
           this.reconnectAttempts++;
           console.log(`[DataChannelHandler] Attempting recovery (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
           
           // The WebRTCConnectionManager should handle reconnection logic
-          // so we don't need to do anything specific here
         }
+        
+        // Reset the intentional closing flag
+        this.channelClosingIntentionally = false;
       };
       
       // Track when the data channel actually opens
@@ -118,7 +133,7 @@ export class DataChannelHandler {
         this.reconnectAttempts = 0;
         
         // If we have user ID and base instructions, trigger Phase 2 context loading
-        if (this.userId && this.baseInstructions && dataChannel.label === 'data') {
+        if (this.userId && this.baseInstructions && dataChannel.label === 'data' && !this.contextUpdateSent) {
           console.log('[DataChannelHandler] Data channel open event - triggering context update');
           this.initiateContextUpdate(dataChannel);
         }
@@ -132,7 +147,7 @@ export class DataChannelHandler {
             console.log(`[DataChannelHandler] Received ${message.type} - session is ready`);
             
             // If we haven't done the context update yet and we have user info, do it now
-            if (this.userId && this.baseInstructions && dataChannel.label === 'data') {
+            if (!this.contextUpdateSent && this.userId && this.baseInstructions && dataChannel.label === 'data') {
               // Wait a brief moment to ensure session is fully initialized
               setTimeout(() => {
                 this.initiateContextUpdate(dataChannel);
@@ -150,7 +165,7 @@ export class DataChannelHandler {
       this.reconnectAttempts = 0;
       
       // If we have user ID and base instructions, trigger Phase 2 context loading
-      if (this.userId && this.baseInstructions && dataChannel.label === 'data') {
+      if (this.userId && this.baseInstructions && dataChannel.label === 'data' && !this.contextUpdateSent) {
         console.log('[DataChannelHandler] Data channel already open - triggering immediate context update');
         this.initiateContextUpdate(dataChannel);
       }
@@ -161,31 +176,53 @@ export class DataChannelHandler {
    * Initiate context update for Phase 2
    */
   private initiateContextUpdate(dataChannel: RTCDataChannel): void {
-    if (!this.userId || !this.baseInstructions) return;
+    if (!this.userId || !this.baseInstructions || this.contextUpdateSent) {
+      return;
+    }
     
-    // Only update context once
+    // Mark that we're sending the context update
     const userId = this.userId;
     const baseInstructions = this.baseInstructions;
     
-    // Clear these values so we don't try to update again
-    this.userId = undefined;
-    this.baseInstructions = undefined;
-    
     console.log('[DataChannelHandler] Initiating context update (Phase 2)');
     
-    // Update session with full context
-    updateSessionWithFullContext(
-      dataChannel,
-      baseInstructions,
-      {
-        userId: userId,
-        activeMode: 'voice',
-        sessionStarted: true
-      }
-    ).catch(error => {
-      console.error('[DataChannelHandler] Error during context update:', error);
-      // Don't propagate the error - this is a background operation
-    });
+    // Use a try-catch block to handle potential errors during context update
+    try {
+      // Update session with full context
+      updateSessionWithFullContext(
+        dataChannel,
+        baseInstructions,
+        {
+          userId: userId,
+          activeMode: 'voice',
+          sessionStarted: true
+        }
+      ).then(success => {
+        // Mark update as sent only after successful completion
+        if (success) {
+          console.log('[DataChannelHandler] Context update sent successfully');
+          this.contextUpdateSent = true;
+        } else {
+          console.error('[DataChannelHandler] Context update failed');
+        }
+      }).catch(error => {
+        console.error('[DataChannelHandler] Error during context update:', error);
+        // Don't propagate the error - this is a background operation
+      });
+    } catch (error) {
+      console.error('[DataChannelHandler] Exception during context update initiation:', error);
+    }
+  }
+  
+  /**
+   * Close the data channel explicitly, marking it as an intentional closure
+   */
+  closeDataChannel(): void {
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      console.log(`[DataChannelHandler] Intentionally closing data channel '${this.dataChannel.label}'`);
+      this.channelClosingIntentionally = true;
+      this.dataChannel.close();
+    }
   }
   
   /**
@@ -242,7 +279,7 @@ export class DataChannelHandler {
   }
   
   /**
-   * Send a text message to OpenAI
+   * Send a text message to OpenAI with improved error handling
    */
   sendTextMessage(text: string, handleError: (error: any) => void): boolean {
     if (!this.dataChannel || !this.dataChannelReady || this.dataChannel.readyState !== "open") {
@@ -327,13 +364,18 @@ export class DataChannelHandler {
       this.commitDebounceTimeout = null;
     }
     
-    // Don't explicitly close the data channel here, just remove our reference to it
-    // This prevents premature closure which can result in "User-Initiated Abort" errors
+    // Mark that we're intentionally closing if we still have a channel
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      this.channelClosingIntentionally = true;
+      // We don't explicitly close here, as the PeerConnection will handle this
+    }
+    
     console.log("[DataChannelHandler] Cleaning up references (but not closing data channel)");
     this.dataChannel = null;
     this.dataChannelReady = false;
     this.reconnectAttempts = 0;
     this.userId = undefined;
     this.baseInstructions = undefined;
+    this.contextUpdateSent = false;
   }
 }

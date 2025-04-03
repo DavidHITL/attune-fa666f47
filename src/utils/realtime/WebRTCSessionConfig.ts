@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "./WebRTCTypes";
 import { getMinimalInstructions, getUnifiedEnhancedInstructions, updateSessionWithFullContext } from "@/services/context/unifiedContextProvider";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +38,7 @@ async function getBaseInstructions(): Promise<string> {
 export async function configureSession(dc: RTCDataChannel, options: WebRTCOptions): Promise<void> {
   console.log("[WebRTCSessionConfig] Phase 1: Configuring initial session");
   
+  // Validate data channel state
   if (dc.readyState !== "open") {
     console.error(`[WebRTCSessionConfig] [DataChannelError] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
     throw new Error(`Data channel not open (state: ${dc.readyState})`);
@@ -97,8 +99,19 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     try {
       // Double-check that the data channel is still open before sending
       if (dc.readyState === "open") {
+        // Set up error handler for data channel
+        const errorHandler = (event: Event) => {
+          console.error("[WebRTCSessionConfig] [DataChannelError] Error during session configuration:", event);
+          dc.removeEventListener('error', errorHandler);
+        };
+        dc.addEventListener('error', errorHandler);
+        
+        // Send initial configuration
         dc.send(JSON.stringify(initialSessionConfig));
         console.log("[WebRTCSessionConfig] Phase 1: Initial session configuration sent successfully");
+        
+        // Remove error handler after successful send
+        dc.removeEventListener('error', errorHandler);
       } else {
         console.error(`[WebRTCSessionConfig] [DataChannelError] Data channel state changed to ${dc.readyState} before sending initial config`);
         throw new Error(`Data channel state changed to ${dc.readyState} before sending initial config`);

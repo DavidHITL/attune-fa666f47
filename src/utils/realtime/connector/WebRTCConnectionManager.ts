@@ -84,6 +84,8 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
       console.log(`[WebRTCConnectionManager] [UserContext] User ID: ${this.options.userId}`);
       this.dataChannelHandler.setUserId(this.options.userId);
       this.dataChannelHandler.setBaseInstructions(this.options.instructions);
+      // Reset the context update status
+      this.dataChannelHandler.resetContextUpdateStatus();
     } else {
       console.log("[WebRTCConnectionManager] [UserContext] No userId available for context loading");
     }
@@ -267,14 +269,17 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.reconnectionHandler.reset();
     this.timeoutManager.clearTimeout();
     this.connectionEstablisher.cleanup();
+    
+    // Mark data channel as intentionally closing before we close it
+    if (this.dataChannelHandler.getDataChannel()) {
+      this.dataChannelHandler.closeDataChannel();
+    }
+    
     this.dataChannelHandler.setDataChannelReady(false);
     this.dataChannelHandler.cleanup();
     
     // Reset session configuration
     this.sessionManager.reset();
-    
-    // Clean up data channel
-    this.dataChannelHandler.setDataChannel(null);
     
     // Clean up connection resources
     this.connectionStateManager.cleanupConnectionResources();

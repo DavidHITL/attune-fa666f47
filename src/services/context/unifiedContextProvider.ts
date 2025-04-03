@@ -1,4 +1,3 @@
-
 // Import only parts being modified to fix the userId error
 import { MessageMetadata } from "@/services/messages/messageUtils";
 import { enhanceInstructionsWithContext } from "./enhanceInstructions";
@@ -213,6 +212,7 @@ export async function updateSessionWithFullContext(
   }
 ): Promise<boolean> {
   try {
+    // Early validation checks
     if (dataChannel.readyState !== 'open') {
       console.warn("[UnifiedContext] [DataChannelError] Cannot update context: Data channel not open, state:", dataChannel.readyState);
       return false;
@@ -240,18 +240,61 @@ export async function updateSessionWithFullContext(
       // Send the context update message through the data channel
       const contextUpdateMessage = {
         type: "session.update",
+        event_id: `session_update_${Date.now()}`,
         session: {
           instructions: fullEnhancedInstructions
         }
       };
       
-      // Verify the channel is still open before attempting to send
+      // Double-check the channel is still open before attempting to send
       if (dataChannel.readyState === 'open') {
-        console.log("[UnifiedContext] [Phase2] Sending context update through data channel");
-        dataChannel.send(JSON.stringify(contextUpdateMessage));
-        
-        console.log("[UnifiedContext] [Phase2] Full context update sent successfully");
-        return true;
+        try {
+          console.log("[UnifiedContext] [Phase2] Sending context update through data channel");
+          dataChannel.send(JSON.stringify(contextUpdateMessage));
+          
+          // Create a promise that resolves on message acknowledgement or timeout
+          const contextUpdateSuccessful = await new Promise<boolean>((resolve) => {
+            // We'll resolve after a short timeout as there's no direct ack
+            setTimeout(() => {
+              if (dataChannel.readyState === 'open') {
+                console.log("[UnifiedContext] [Phase2] Full context update sent successfully");
+                resolve(true);
+              } else {
+                console.warn("[UnifiedContext] [Phase2] Data channel closed after sending context");
+                resolve(false);
+              }
+            }, 500); // Small delay to ensure message is processed
+            
+            // Also listen for a message that might indicate success
+            const messageHandler = (event: MessageEvent) => {
+              try {
+                const response = JSON.parse(event.data);
+                if (response.type === 'session.updated') {
+                  console.log("[UnifiedContext] [Phase2] Received session.updated confirmation");
+                  dataChannel.removeEventListener('message', messageHandler);
+                  resolve(true);
+                }
+              } catch (e) {
+                // Ignore parsing errors
+              }
+            };
+            
+            // Only add listener if channel is open
+            if (dataChannel.readyState === 'open') {
+              dataChannel.addEventListener('message', messageHandler);
+              
+              // Remove listener after timeout
+              setTimeout(() => {
+                dataChannel.removeEventListener('message', messageHandler);
+              }, 2000);
+            }
+          });
+          
+          return contextUpdateSuccessful;
+        } catch (error) {
+          console.error("[UnifiedContext] [DataChannelError] Error sending context through data channel:", error);
+          return false;
+        }
       } else {
         console.warn(`[UnifiedContext] [DataChannelError] Data channel closed (${dataChannel.readyState}) before context could be sent`);
         return false;
