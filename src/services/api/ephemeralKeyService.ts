@@ -27,14 +27,14 @@ export async function getEphemeralKey(options: {
     // Verify we have an authenticated session before making the request
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     
+    // Still proceed even if there's no authenticated session
+    // This allows anonymous sessions to work
     if (sessionError) {
-      console.error("[ephemeralKeyService] Session error:", sessionError);
-      throw new Error(`Authentication error: ${sessionError.message}`);
+      console.warn("[ephemeralKeyService] Auth session warning (proceeding anyway):", sessionError);
     }
     
     if (!sessionData?.session) {
-      console.error("[ephemeralKeyService] No active session found");
-      throw new Error("No active authentication session found");
+      console.warn("[ephemeralKeyService] No active session found, proceeding with anonymous access");
     }
     
     // Default parameters for the token request
@@ -48,11 +48,12 @@ export async function getEphemeralKey(options: {
       JSON.stringify({
         model: params.model,
         voice: params.voice, 
-        hasInstructions: !!params.instructions
+        hasInstructions: !!params.instructions,
+        isAuthenticated: !!sessionData?.session
       })
     );
     
-    // Now make the request with the authenticated session
+    // Now make the request, with or without an authenticated session
     const { data, error } = await supabase.functions.invoke('generate-ephemeral-key', {
       body: params
     });
@@ -81,7 +82,7 @@ export async function getEphemeralKey(options: {
     return data.client_secret.value;
   } catch (error) {
     console.error("[ephemeralKeyService] Exception getting ephemeral key:", error);
-    toast.error(`Authentication error: Please make sure you're signed in and try again.`);
+    toast.error(`Connection error: Please try again in a moment.`);
     throw new Error(`Failed to get ephemeral key: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -112,7 +113,6 @@ export async function withSecureOpenAI<T>(
     return await apiCallback(ephemeralKey);
   } catch (error) {
     console.error("[ephemeralKeyService] Error in secure API call:", error);
-    toast.error("Authentication failed. Please sign in again.");
     throw new Error(`Secure API call failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

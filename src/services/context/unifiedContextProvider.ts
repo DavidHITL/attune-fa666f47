@@ -17,7 +17,7 @@ export async function getUnifiedEnhancedInstructions(
   }
 ): Promise<string> {
   try {
-    // Validate userId before proceeding
+    // Validate userId before proceeding - but don't block the process
     if (!params.userId) {
       console.warn("[UnifiedContext] Missing userId in params - using basic instructions without context");
       // Return original instructions if no userId without throwing error
@@ -25,13 +25,25 @@ export async function getUnifiedEnhancedInstructions(
     }
     
     // Use the enhanceInstructionsWithContext function to add context to the instructions
-    const enhancedInstructions = await enhanceInstructionsWithContext(baseInstructions, params.userId);
+    // Add a timeout to prevent blocking if context enhancement takes too long
+    const enhancementPromise = enhanceInstructionsWithContext(baseInstructions, params.userId);
+    
+    // Set a timeout to prevent blocking
+    const timeoutPromise = new Promise<string>((resolve) => {
+      setTimeout(() => {
+        console.warn("[UnifiedContext] Context enhancement timed out, using basic instructions");
+        resolve(baseInstructions);
+      }, 2500); // 2.5 second timeout
+    });
+    
+    // Race the enhancement against the timeout
+    const enhancedInstructions = await Promise.race([enhancementPromise, timeoutPromise]);
     
     // Log that we enhanced the instructions for this user
     console.log(`[UnifiedContext] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
     
-    // Log context verification
-    await logContextVerification(params, baseInstructions).catch(err => {
+    // Log context verification without awaiting it
+    logContextVerification(params, baseInstructions).catch(err => {
       // Don't let logging errors disrupt the main flow
       console.error("[UnifiedContext] Error in context verification logging:", err);
     });
@@ -88,8 +100,14 @@ export async function logContextVerification(
       return;
     }
     
-    // Fetch context to verify what was loaded
-    const contextData = await fetchUserContext(params.userId);
+    // Fetch context to verify what was loaded - with a timeout
+    const contextPromise = fetchUserContext(params.userId);
+    const timeoutPromise = new Promise<null>((_, resolve) => {
+      setTimeout(() => resolve(null), 1500);
+    });
+    
+    const contextData = await Promise.race([contextPromise, timeoutPromise])
+      .catch(() => null); // Catch any errors and continue
     
     // Log context verification with detailed information
     console.log(`[UnifiedContext] Context verification for ${params.userId} in ${params.activeMode} mode:`, {
@@ -121,12 +139,21 @@ export async function getRecentContextSummary(
       return null;
     }
     
-    const contextData = await fetchUserContext(userId);
+    // Add a timeout to prevent blocking
+    const contextPromise = fetchUserContext(userId);
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 2000);
+    });
+    
+    // Race the context fetching against the timeout
+    const contextData = await Promise.race([contextPromise, timeoutPromise])
+      .catch(() => null);
+      
     if (!contextData) {
-      return "No context available.";
+      return "No context available or timed out loading context.";
     }
     
-    return `Context summary: ${contextData.recentMessages.length} messages, ` +
+    return `Context summary: ${contextData.recentMessages?.length || 0} messages, ` +
       `${contextData.knowledgeEntries?.length || 0} knowledge entries, ` +
       `${contextData.userDetails ? "has user details" : "no user details"}, ` +
       `${contextData.analysisResults ? "has analysis" : "no analysis"}`;
