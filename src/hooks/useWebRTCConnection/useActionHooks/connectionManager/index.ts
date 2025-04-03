@@ -46,11 +46,12 @@ export function useConnectionManager(
   // Use connection state handler
   const { handleConnectionStateChange } = useConnectionStateHandler(
     isConnected,
+    connectorRef,
     options,
     setIsConnected,
     setIsConnecting,
     () => disconnect(),
-    toggleMicrophone,
+    toggleMicrophone
   );
 
   // Create a function to create and configure connector

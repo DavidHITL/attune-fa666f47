@@ -19,8 +19,8 @@ export async function getUnifiedEnhancedInstructions(
   try {
     // Validate userId before proceeding
     if (!params.userId) {
-      console.error("[UnifiedContext] Missing userId in params - cannot enhance instructions with context");
-      // Return original instructions if no userId
+      console.warn("[UnifiedContext] Missing userId in params - using basic instructions without context");
+      // Return original instructions if no userId without throwing error
       return baseInstructions;
     }
     
@@ -31,7 +31,10 @@ export async function getUnifiedEnhancedInstructions(
     console.log(`[UnifiedContext] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
     
     // Log context verification
-    await logContextVerification(params, baseInstructions);
+    await logContextVerification(params, baseInstructions).catch(err => {
+      // Don't let logging errors disrupt the main flow
+      console.error("[UnifiedContext] Error in context verification logging:", err);
+    });
     
     return enhancedInstructions;
   } catch (error) {
@@ -52,7 +55,7 @@ export async function trackModeTransition(
 ): Promise<void> {
   try {
     if (!userId) {
-      console.error("[UnifiedContext] Cannot track mode transition: No userId provided");
+      console.warn("[UnifiedContext] Cannot track mode transition: No userId provided");
       return;
     }
     
@@ -62,6 +65,7 @@ export async function trackModeTransition(
     
   } catch (error) {
     console.error("[UnifiedContext] Error tracking mode transition:", error);
+    // Swallow error, don't let it propagate
   }
 }
 
@@ -80,7 +84,7 @@ export async function logContextVerification(
 ): Promise<void> {
   try {
     if (!params.userId) {
-      console.error("[UnifiedContext] Cannot log context verification: No userId provided");
+      console.warn("[UnifiedContext] Cannot log context verification: No userId provided");
       return;
     }
     
@@ -101,6 +105,7 @@ export async function logContextVerification(
     
   } catch (error) {
     console.error("[UnifiedContext] Error logging context verification:", error);
+    // Don't let this error propagate
   }
 }
 
@@ -112,7 +117,7 @@ export async function getRecentContextSummary(
 ): Promise<string | null> {
   try {
     if (!userId) {
-      console.error("[UnifiedContext] Cannot get context summary: No userId provided");
+      console.warn("[UnifiedContext] Cannot get context summary: No userId provided");
       return null;
     }
     

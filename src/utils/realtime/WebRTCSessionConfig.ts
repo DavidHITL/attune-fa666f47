@@ -44,32 +44,55 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     // Get base instructions from configuration
     const baseInstructions = await getBaseInstructions();
     
-    // Check if we have a userId before attempting to get enhanced instructions
-    if (!options.userId) {
-      console.error("[WebRTCSessionConfig] No userId provided, cannot load full context. Using basic instructions only.");
+    // Initialize with base instructions and prepare to enhance if userId is available
+    let enhancedInstructions = options.instructions || baseInstructions;
+    let contextData = null;
+    let userIdPresent = !!options.userId;
+    
+    // Log userId availability
+    if (!userIdPresent) {
+      console.warn("[WebRTCSessionConfig] No userId provided, cannot load full context. Using basic instructions only.");
     } else {
       console.log(`[WebRTCSessionConfig] Using userId for enhanced instructions: ${options.userId}`);
     }
     
-    // Prepare the full context data if userId is available
-    let contextData = null;
-    let enhancedInstructions = baseInstructions;
-    
-    if (options.userId) {
-      // Fetch and prepare the full context data
-      contextData = await prepareContextData(options.userId);
-      
-      // Enhance instructions with context using unified context provider
-      enhancedInstructions = await getUnifiedEnhancedInstructions(
-        options.instructions || baseInstructions,
-        {
-          userId: options.userId,
-          activeMode: 'voice',
-          sessionStarted: true
-        }
-      );
-      
-      console.log("[WebRTCSessionConfig] Successfully loaded enhanced instructions with full context");
+    // Safely attempt to enhance instructions if userId is available
+    // This approach prevents blocking if context loading fails
+    if (userIdPresent) {
+      try {
+        // Prepare the context data with timeout protection
+        const contextPromise = prepareContextData(options.userId);
+        
+        // Apply a timeout to prevent blocking too long
+        const timeoutPromise = new Promise<null>((_, reject) => {
+          setTimeout(() => reject(new Error("Context preparation timed out")), 3000);
+        });
+        
+        // Race the context loading against the timeout
+        contextData = await Promise.race([contextPromise, timeoutPromise])
+          .catch(err => {
+            console.warn("[WebRTCSessionConfig] Context preparation issue:", err.message);
+            return null; // Continue without context if it times out or fails
+          });
+        
+        // Only enhance if we have a valid userId (even if context failed)
+        enhancedInstructions = await getUnifiedEnhancedInstructions(
+          enhancedInstructions,
+          {
+            userId: options.userId,
+            activeMode: 'voice',
+            sessionStarted: true
+          }
+        ).catch(err => {
+          console.warn("[WebRTCSessionConfig] Failed to enhance instructions:", err);
+          return enhancedInstructions; // Fall back to base instructions
+        });
+        
+        console.log("[WebRTCSessionConfig] Context preparation completed");
+      } catch (contextError) {
+        // Log but continue if context enhancement fails
+        console.error("[WebRTCSessionConfig] Error during context enhancement:", contextError);
+      }
     }
     
     // Build the context payload for debugging and verification
