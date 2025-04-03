@@ -18,6 +18,16 @@ export class ConnectionEstablisher {
     try {
       console.log("[ConnectionEstablisher] Starting connection establishment process");
       
+      // Verify API key is present
+      if (!apiKey || apiKey.trim() === '') {
+        console.error("[ConnectionEstablisher] [ApiKeyError] Empty or invalid API key provided");
+        callbacks.onError(new Error("No valid API key provided"));
+        return null;
+      }
+      
+      // Log key validity (first few chars only for security)
+      console.log(`[ConnectionEstablisher] Using API key: ${apiKey.substring(0, 5)}..., length: ${apiKey.length}`);
+      
       // Create and configure peer connection
       console.log("[ConnectionEstablisher] Creating RTCPeerConnection");
       const pc = new RTCPeerConnection({
@@ -112,8 +122,10 @@ export class ConnectionEstablisher {
       // Request the API endpoint with the SDP offer
       const endpoint = `https://api.openai.com/v1/realtime?model=${options.model}`;
       console.log(`[ConnectionEstablisher] [ApiRequest] Sending SDP offer to ${endpoint}`);
+      console.log(`[ConnectionEstablisher] [ApiRequest] Using bearer token auth with key: ${apiKey.substring(0, 5)}...`);
 
       try {
+        console.time("[ConnectionEstablisher] [ApiRequest] SDP exchange duration");
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
@@ -122,16 +134,28 @@ export class ConnectionEstablisher {
           },
           body: pc.localDescription.sdp
         });
+        console.timeEnd("[ConnectionEstablisher] [ApiRequest] SDP exchange duration");
 
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`[ConnectionEstablisher] [ApiRequestError] API request failed with status ${response.status}:`, errorText);
-          throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+          
+          // Check specifically for auth errors
+          if (response.status === 401 || response.status === 403 || errorText.includes("auth")) {
+            throw new Error(`Authentication failed: ${response.status} - Please check your API key`);
+          } else {
+            throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+          }
         }
 
         // Get the SDP answer from the response
         const answerSdp = await response.text();
         console.log("[ConnectionEstablisher] [ApiRequest] Received SDP answer from API");
+
+        if (!answerSdp || answerSdp.trim().length < 10) {
+          console.error("[ConnectionEstablisher] [ApiRequestError] Received empty or invalid SDP answer");
+          throw new Error("Received empty or invalid SDP answer from OpenAI");
+        }
 
         // Create and set remote description
         const answerDesc = new RTCSessionDescription({

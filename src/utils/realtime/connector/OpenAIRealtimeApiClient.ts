@@ -32,6 +32,17 @@ export class OpenAIRealtimeApiClient {
     }
     
     try {
+      // Verify API key
+      if (!apiKey || apiKey.trim() === '') {
+        console.error("[WebRTC] Empty or invalid API key provided");
+        return {
+          success: false,
+          error: "Invalid or empty API key"
+        };
+      }
+      
+      console.log(`[WebRTC] Using ephemeral API key: ${apiKey.substring(0, 5)}..., length: ${apiKey.length}`);
+      
       // Ensure model is properly set
       const actualModel = model || "gpt-4o-realtime-preview-2024-12-17";
       console.log(`[WebRTC] Using model: ${actualModel}`);
@@ -43,11 +54,6 @@ export class OpenAIRealtimeApiClient {
       console.log(`[WebRTC] SDP offer preview: ${sdpPreview}`);
       
       console.time("[WebRTC] SDP Exchange Request Time");
-      
-      // Make sure the API key is valid
-      if (!apiKey || apiKey.trim() === '') {
-        throw new Error("Invalid or empty API key");
-      }
 
       // Instead of directly calling OpenAI API, use our Edge Function as a proxy
       const response = await supabase.functions.invoke('webrtc-sdp-exchange', {
@@ -63,6 +69,18 @@ export class OpenAIRealtimeApiClient {
       // Check for errors from the Edge Function
       if (response.error) {
         console.error("[WebRTC] Edge Function error:", response.error);
+        
+        // Check for auth-related errors
+        if (response.error.message?.includes("Unauthorized") || 
+            response.error.message?.includes("auth") ||
+            response.error.message?.includes("401") || 
+            response.error.message?.includes("403")) {
+          return {
+            success: false,
+            error: `Authentication failed: ${response.error.message || 'Invalid API key'}`
+          };
+        }
+        
         return {
           success: false,
           error: `Edge Function error: ${response.error.message || 'Unknown error'}`

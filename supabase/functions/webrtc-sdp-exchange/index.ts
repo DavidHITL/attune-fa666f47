@@ -24,7 +24,17 @@ serve(async (req: Request) => {
       );
     }
 
+    // Validate API key
+    if (apiKey.trim() === "" || apiKey.length < 20) {
+      console.error("[webrtc-sdp-exchange] Invalid API key format");
+      return new Response(
+        JSON.stringify({ error: "Invalid API key format" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log(`[webrtc-sdp-exchange] Processing SDP exchange request for model: ${model}`);
+    console.log(`[webrtc-sdp-exchange] Using API key: ${apiKey.substring(0, 5)}..., length: ${apiKey.length}`);
     
     // Forward the SDP offer to OpenAI
     const modelParam = encodeURIComponent(model);
@@ -49,9 +59,21 @@ serve(async (req: Request) => {
     if (!sdpResponse.ok) {
       const errorText = await sdpResponse.text();
       console.error(`[webrtc-sdp-exchange] OpenAI error (${sdpResponse.status}):`, errorText);
+      
+      // Provide more specific error messages for common error types
+      let errorMessage = `OpenAI SDP exchange failed: ${sdpResponse.status} ${sdpResponse.statusText}`;
+      
+      if (sdpResponse.status === 401 || sdpResponse.status === 403 || errorText.includes("auth")) {
+        errorMessage = "Authentication failed with OpenAI. The ephemeral token may have expired.";
+      } else if (sdpResponse.status === 429) {
+        errorMessage = "OpenAI API rate limit exceeded. Please try again later.";
+      } else if (sdpResponse.status >= 500) {
+        errorMessage = "OpenAI API service error. Please try again later.";
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: `OpenAI SDP exchange failed: ${sdpResponse.status} ${sdpResponse.statusText}`, 
+          error: errorMessage, 
           details: errorText 
         }),
         { 
@@ -71,6 +93,12 @@ serve(async (req: Request) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    // Log a preview of the SDP answer (first and last 50 characters)
+    const sdpPreview = sdpAnswer.length > 100 
+      ? `${sdpAnswer.substring(0, 50)}...${sdpAnswer.substring(sdpAnswer.length - 50)}`
+      : sdpAnswer;
+    console.log(`[webrtc-sdp-exchange] SDP answer preview: ${sdpPreview}`);
     
     // Return the SDP answer to the client
     console.log("[webrtc-sdp-exchange] Successfully forwarded SDP answer");

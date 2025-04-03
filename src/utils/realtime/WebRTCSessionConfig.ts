@@ -107,7 +107,10 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
         dc.addEventListener('error', errorHandler);
         
         // Send initial configuration
-        dc.send(JSON.stringify(initialSessionConfig));
+        const messageJson = JSON.stringify(initialSessionConfig);
+        console.log(`[WebRTCSessionConfig] Sending session update (${messageJson.length} bytes)`);
+        
+        dc.send(messageJson);
         console.log("[WebRTCSessionConfig] Phase 1: Initial session configuration sent successfully");
         
         // Remove error handler after successful send

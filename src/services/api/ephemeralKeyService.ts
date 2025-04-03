@@ -35,6 +35,11 @@ export async function getEphemeralKey(options: {
     
     if (!sessionData?.session) {
       console.warn("[ephemeralKeyService] No active session found, proceeding with anonymous access");
+    } else {
+      console.log("[ephemeralKeyService] User authenticated:", 
+        sessionData.session.user?.id ? 
+        `${sessionData.session.user.id.substring(0, 8)}...` : 
+        "unknown user");
     }
     
     // Default parameters for the token request
@@ -53,10 +58,14 @@ export async function getEphemeralKey(options: {
       })
     );
     
+    console.time("[ephemeralKeyService] Token request duration");
+    
     // Now make the request, with or without an authenticated session
     const { data, error } = await supabase.functions.invoke('generate-ephemeral-key', {
       body: params
     });
+    
+    console.timeEnd("[ephemeralKeyService] Token request duration");
     
     if (error) {
       console.error("[ephemeralKeyService] [TokenFetchError] Error fetching ephemeral key:", error);
@@ -78,7 +87,8 @@ export async function getEphemeralKey(options: {
       throw new Error(`Ephemeral key expiring too soon (${timeUntilExpiration}s)`);
     }
     
-    console.log("[ephemeralKeyService] Successfully obtained ephemeral key, valid for", timeUntilExpiration, "seconds");
+    // Log the token preview (first few characters) for debugging
+    console.log(`[ephemeralKeyService] Successfully obtained ephemeral key: ${data.client_secret.value.substring(0, 8)}..., valid for ${timeUntilExpiration} seconds`);
     return data.client_secret.value;
   } catch (error) {
     console.error("[ephemeralKeyService] [TokenFetchError] Exception getting ephemeral key:", error);

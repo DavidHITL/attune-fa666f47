@@ -22,24 +22,24 @@ serve(async (req: Request) => {
 
     // Verify the user is authenticated
     const authHeader = req.headers.get('Authorization');
+    let userId = 'anonymous';
     
-    if (!authHeader) {
-      console.error('Missing Authorization header');
-      return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Get the user from the auth header
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-    
-    if (authError || !user) {
-      console.error('Authentication failed:', authError || 'No user found');
-      return new Response(
-        JSON.stringify({ error: 'Authentication failed', details: authError?.message }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (authHeader) {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+        
+        if (user && !authError) {
+          userId = user.id;
+          console.log(`Processing request for authenticated user: ${userId}`);
+        } else {
+          console.log('Auth token present but invalid:', authError?.message);
+        }
+      } catch (authCheckError) {
+        console.warn('Error checking authentication:', authCheckError);
+        // Continue as anonymous
+      }
+    } else {
+      console.log('No Authorization header - proceeding with anonymous access');
     }
     
     // Get the OpenAI API key from environment variable
@@ -66,6 +66,9 @@ serve(async (req: Request) => {
     const instructions = params.instructions || "You are a helpful assistant. Be concise in your responses.";
     
     console.log(`Generating ephemeral key for OpenAI API with model: ${model}, voice: ${voice}`);
+    console.log(`Using instructions of length: ${instructions?.length || 0} characters`);
+    
+    console.time('OpenAI Session Creation');
     
     // Create a client secret for use with WebRTC
     const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
@@ -81,13 +84,26 @@ serve(async (req: Request) => {
       }),
     })
     
+    console.timeEnd('OpenAI Session Creation');
+    
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`OpenAI API error (${response.status}):`, errorText);
       
+      // Provide more specific error message for common errors
+      let errorMessage = `Failed to generate ephemeral key: ${response.status} ${response.statusText}`;
+      
+      if (response.status === 401 || response.status === 403) {
+        errorMessage = "Authentication failed with OpenAI API. Please check your API key.";
+      } else if (response.status === 429) {
+        errorMessage = "OpenAI API rate limit exceeded. Please try again later.";
+      } else if (response.status >= 500) {
+        errorMessage = "OpenAI API service error. Please try again later.";
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: `Failed to generate ephemeral key: ${response.status} ${response.statusText}`,
+          error: errorMessage,
           details: errorText
         }),
         { 
@@ -99,11 +115,46 @@ serve(async (req: Request) => {
     
     const data = await response.json();
     
-    console.log('Successfully generated ephemeral key, expires at:', new Date(data.client_secret.expires_at * 1000).toISOString());
+    // Validate the response contains a valid client_secret
+    if (!data.client_secret?.value || !data.client_secret?.expires_at) {
+      console.error('Invalid response format from OpenAI:', data);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid response format from OpenAI',
+          details: 'Missing client_secret or expires_at'
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
     
-    // Return the ephemeral key
+    const expiresAt = new Date(data.client_secret.expires_at * 1000).toISOString();
+    console.log('Successfully generated ephemeral key, expires at:', expiresAt);
+    
+    // Check expiration time is at least 30 seconds in the future
+    const expiresInSeconds = Math.floor((data.client_secret.expires_at * 1000 - Date.now()) / 1000);
+    if (expiresInSeconds < 30) {
+      console.warn(`Warning: Ephemeral key expires soon (${expiresInSeconds} seconds)`);
+    }
+    
+    // Log partial key for debugging (first 5 chars only for security)
+    const keyPreview = data.client_secret.value.substring(0, 5);
+    console.log(`Generated key preview: ${keyPreview}..., length: ${data.client_secret.value.length}, valid for: ${expiresInSeconds}s`);
+    
+    // Return the ephemeral key with additional metadata
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify({
+        ...data,
+        metadata: {
+          expires_in_seconds: expiresInSeconds,
+          created_for: userId,
+          created_at: new Date().toISOString(),
+          model: model,
+          voice: voice
+        }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -112,7 +163,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ 
         error: 'Failed to generate ephemeral key',
-        message: error.message
+        message: error instanceof Error ? error.message : String(error)
       }),
       { 
         status: 500, 

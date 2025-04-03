@@ -32,6 +32,7 @@ export function useConnectionInitiation(
       setIsConnecting(true);
       
       // Create a new WebRTC connector with proper options
+      console.log("[useConnectionInitiation] Creating and configuring WebRTC connector");
       const connector = await createAndConfigureConnector();
       
       if (!connector) {
@@ -46,6 +47,7 @@ export function useConnectionInitiation(
       // Get microphone access if needed but not already available
       let audioTrack = getActiveAudioTrack();
       if (!audioTrack && options.enableMicrophone) {
+        console.log("[useConnectionInitiation] Requesting microphone access");
         audioTrack = await requestMicrophoneAccess();
       }
       
@@ -54,6 +56,7 @@ export function useConnectionInitiation(
         audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
       
       console.time("WebRTC Connection Process");
+      // The connect method internally requests a fresh ephemeral token
       const success = await connector.connect(audioTrack || undefined);
       console.timeEnd("WebRTC Connection Process");
       
@@ -66,8 +69,24 @@ export function useConnectionInitiation(
       return true;
     } catch (error) {
       console.error("[useConnectionInitiation] Connection error:", error);
+      
+      // Display user-friendly error messages
+      if (error instanceof Error) {
+        if (error.message.includes("API key") || error.message.includes("auth")) {
+          toast.error("Authentication failed. Please refresh and try again.");
+        } else {
+          toast.error(`Connection error: ${error.message}`);
+        }
+      } else {
+        toast.error("Connection failed. Please try again.");
+      }
+      
       handleConnectionError(error);
       return false;
+    } finally {
+      if (!connectorRef.current) {
+        setIsConnecting(false);
+      }
     }
   }, [
     isConnected,
