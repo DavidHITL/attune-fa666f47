@@ -1,4 +1,3 @@
-
 import { TextMessageSender } from "./TextMessageSender";
 import { AudioSender } from "./AudioSender";
 
@@ -146,6 +145,13 @@ export class DataChannelHandler {
     if (ready) {
       this.reconnectAttempts = 0;
     }
+  }
+
+  /**
+   * Get the data channel
+   */
+  getDataChannel(): RTCDataChannel | null {
+    return this.dataChannel;
   }
 
   /**

@@ -6,18 +6,21 @@ import { ConnectionStateManager } from "./ConnectionStateManager";
 import { DataChannelHandler } from "./DataChannelHandler";
 import { ConnectionReconnectionHandler } from "./ConnectionReconnectionHandler";
 import { IConnectionManager } from "./interfaces/IConnectionManager";
-import { SessionConfigurationManager } from "./SessionConfigurationManager";
 import { ConnectionTimeoutManager } from "./ConnectionTimeoutManager";
 import { AudioPlaybackManager } from "../audio/AudioPlaybackManager";
+import { AudioConnectionManager } from "./audioManagement/AudioConnectionManager";
+import { MessageSender } from "./messaging/MessageSender";
+import { SessionConfigManager } from "./session/SessionConfigManager";
 
 export class WebRTCConnectionManager extends ConnectionBase implements IConnectionManager {
-  private sessionConfigManager: SessionConfigurationManager;
   private connectionEstablisher: WebRTCConnectionEstablisher;
   private connectionStateManager: ConnectionStateManager;
   private dataChannelHandler: DataChannelHandler;
   private reconnectionHandler: ConnectionReconnectionHandler;
   private timeoutManager: ConnectionTimeoutManager;
-  private audioPlaybackManager: AudioPlaybackManager | null = null;
+  private audioManager: AudioConnectionManager;
+  private messageSender: MessageSender;
+  private sessionManager: SessionConfigManager;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -26,8 +29,10 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.connectionStateManager = new ConnectionStateManager();
     this.dataChannelHandler = new DataChannelHandler();
     this.reconnectionHandler = new ConnectionReconnectionHandler(options);
-    this.sessionConfigManager = new SessionConfigurationManager();
     this.timeoutManager = new ConnectionTimeoutManager();
+    this.audioManager = new AudioConnectionManager();
+    this.messageSender = new MessageSender();
+    this.sessionManager = new SessionConfigManager();
     
     console.log("[WebRTCConnectionManager] Initialized with options:", 
       JSON.stringify({
@@ -48,8 +53,8 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * Set the audio playback manager
    */
   setAudioPlaybackManager(manager: AudioPlaybackManager): void {
-    this.audioPlaybackManager = manager;
-    this.sessionConfigManager.setAudioPlaybackManager(manager);
+    this.audioManager.setAudioPlaybackManager(manager);
+    this.sessionManager.setAudioPlaybackManager(manager);
   }
 
   /**
@@ -141,24 +146,33 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   private configureSessionWhenReady() {
     const pc = this.connectionStateManager.getPeerConnection();
     const dc = this.dataChannelHandler.isDataChannelReady() ? 
-                this.connectionStateManager.getPeerConnection()?.createDataChannel("data") : 
+                this.dataChannelHandler.getDataChannel() : 
                 null;
                 
-    this.sessionConfigManager.configureSessionWhenReady(pc, dc, this.options);
+    this.sessionManager.configureSession(pc, dc, this.options);
   }
 
   /**
    * Send a text message to OpenAI
    */
   sendTextMessage(text: string): boolean {
-    return this.dataChannelHandler.sendTextMessage(text, this.handleError.bind(this));
+    const dataChannel = this.dataChannelHandler.getDataChannel();
+    return this.messageSender.sendTextMessage(
+      dataChannel, 
+      text, 
+      this.handleError.bind(this)
+    );
   }
 
   /**
    * Commit the audio buffer to indicate end of speech
    */
   commitAudioBuffer(): boolean {
-    return this.dataChannelHandler.commitAudioBuffer(this.handleError.bind(this));
+    const dataChannel = this.dataChannelHandler.getDataChannel();
+    return this.messageSender.commitAudioBuffer(
+      dataChannel, 
+      this.handleError.bind(this)
+    );
   }
   
   /**
@@ -196,7 +210,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.dataChannelHandler.cleanup();
     
     // Reset session configuration
-    this.sessionConfigManager.resetSessionManager();
+    this.sessionManager.reset();
     
     // Clean up data channel
     this.dataChannelHandler.setDataChannel(null);
@@ -204,6 +218,9 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     // Clean up connection resources
     this.connectionStateManager.cleanupConnectionResources();
     this.connectionStateManager.setConnectionState("closed");
+    
+    // Cleanup audio manager
+    this.audioManager.cleanup();
     
     // Reset the disconnecting flag after a short delay
     // to avoid race conditions if reconnect is called immediately after disconnect

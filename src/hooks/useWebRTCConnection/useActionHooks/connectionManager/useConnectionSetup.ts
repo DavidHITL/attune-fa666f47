@@ -2,72 +2,74 @@
 import { useCallback } from "react";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { UseWebRTCConnectionOptions } from "../../types";
-import { useConnectionErrorHandler } from "../../useConnectionErrorHandler";
-import { useConnectionStateHandler } from "../../useConnectionStateHandler";
 
 export function useConnectionSetup(
-  isConnected: boolean,
   connectorRef: React.MutableRefObject<WebRTCConnector | null>,
   options: UseWebRTCConnectionOptions,
   setIsConnected: (isConnected: boolean) => void,
   setIsConnecting: (isConnecting: boolean) => void,
-  disconnect: () => void,
-  toggleMicrophone: () => Promise<boolean>,
-  handleMessage: (event: MessageEvent) => void,
-  getActiveAudioTrack: () => MediaStreamTrack | null
+  audioTrackRef: React.MutableRefObject<MediaStreamTrack | null>
 ) {
-  // Use the connection error handler hook
-  const { handleConnectionError } = useConnectionErrorHandler(
-    disconnect,
-    setIsConnecting
-  );
-
-  // Use the connection state handler hook
-  const { handleConnectionStateChange } = useConnectionStateHandler(
-    isConnected,
-    connectorRef,
-    options,
-    setIsConnected,
-    setIsConnecting,
-    disconnect,
-    toggleMicrophone
-  );
-
-  // Helper function to create and configure WebRTC connector
-  const createAndConfigureConnector = useCallback(async () => {
-    try {
-      // Create the connector with all necessary handlers
-      const connector = new WebRTCConnector({
-        ...options,
-        userId: options.userId, // Pass through the userId
-        onMessage: handleMessage,
-        onTrack: (event) => {
-          console.log("[useConnectionSetup] Track event received, handling via connector");
-          // This will be handled by the main hook that integrates the track handler
-          if (options.onTrack) {
-            options.onTrack(event);
-          }
-        },
-        onConnectionStateChange: handleConnectionStateChange,
-        onError: handleConnectionError
-      });
-      
-      return connector;
-    } catch (error) {
-      console.error("[useConnectionSetup] Error creating connector:", error);
-      handleConnectionError(error);
-      return null;
+  // Initialize connector
+  const initializeConnector = useCallback(() => {
+    if (!connectorRef.current) {
+      console.log("[useConnectionSetup] Initializing WebRTCConnector");
+      try {
+        connectorRef.current = new WebRTCConnector({
+          model: options.model || "gpt-4o-realtime-preview-2024-12-17",
+          voice: options.voice || "alloy",
+          instructions: options.instructions,
+          userId: options.userId,
+          onMessage: options.onMessage,
+          // Previously we were using onTrack which doesn't exist in UseWebRTCConnectionOptions
+          // Handle this consistently with how it's used elsewhere
+          onConnectionStateChange: (state: RTCPeerConnectionState) => {
+            console.log(`[useConnectionSetup] Connection state changed to: ${state}`);
+            setIsConnected(state === "connected");
+            setIsConnecting(state === "connecting");
+            
+            if (options.onConnectionStateChange) {
+              options.onConnectionStateChange(state);
+            }
+          },
+          onError: options.onError
+        });
+        
+        return true;
+      } catch (error) {
+        console.error("[useConnectionSetup] Error initializing WebRTCConnector:", error);
+        return false;
+      }
     }
-  }, [
-    options,
-    handleMessage,
-    handleConnectionStateChange,
-    handleConnectionError
-  ]);
+    return true;
+  }, [connectorRef, options, setIsConnected, setIsConnecting]);
 
-  return {
-    handleConnectionStateChange,
-    handleConnectionError,
-    createAndConfigureConnector
-  };
+  const connect = useCallback(async () => {
+    console.log("[useConnectionSetup] Connecting to WebRTC server");
+    setIsConnecting(true);
+    
+    // Initialize connector if not already done
+    if (!initializeConnector()) {
+      console.error("[useConnectionSetup] Failed to initialize connector");
+      setIsConnecting(false);
+      return false;
+    }
+    
+    try {
+      const success = await connectorRef.current!.connect(audioTrackRef.current || undefined);
+      console.log(`[useConnectionSetup] Connection ${success ? 'successful' : 'failed'}`);
+      
+      if (!success) {
+        setIsConnecting(false);
+      }
+      
+      return success;
+    } catch (error) {
+      console.error("[useConnectionSetup] Error connecting:", error);
+      setIsConnecting(false);
+      return false;
+    }
+  }, [connectorRef, setIsConnecting, initializeConnector, audioTrackRef]);
+
+  return { connect, initializeConnector };
 }
