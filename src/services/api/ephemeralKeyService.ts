@@ -20,6 +20,7 @@ export async function getEphemeralKey(options: {
   model?: string;
   voice?: string;
   instructions?: string;
+  userId?: string;  // Add userId to the options type
 } = {}): Promise<string> {
   try {
     console.log("[ephemeralKeyService] Requesting ephemeral key from Supabase");
@@ -108,6 +109,7 @@ export async function withSecureOpenAI<T>(
     model?: string;
     voice?: string;
     instructions?: string;
+    userId?: string;  // Add userId to the options type
   } = {}
 ): Promise<T> {
   try {

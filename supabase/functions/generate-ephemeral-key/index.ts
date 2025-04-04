@@ -64,9 +64,15 @@ serve(async (req: Request) => {
     const model = params.model || "gpt-4o-realtime-preview-2024-12-17";
     const voice = params.voice || "alloy";
     const instructions = params.instructions || "You are a helpful assistant. Be concise in your responses.";
+    // Accept userId from client, but fall back to the one detected from auth
+    const userIdFromClient = params.userId;
+    const effectiveUserId = userIdFromClient || userId;
     
     console.log(`Generating ephemeral key for OpenAI API with model: ${model}, voice: ${voice}`);
     console.log(`Using instructions of length: ${instructions?.length || 0} characters`);
+    if (userIdFromClient) {
+      console.log(`Using userId from client: ${userIdFromClient.substring(0, 8)}...`);
+    }
     
     console.time('OpenAI Session Creation');
     
@@ -149,7 +155,7 @@ serve(async (req: Request) => {
         ...data,
         metadata: {
           expires_in_seconds: expiresInSeconds,
-          created_for: userId,
+          created_for: effectiveUserId,
           created_at: new Date().toISOString(),
           model: model,
           voice: voice

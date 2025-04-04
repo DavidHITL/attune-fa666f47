@@ -55,7 +55,7 @@ export class WebRTCConnector {
         model: this.getOptions().model,
         voice: this.getOptions().voice,
         instructions: this.getOptions().instructions,
-        userId: this.getOptions().userId // Pass userId to ephemeral key service for logging
+        userId: this.getOptions().userId // This is causing the TypeScript error
       });
     } catch (error) {
       console.error("[WebRTCConnector] Error connecting:", error);
