@@ -1,110 +1,115 @@
 
 import { useCallback } from "react";
-import { useMicrophoneControl } from "./useActionHooks/useMicrophoneControl";
-import { useDataChannelStatus } from "./useDataChannelStatus";
-import { UseWebRTCConnectionOptions, WebRTCMessage } from "./types";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
-import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
-import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
-import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
-import { 
-  useConnectionInitializer,
-  useConnectionManager,
-  useMessageManager
-} from "./useActionHooks";
 
+/**
+ * Hook for managing WebRTC connection actions
+ */
 export function useConnectionActions(
   isConnected: boolean,
   isConnecting: boolean,
-  isMicrophoneActive: boolean,
   connectorRef: React.MutableRefObject<WebRTCConnector | null>,
-  recorderRef: React.MutableRefObject<AudioRecorder | null>,
-  audioProcessorRef: React.MutableRefObject<AudioProcessor | null>,
-  handleMessage: (event: MessageEvent) => void,
-  options: UseWebRTCConnectionOptions,
-  setIsConnected: (isConnected: boolean) => void,
+  audioTrackRef: React.MutableRefObject<MediaStreamTrack | null>,
+  options: any,
   setIsConnecting: (isConnecting: boolean) => void,
-  setIsMicrophoneActive: (isMicrophoneActive: boolean) => void,
-  setCurrentTranscript: (currentTranscript: string) => void,
-  setIsAiSpeaking: (isAiSpeaking: boolean) => void,
-  setMessages: (message: WebRTCMessage) => void
+  handleConnectionStateChange: (state: RTCPeerConnectionState) => void,
+  handleConnectionError: (error: any) => void
 ) {
-  // Monitor data channel readiness first before using it
-  const { isDataChannelReady } = useDataChannelStatus(
-    isConnected,
-    connectorRef
-  );
-  
-  // Initialize microphone control hooks first
-  const { 
-    toggleMicrophone,
-    getActiveMediaStream,
-    getActiveAudioTrack,
-    prewarmMicrophoneAccess,
-    isMicrophoneReady
-  } = useMicrophoneControl(
-    isConnected,
-    isMicrophoneActive,
-    connectorRef,
-    recorderRef,
-    audioProcessorRef,
-    setIsMicrophoneActive
-  );
-  
-  // Initialize message sending hooks - this will return the sendTextMessage and commitAudioBuffer functions
-  const { sendTextMessage, commitAudioBuffer } = useMessageManager(
-    isConnected,
-    connectorRef,
-    isDataChannelReady
-  );
-
-  // Then initialize connection management hooks that depend on toggleMicrophone
-  const { connect, disconnect, setAudioPlaybackManager } = useConnectionManager(
-    isConnected,
-    isConnecting,
-    connectorRef,
-    audioProcessorRef,
-    recorderRef,
-    handleMessage,
-    options,
-    setIsConnected,
-    setIsConnecting,
-    setIsMicrophoneActive,
-    setCurrentTranscript,
-    setIsAiSpeaking,
-    toggleMicrophone,
-    getActiveAudioTrack
-  );
-  
-  // Fix the connect function to ensure it's properly typed as an async function
-  const connectAsync = useCallback(async () => {
-    if (connect) {
-      return await connect();
+  // Connect to OpenAI Realtime API
+  const connect = useCallback(async () => {
+    if (isConnected || isConnecting) {
+      console.log("[useConnectionActions] Already connected or connecting");
+      return;
     }
-    return false;
-  }, [connect]);
-  
-  // Initialize microphone prewarming
-  useConnectionInitializer(
+    
+    try {
+      console.log("[useConnectionActions] Starting connection process");
+      setIsConnecting(true);
+      
+      // Check if API key is available
+      const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || localStorage.getItem("OPENAI_API_KEY");
+      if (!apiKey) {
+        console.error("[useConnectionActions] No API key available");
+        handleConnectionError(new Error("No API key available"));
+        setIsConnecting(false);
+        return;
+      }
+      
+      console.log("[useConnectionActions] Creating WebRTC connector");
+      
+      const connector = new WebRTCConnector({
+        ...options,
+        onConnectionStateChange: handleConnectionStateChange,
+        onError: handleConnectionError
+      });
+      
+      connectorRef.current = connector;
+      
+      // Get existing audio track if available
+      const audioTrack = audioTrackRef.current;
+      if (audioTrack) {
+        console.log("[useConnectionActions] Using existing audio track:", audioTrack.label);
+      }
+      
+      console.log("[useConnectionActions] Connecting to OpenAI");
+      const connected = await connector.connect(apiKey, audioTrack || undefined);
+      
+      if (!connected) {
+        console.error("[useConnectionActions] Failed to connect");
+        setIsConnecting(false);
+        return;
+      }
+      
+      console.log("[useConnectionActions] Connected successfully");
+    } catch (error) {
+      console.error("[useConnectionActions] Connection error:", error);
+      handleConnectionError(error);
+      setIsConnecting(false);
+    }
+  }, [
+    connectorRef,
+    audioTrackRef,
     options,
     isConnected,
     isConnecting,
-    connectorRef,
-    prewarmMicrophoneAccess
-  );
+    setIsConnecting,
+    handleConnectionStateChange,
+    handleConnectionError
+  ]);
 
-  // Update the return values to match the expected types
+  // Send text message to AI
+  const sendTextMessage = useCallback((text: string): boolean => {
+    if (!connectorRef.current || !isConnected) {
+      console.warn("[useConnectionActions] Cannot send message: not connected");
+      return false;
+    }
+    
+    try {
+      return connectorRef.current.sendTextMessage(text);
+    } catch (error) {
+      console.error("[useConnectionActions] Error sending text message:", error);
+      return false;
+    }
+  }, [connectorRef, isConnected]);
+
+  // Commit audio buffer to signal end of speech
+  const commitAudioBuffer = useCallback((): boolean => {
+    if (!connectorRef.current || !isConnected) {
+      console.warn("[useConnectionActions] Cannot commit audio buffer: not connected");
+      return false;
+    }
+    
+    try {
+      return connectorRef.current.commitAudioBuffer();
+    } catch (error) {
+      console.error("[useConnectionActions] Error committing audio buffer:", error);
+      return false;
+    }
+  }, [connectorRef, isConnected]);
+
   return {
-    connect: connectAsync,
-    disconnect,
-    toggleMicrophone,
+    connect,
     sendTextMessage,
-    commitAudioBuffer,
-    getActiveMediaStream,
-    getActiveAudioTrack,
-    prewarmMicrophoneAccess,
-    isMicrophoneReady,
-    isDataChannelReady,
-    setAudioPlaybackManager
+    commitAudioBuffer
   };
 }

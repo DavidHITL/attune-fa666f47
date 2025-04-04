@@ -72,6 +72,7 @@ export function useConnectionStateHandler(
         clearTimeout(recoveryTimerRef.current);
       }
       
+      // Increased from 10s to 15s to give more time for recovery
       recoveryTimerRef.current = setTimeout(() => {
         // If we're still in the disconnected state after the grace period
         if (connectorRef.current?.getConnectionState() !== "connected") {
@@ -86,7 +87,7 @@ export function useConnectionStateHandler(
             disconnect();
           }
         }
-      }, 10000); // 10 second grace period for auto-recovery
+      }, 15000); // 15 second grace period for auto-recovery (increased from 10s)
     }
     else if (state === "closed") {
       console.warn("[useConnectionStateHandler] WebRTC connection closed");

@@ -46,10 +46,29 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     throw new Error(`Data channel not open (state: ${dc.readyState})`);
   }
   
+  // Create a timeout promise that rejects after a specified duration
+  const timeoutPromise = new Promise((_, reject) => {
+    // Increased timeout from 20 seconds to a more generous 30 seconds
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Session configuration timed out after 30 seconds'));
+    }, 30000);
+    
+    // Store the timeout ID on the data channel object so it can be cleared if successful
+    (dc as any)._configTimeoutId = timeoutId;
+  });
+  
   try {
     // Get base instructions from configuration
     console.log("[WebRTCSessionConfig] Phase 1: Fetching base instructions");
-    const baseInstructions = await getBaseInstructions();
+    const instructionsPromise = getBaseInstructions();
+    
+    // Race between timeout and instructions loading
+    const baseInstructions = await Promise.race([
+      instructionsPromise,
+      timeoutPromise.then(() => {
+        throw new Error('Timed out waiting for base instructions');
+      })
+    ]);
     
     // Log if we have a userId for context
     if (options.userId) {
@@ -120,6 +139,12 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
       if (dc.readyState === "open") {
         dc.send(messageJson);
         console.log("[WebRTCSessionConfig] Phase 1: Initial session configuration sent successfully");
+        
+        // Clear the timeout since configuration was successful
+        if ((dc as any)._configTimeoutId) {
+          clearTimeout((dc as any)._configTimeoutId);
+          delete (dc as any)._configTimeoutId;
+        }
       } else {
         console.error(`[WebRTCSessionConfig] [DataChannelError] Data channel state changed to ${dc.readyState} during send`);
         throw new Error(`Data channel state changed to ${dc.readyState} during send`);
@@ -129,6 +154,13 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
       dc.removeEventListener('error', errorHandler);
     } catch (error) {
       console.error("[WebRTCSessionConfig] [DataChannelError] Phase 1: Error sending initial configuration:", error);
+      
+      // Clear the timeout if it exists
+      if ((dc as any)._configTimeoutId) {
+        clearTimeout((dc as any)._configTimeoutId);
+        delete (dc as any)._configTimeoutId;
+      }
+      
       throw error;
     }
     
@@ -136,6 +168,13 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     return Promise.resolve();
   } catch (error) {
     console.error("[WebRTCSessionConfig] [ConfigurationError] Phase 1: Error in session configuration:", error);
+    
+    // Clear the timeout if it exists
+    if ((dc as any)._configTimeoutId) {
+      clearTimeout((dc as any)._configTimeoutId);
+      delete (dc as any)._configTimeoutId;
+    }
+    
     return Promise.reject(error);
   }
 }
