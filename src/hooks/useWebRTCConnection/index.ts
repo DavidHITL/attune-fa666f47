@@ -64,7 +64,7 @@ export function useWebRTCConnection(
 
   // Connection actions
   const {
-    connect,
+    connect: innerConnect,
     disconnect,
     toggleMicrophone,
     sendTextMessage,
@@ -94,6 +94,20 @@ export function useWebRTCConnection(
     }
   );
 
+  // Properly wrap connect function with async/await
+  const connect = async (): Promise<void> => {
+    if (innerConnect) {
+      await innerConnect();
+    }
+  };
+
+  // Properly wrap toggleMicrophone function
+  const wrappedToggleMicrophone = async (): Promise<void> => {
+    if (toggleMicrophone) {
+      await toggleMicrophone();
+    }
+  };
+
   // Return the WebRTCConnectionResult with the correct types
   return {
     isConnected,
@@ -105,15 +119,9 @@ export function useWebRTCConnection(
     transcriptProgress,
     messages,
     isDataChannelReady,
-    // Fix the connect function to return Promise<void>
-    connect: async () => { 
-      await connect();
-    },
+    connect,
     disconnect,
-    // Fix the toggleMicrophone function to return Promise<void>
-    toggleMicrophone: async () => {
-      await toggleMicrophone();
-    },
+    toggleMicrophone: wrappedToggleMicrophone,
     sendTextMessage,
     commitAudioBuffer,
     getActiveMediaStream,
