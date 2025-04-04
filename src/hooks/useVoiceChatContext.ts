@@ -3,7 +3,7 @@ import { createContext, useContext, ReactNode, useState, useEffect, useCallback,
 import { useWebRTCConnection } from "./useWebRTCConnection";
 import { useAuth } from "@/context/AuthContext";
 import { useVoiceMicrophoneHandler } from "@/hooks/useVoiceMicrophoneHandler";
-import { useVoiceChatEffects } from "./useVoiceChatEffects";
+import { useVoiceChatEffects } from "./voice/useVoiceChatEffects"; // Fixed import path
 import { useContextLoader } from "./voice/useContextLoader";
 import { useConnectionErrorHandler } from "./voice/useConnectionErrorHandler";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";

@@ -22,3 +22,7 @@ export {
 
 // Export from contextSummary
 export { getRecentContextSummary } from './contextSummary';
+
+// Export context service main functions
+export { fetchUserContext } from './contextService';
+export { enhanceInstructionsWithContext } from './enhanceInstructions';

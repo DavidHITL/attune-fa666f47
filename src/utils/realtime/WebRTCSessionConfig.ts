@@ -139,16 +139,3 @@ export async function configureSession(dc: RTCDataChannel, options: WebRTCOption
     return Promise.reject(error);
   }
 }
-
-/**
- * Phase 2: Full context loading once data channel is confirmed working
- * This is no longer used as we moved this to the DataChannelHandler
- * to ensure proper synchronization with the data channel opening event
- */
-async function loadFullContextPhase(
-  dc: RTCDataChannel, 
-  baseInstructions: string,
-  options: WebRTCOptions
-): Promise<void> {
-  console.log("[WebRTCSessionConfig] Phase 2: This method is deprecated - phase 2 loading is now handled by DataChannelHandler");
-}
