@@ -115,7 +115,7 @@ const Index = () => {
         </Container>
 
         {/* Second Heading Section */}
-        <Container className="mb-16">
+        <Container className="mb-16" id="why-section">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-16 font-serif">
               Folders are dead. This is your<br />personal search engine.
@@ -159,7 +159,7 @@ const Index = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-24">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-24" id="how-section">
             {/* Feature 3 */}
             <div className="p-8 rounded-xl">
               <h3 className="text-2xl font-bold mb-4">Read without distraction</h3>
