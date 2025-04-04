@@ -27,15 +27,6 @@ export function useConnectionActions(
       console.log("[useConnectionActions] Starting connection process");
       setIsConnecting(true);
       
-      // Check if API key is available
-      const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || localStorage.getItem("OPENAI_API_KEY");
-      if (!apiKey) {
-        console.error("[useConnectionActions] No API key available");
-        handleConnectionError(new Error("No API key available"));
-        setIsConnecting(false);
-        return;
-      }
-      
       console.log("[useConnectionActions] Creating WebRTC connector");
       
       const connector = new WebRTCConnector({
