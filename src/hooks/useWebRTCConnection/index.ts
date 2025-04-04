@@ -55,12 +55,17 @@ export function useWebRTCConnection(
   }, []);
 
   // Update message handler options when options change
-  useCallback(() => {
+  const updateMessageHandler = useCallback(() => {
     messageHandlerRef.current.updateOptions({
       instructions: options.instructions,
       userId: options.userId
     });
   }, [options.instructions, options.userId]);
+
+  // Call updateMessageHandler when options change
+  useCallback(() => {
+    updateMessageHandler();
+  }, [updateMessageHandler]);
 
   // Connection actions
   const {
@@ -95,18 +100,18 @@ export function useWebRTCConnection(
   );
 
   // Properly wrap connect function with async/await
-  const connect = async (): Promise<void> => {
+  const connect = useCallback(async (): Promise<void> => {
     if (innerConnect) {
       await innerConnect();
     }
-  };
+  }, [innerConnect]);
 
   // Properly wrap toggleMicrophone function
-  const wrappedToggleMicrophone = async (): Promise<void> => {
+  const wrappedToggleMicrophone = useCallback(async (): Promise<void> => {
     if (toggleMicrophone) {
       await toggleMicrophone();
     }
-  };
+  }, [toggleMicrophone]);
 
   // Return the WebRTCConnectionResult with the correct types
   return {

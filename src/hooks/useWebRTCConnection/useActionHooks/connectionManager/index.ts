@@ -26,7 +26,7 @@ export function useConnectionManager(
 ) {
   // Use the track event handler
   const { handleTrackEvent } = useTrackEventHandler(
-    options,
+    audioProcessorRef,
     setIsAiSpeaking
   );
   
@@ -47,16 +47,20 @@ export function useConnectionManager(
   // Use the connection disconnection hook
   const { disconnect } = useConnectionDisconnection(
     connectorRef,
-    audioProcessorRef,
     recorderRef,
+    audioProcessorRef,
     setIsConnected,
+    setIsConnecting,
     setIsMicrophoneActive,
     setCurrentTranscript,
     setIsAiSpeaking
   );
   
   // Use the audio playback manager hook
-  const { setAudioPlaybackManager } = useAudioPlaybackManager(connectorRef, isConnected);
+  const { setAudioPlaybackManager } = useAudioPlaybackManager(
+    connectorRef,
+    isConnected
+  );
   
   // Get active media stream
   const getActiveMediaStream = useCallback(() => {

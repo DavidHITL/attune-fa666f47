@@ -1,18 +1,19 @@
 
 import { useCallback } from "react";
-import { toast } from "sonner";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { UseWebRTCConnectionOptions } from "../../types";
 
 export function useConnectionInitiation(
+  connectorRef: React.MutableRefObject<WebRTCConnector | null>,
+  audioProcessorRef: React.MutableRefObject<any>,
+  recorderRef: React.MutableRefObject<any>,
+  options: UseWebRTCConnectionOptions,
   isConnected: boolean,
   isConnecting: boolean,
-  connectorRef: React.MutableRefObject<WebRTCConnector | null>,
-  createAndConfigureConnector: () => Promise<WebRTCConnector | null>,
   setIsConnecting: (isConnecting: boolean) => void,
-  handleConnectionError: (error: any) => void,
-  getActiveAudioTrack: () => MediaStreamTrack | null,
-  options: UseWebRTCConnectionOptions
+  handleMessage: (event: MessageEvent) => void,
+  handleTrackEvent: (event: RTCTrackEvent) => void,
+  getActiveAudioTrack: () => MediaStreamTrack | null
 ) {
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
@@ -20,118 +21,88 @@ export function useConnectionInitiation(
       console.log("[useConnectionInitiation] Already connected or connecting, aborting");
       return false;
     }
-    
+
     try {
       console.log("[useConnectionInitiation] Starting connection process");
-      if (options.userId) {
-        console.log(`[useConnectionInitiation] Using userId: ${options.userId}`);
-      } else {
-        console.log("[useConnectionInitiation] No userId available, connecting anonymously");
-      }
-      
       setIsConnecting(true);
       
-      // Create a new WebRTC connector with proper options
-      console.log("[useConnectionInitiation] Creating and configuring WebRTC connector");
-      const connector = await createAndConfigureConnector();
+      // Create a new WebRTC connector
+      console.log("[useConnectionInitiation] Creating WebRTC connector");
       
-      if (!connector) {
-        console.error("[useConnectionInitiation] Failed to create connector");
-        setIsConnecting(false);
-        toast.error("Failed to create connection");
-        return false;
+      // Make sure we don't have any previous connector instance
+      if (connectorRef.current) {
+        console.log("[useConnectionInitiation] Cleaning up previous connector instance");
+        connectorRef.current.disconnect();
+        connectorRef.current = null;
       }
       
-      connectorRef.current = connector;
-      
-      // Get microphone access if needed but not already available
+      // Get any existing audio track from the microphone if available
       let audioTrack = getActiveAudioTrack();
-      if (!audioTrack && options.enableMicrophone) {
-        console.log("[useConnectionInitiation] Requesting microphone access");
-        audioTrack = await requestMicrophoneAccess();
-      }
       
-      // Attempt to connect with the audio track if available
+      // Create a new connector
+      connectorRef.current = new WebRTCConnector({
+        ...options,
+        onMessage: handleMessage,
+        onTrack: handleTrackEvent,
+      });
+      
+      // Attempt to connect with the audio track
       console.log("[useConnectionInitiation] Connecting with audio track:", 
         audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
       
-      console.time("WebRTC Connection Process");
-      // The connect method internally requests a fresh ephemeral token
-      const success = await connector.connect(audioTrack || undefined);
-      console.timeEnd("WebRTC Connection Process");
+      const success = await connectorRef.current.connect(audioTrack || undefined);
       
       if (!success) {
-        cleanup();
-        toast.error("Connection failed. Please check your API key and try again.");
+        console.error("[useConnectionInitiation] Connection failed");
+        connectorRef.current = null;
+        setIsConnecting(false);
         return false;
       }
       
       return true;
     } catch (error) {
       console.error("[useConnectionInitiation] Connection error:", error);
-      
-      // Display user-friendly error messages
-      if (error instanceof Error) {
-        if (error.message.includes("API key") || error.message.includes("auth")) {
-          toast.error("Authentication failed. Please refresh and try again.");
-        } else {
-          toast.error(`Connection error: ${error.message}`);
-        }
-      } else {
-        toast.error("Connection failed. Please try again.");
-      }
-      
-      handleConnectionError(error);
+      setIsConnecting(false);
       return false;
-    } finally {
-      if (!connectorRef.current) {
-        setIsConnecting(false);
-      }
     }
   }, [
-    isConnected,
-    isConnecting,
-    setIsConnecting,
-    getActiveAudioTrack,
-    handleConnectionError,
-    createAndConfigureConnector,
-    connectorRef,
-    options.enableMicrophone,
-    options.userId
+    isConnected, 
+    isConnecting, 
+    setIsConnecting, 
+    options, 
+    handleMessage, 
+    handleTrackEvent, 
+    connectorRef, 
+    getActiveAudioTrack
   ]);
 
-  // Helper function to request microphone access
-  const requestMicrophoneAccess = useCallback(async () => {
+  // For sending messages, we need to add a message sender
+  const sendTextMessage = useCallback((text: string) => {
+    if (!connectorRef.current) return false;
+    
     try {
-      console.log("[useConnectionInitiation] Requesting microphone access");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 16000, // Using 16 kHz for OpenAI compatibility
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      
-      const tracks = stream.getAudioTracks();
-      if (tracks.length > 0) {
-        return tracks[0];
-      }
-      return undefined;
+      return connectorRef.current.sendTextMessage(text);
     } catch (error) {
-      console.warn("[useConnectionInitiation] Could not access microphone:", error);
-      return undefined;
+      console.error("[useConnectionInitiation] Error sending message:", error);
+      return false;
     }
-  }, []);
+  }, [connectorRef]);
 
-  // Helper for cleaning up after failed connection attempts
-  const cleanup = useCallback(() => {
-    if (connectorRef.current) {
-      connectorRef.current.disconnect();
-      connectorRef.current = null;
+  // For committing audio buffers
+  const commitAudioBuffer = useCallback(() => {
+    if (!connectorRef.current) return false;
+    
+    try {
+      return connectorRef.current.commitAudioBuffer();
+    } catch (error) {
+      console.error("[useConnectionInitiation] Error committing audio buffer:", error);
+      return false;
     }
-    setIsConnecting(false);
-  }, [connectorRef, setIsConnecting]);
+  }, [connectorRef]);
 
-  return { connect };
+  return {
+    connect,
+    sendTextMessage,
+    commitAudioBuffer
+  };
 }

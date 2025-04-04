@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
@@ -21,7 +22,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   private messageSender: MessageSender;
   private sessionManager: SessionConfigManager;
   private sessionConfigured: boolean = false;
-  private _audioPlaybackManager: AudioPlaybackManager | null = null;
+  private _audioPlaybackManagerRef: AudioPlaybackManager | null = null;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -56,7 +57,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    */
   setAudioPlaybackManager(manager: AudioPlaybackManager): void {
     console.log("[WebRTCConnectionManager] Setting AudioPlaybackManager");
-    this._audioPlaybackManager = manager;
+    this._audioPlaybackManagerRef = manager;
     this.audioManager.setAudioPlaybackManager(manager);
     this.sessionManager.setAudioPlaybackManager(manager);
     
@@ -70,7 +71,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * Get the audio playback manager for internal use
    */
   get _audioPlaybackManager(): AudioPlaybackManager | null {
-    return this._audioPlaybackManager;
+    return this._audioPlaybackManagerRef;
   }
 
   /**
