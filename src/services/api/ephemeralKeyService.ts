@@ -48,7 +48,7 @@ export async function getEphemeralKey(options: EphemeralKeyOptions = {}): Promis
       throw new Error('No data returned from ephemeral key function');
     }
 
-    // Get the token
+    // FIXED: Get the token from the correct location in the response
     const apiKey = data.key;
     if (!apiKey) {
       console.error("[EphemeralKey] [TokenFetch] [ERROR] No API key in response:", data);

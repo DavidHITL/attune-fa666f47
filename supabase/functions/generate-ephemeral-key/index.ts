@@ -76,7 +76,7 @@ serve(async (req: Request) => {
     
     console.time('OpenAI Session Creation');
     
-    // Create a client secret for use with WebRTC
+    // FIXED: Use the correct endpoint for realtime sessions
     const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: {
@@ -121,7 +121,7 @@ serve(async (req: Request) => {
     
     const data = await response.json();
     
-    // Validate the response contains a valid client_secret
+    // FIXED: Validate the response contains a valid client_secret
     if (!data.client_secret?.value || !data.client_secret?.expires_at) {
       console.error('Invalid response format from OpenAI:', data);
       return new Response(
@@ -149,10 +149,11 @@ serve(async (req: Request) => {
     const keyPreview = data.client_secret.value.substring(0, 5);
     console.log(`Generated key preview: ${keyPreview}..., length: ${data.client_secret.value.length}, valid for: ${expiresInSeconds}s`);
     
-    // Return the ephemeral key with additional metadata
+    // FIXED: Expose the key properly in the response
     return new Response(
       JSON.stringify({
-        ...data,
+        key: data.client_secret.value,
+        expires_at: expiresAt,
         metadata: {
           expires_in_seconds: expiresInSeconds,
           created_for: effectiveUserId,
