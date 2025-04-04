@@ -3,7 +3,6 @@ import { useRef, useCallback } from "react";
 
 /**
  * Hook to manage MediaStream references and access
- * @returns Methods for accessing and managing media streams
  */
 export function useMediaStreamManager() {
   // Store the MediaStream reference
@@ -13,7 +12,12 @@ export function useMediaStreamManager() {
    * Get the current active MediaStream, if available
    */
   const getActiveMediaStream = useCallback(() => {
-    return mediaStreamRef.current;
+    if (mediaStreamRef.current) {
+      return mediaStreamRef.current;
+    }
+    
+    // Fallback to recorder's media stream if available
+    return null;
   }, []);
 
   /**

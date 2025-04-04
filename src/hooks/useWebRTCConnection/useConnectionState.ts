@@ -2,43 +2,34 @@
 import { useState, useRef } from "react";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
 import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
-import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder"; // Updated import path
+import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
-import { WebRTCConnectionState, WebRTCMessage } from "./types";
+import { WebRTCMessage } from "./types";
 
-export function useConnectionState(): WebRTCConnectionState & {
-  connectorRef: React.MutableRefObject<WebRTCConnector | null>;
-  recorderRef: React.MutableRefObject<AudioRecorder | null>;
-  audioProcessorRef: React.MutableRefObject<AudioProcessor | null>;
-  messageHandlerRef: React.MutableRefObject<WebRTCMessageHandler | null>;
-  setMessages: React.Dispatch<React.SetStateAction<WebRTCMessage[]>>;
-  setIsConnected: (isConnected: boolean) => void;
-  setIsConnecting: (isConnecting: boolean) => void;
-  setIsMicrophoneActive: (isMicrophoneActive: boolean) => void;
-  setIsAiSpeaking: (isAiSpeaking: boolean) => void;
-  setCurrentTranscript: (currentTranscript: string) => void;
-} {
+/**
+ * Hook to manage WebRTC connection state
+ */
+export function useConnectionState() {
   // Connection state
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
-  const [messages, setMessages] = useState<WebRTCMessage[]>([]);
-  const [currentTranscript, setCurrentTranscript] = useState("");
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const [currentTranscript, setCurrentTranscript] = useState("");
   
-  // References to critical objects
+  // Technical refs
   const connectorRef = useRef<WebRTCConnector | null>(null);
-  const recorderRef = useRef<AudioRecorder | null>(null);
   const audioProcessorRef = useRef<AudioProcessor | null>(null);
+  const recorderRef = useRef<AudioRecorder | null>(null);
   const messageHandlerRef = useRef<WebRTCMessageHandler | null>(null);
 
   return {
+    // State
     isConnected,
     isConnecting,
     isMicrophoneActive,
     isAiSpeaking,
     currentTranscript,
-    messages,
     
     // Refs
     connectorRef,
@@ -51,7 +42,6 @@ export function useConnectionState(): WebRTCConnectionState & {
     setIsConnecting,
     setIsMicrophoneActive,
     setIsAiSpeaking,
-    setCurrentTranscript,
-    setMessages
+    setCurrentTranscript
   };
 }

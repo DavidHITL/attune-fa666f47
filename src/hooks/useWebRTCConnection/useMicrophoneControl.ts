@@ -2,13 +2,10 @@
 import { useCallback } from "react";
 import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
 import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
-import { useSilenceDetection } from "./useSilenceDetection";
-import { useMediaStreamManager } from "./useMediaStreamManager";
-import { useMicrophoneState } from "./microphone/useMicrophoneState";
-import { useMicrophoneToggle } from "./microphone/useMicrophoneToggle";
-import { useMicrophonePrewarm } from "./microphone/useMicrophonePrewarm";
-import { useKeyboardControl } from "./microphone/useKeyboardControl";
 
+/**
+ * Hook to control microphone for WebRTC connections
+ */
 export function useMicrophoneControl(
   isConnected: boolean,
   isMicrophoneActive: boolean,
@@ -16,71 +13,67 @@ export function useMicrophoneControl(
   recorderRef: React.MutableRefObject<AudioRecorder | null>,
   setIsMicrophoneActive: (isMicrophoneActive: boolean) => void
 ) {
-  // Use the media stream manager hook
-  const { 
-    mediaStreamRef, 
-    getActiveMediaStream, 
-    getActiveAudioTrack, 
-    setMediaStream 
-  } = useMediaStreamManager();
-  
-  // Use microphone state management hook
-  const {
-    microphoneReady,
-    microphonePermission,
-    setMicrophoneReady
-  } = useMicrophoneState();
-
-  // Use the silence detection hook with improved sensitivity
-  const { handleSilenceDetected, resetSilenceDetection } = useSilenceDetection(connectorRef, isMicrophoneActive);
-
-  // Use the microphone toggle hook with silence detection integration
-  const { toggleMicrophone } = useMicrophoneToggle({
-    isConnected,
-    isMicrophoneActive,
-    microphonePermission,
-    connectorRef,
-    recorderRef,
-    mediaStreamRef,
-    setMediaStream,
-    setIsMicrophoneActive,
-    setMicrophoneReady,
-    handleSilenceDetected,
-    resetSilenceDetection
-  });
-
-  // Use the microphone prewarm hook
-  const { prewarmMicrophoneAccess } = useMicrophonePrewarm({
-    getActiveMediaStream,
-    setMediaStream,
-    setMicrophoneReady
-  });
-
-  // Get a commit function for the audio buffer
-  const commitAudioBuffer = useCallback(() => {
-    if (connectorRef.current) {
-      console.log("[useMicrophoneControl] Manually committing audio buffer");
-      connectorRef.current.commitAudioBuffer();
-      // Reset silence detection after manual commit
-      resetSilenceDetection();
+  // Toggle microphone
+  const toggleMicrophone = useCallback(async (): Promise<boolean> => {
+    console.log("[useMicrophoneControl] Toggle microphone, current state:", isMicrophoneActive);
+    
+    // If already active, stop it
+    if (isMicrophoneActive && recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+      setIsMicrophoneActive(false);
+      return true;
     }
-  }, [connectorRef, resetSilenceDetection]);
+    
+    // Check if connected
+    if (!isConnected) {
+      console.warn("[useMicrophoneControl] Cannot toggle microphone: not connected");
+      return false;
+    }
+    
+    try {
+      // Create new recorder
+      const recorder = new AudioRecorder({
+        onAudioData: () => {
+          // WebRTC connection handles audio data directly
+        },
+        silenceThreshold: 0.01,
+        silenceDuration: 3000
+      });
+      
+      // Start recording
+      const success = await recorder.start();
+      
+      if (success) {
+        recorderRef.current = recorder;
+        setIsMicrophoneActive(true);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("[useMicrophoneControl] Error toggling microphone:", error);
+      return false;
+    }
+  }, [isConnected, isMicrophoneActive, recorderRef, setIsMicrophoneActive]);
 
-  // Use keyboard control hook
-  useKeyboardControl({
-    isConnected,
-    isMicrophoneActive,
-    commitAudioBuffer,
-    toggleMicrophone
-  });
+  // Commit audio buffer
+  const commitAudioBuffer = useCallback((): boolean => {
+    if (!connectorRef.current || !isConnected) {
+      console.warn("[useMicrophoneControl] Cannot commit audio buffer: not connected");
+      return false;
+    }
+    
+    try {
+      return connectorRef.current.commitAudioBuffer();
+    } catch (error) {
+      console.error("[useMicrophoneControl] Error committing audio buffer:", error);
+      return false;
+    }
+  }, [connectorRef, isConnected]);
 
   return {
     toggleMicrophone,
-    getActiveMediaStream,
-    getActiveAudioTrack,
-    prewarmMicrophoneAccess,
-    isMicrophoneReady: microphoneReady,
-    microphonePermission,
     commitAudioBuffer
   };
 }
