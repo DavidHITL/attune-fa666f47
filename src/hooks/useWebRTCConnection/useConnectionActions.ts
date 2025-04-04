@@ -76,6 +76,14 @@ export function useConnectionActions(
     getActiveAudioTrack
   );
   
+  // Fix the connect function to ensure it's properly typed as an async function
+  const connectAsync = useCallback(async () => {
+    if (connect) {
+      return await connect();
+    }
+    return false;
+  }, [connect]);
+  
   // Initialize microphone prewarming
   useConnectionInitializer(
     options,
@@ -87,7 +95,7 @@ export function useConnectionActions(
 
   // Update the return values to match the expected types
   return {
-    connect,
+    connect: connectAsync,
     disconnect,
     toggleMicrophone,
     sendTextMessage,

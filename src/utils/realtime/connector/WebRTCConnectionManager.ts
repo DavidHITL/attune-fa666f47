@@ -1,4 +1,3 @@
-
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
@@ -70,7 +69,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   /**
    * Get the audio playback manager for internal use
    */
-  get _audioPlaybackManager(): AudioPlaybackManager | null {
+  get audioPlaybackManager(): AudioPlaybackManager | null {
     return this._audioPlaybackManagerRef;
   }
 
