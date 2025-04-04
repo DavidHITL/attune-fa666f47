@@ -1,4 +1,5 @@
-import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from "react";
+
+import { createContext, useContext, ReactNode, useState, useEffect, useCallback, useRef } from "react";
 import { useWebRTCConnection } from "./useWebRTCConnection";
 import { useAuth } from "@/context/AuthContext";
 import { useVoiceMicrophoneHandler } from "@/hooks/useVoiceMicrophoneHandler";
@@ -59,8 +60,8 @@ export function VoiceChatProvider({
   onClose?: () => void;
 }) {
   const { user } = useAuth();
-  const audioRef = React.useRef<HTMLAudioElement>(null);
-  const audioPlaybackManager = React.useRef<AudioPlaybackManager | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioPlaybackManager = useRef<AudioPlaybackManager | null>(null);
   const [contextLoaded, setContextLoaded] = useState(false);
   const [contextLoadError, setContextLoadError] = useState<string | null>(null);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
