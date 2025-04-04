@@ -4,7 +4,7 @@ import React from "react";
 export interface ContainerProps {
   children: React.ReactNode;
   className?: string;
-  id?: string; // Add id as an optional prop
+  id?: string;
 }
 
 export function Container({ children, className = "", id }: ContainerProps) {
