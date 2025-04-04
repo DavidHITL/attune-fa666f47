@@ -181,7 +181,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    */
   private configureSessionWhenReady() {
     const pc = this.connectionStateManager.getPeerConnection();
-    const dc = this.dataChannelHandler.isDataChannelReady() ? 
+    const dc = this.dataChannelHandler.isChannelReady() ? 
                 this.dataChannelHandler.getDataChannel() : 
                 null;
     
@@ -282,7 +282,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * Check if the data channel is ready for sending
    */
   isDataChannelReady(): boolean {
-    return this.dataChannelHandler.isDataChannelReady();
+    return this.dataChannelHandler.isChannelReady();
   }
 
   /**

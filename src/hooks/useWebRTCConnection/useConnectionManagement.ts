@@ -26,7 +26,11 @@ export function useConnectionManagement(options: UseWebRTCConnectionOptions = {}
   // WebRTC message handler
   const messageHandlerRef = useRef<WebRTCMessageHandler>(new WebRTCMessageHandler({
     onTranscriptUpdate: (text) => setCurrentTranscript(text),
+    onTranscriptComplete: () => console.log("Transcript complete"),
+    onAudioData: (base64Audio) => console.log("Audio data received"),
     onAudioComplete: () => setIsAiSpeaking(false),
+    onMessageReceived: (message) => console.log("Message received:", message),
+    onFinalTranscript: (transcript) => console.log("Final transcript:", transcript),
     instructions: options.instructions,
     userId: options.userId
   }));

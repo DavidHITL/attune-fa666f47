@@ -46,6 +46,7 @@ export class WebRTCMessageHandler {
   public async handleMessage(event: MessageEvent) {
     try {
       const data = JSON.parse(event.data);
+      console.log("[WebRTCMessageHandler] Received message:", data.type);
 
       switch (data.type) {
         case "audio.data":

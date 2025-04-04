@@ -1,6 +1,6 @@
 
 import { WebRTCOptions } from "../WebRTCTypes";
-import { setupDataChannelListeners } from "../WebRTCDataChannelListeners";
+import { setupDataChannelListeners } from "../WebRTCDataChannelHandler";
 import { updateSessionWithFullContext } from "@/services/context/unifiedContextProvider";
 
 /**
