@@ -23,10 +23,24 @@ export class DataChannelHandler {
   private channelClosingIntentionally: boolean = false;
   private contextUpdateAttempts: number = 0;
   private maxContextUpdateAttempts: number = 2;
+  private onDataChannelOpen: (() => void) | null = null;
 
   constructor() {
     this.dataChannelReady = false;
     this.dataChannel = null;
+  }
+  
+  /**
+   * Set callback to be executed when data channel opens
+   */
+  setOnDataChannelOpen(callback: () => void): void {
+    this.onDataChannelOpen = callback;
+    
+    // If the channel is already open, call the callback immediately
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      console.log("[DataChannelHandler] Channel already open, calling onDataChannelOpen callback immediately");
+      callback();
+    }
   }
   
   /**
@@ -146,15 +160,10 @@ export class DataChannelHandler {
         // Reset reconnect attempts on successful opening
         this.reconnectAttempts = 0;
         
-        // Verify we have user context before attempting to send it
-        if (!this.userId) {
-          console.warn("[DataChannelHandler] No userId available for context update - continuing with limited context");
-        }
-        
-        // If we have user ID and base instructions, trigger Phase 2 context loading
-        if (this.baseInstructions && dataChannel.label === 'data' && !this.contextUpdateSent) {
-          console.log('[DataChannelHandler] Data channel open event - triggering context update');
-          this.initiateContextUpdate(dataChannel);
+        // Execute the data channel open callback if provided
+        if (this.onDataChannelOpen) {
+          console.log("[DataChannelHandler] Executing onDataChannelOpen callback");
+          this.onDataChannelOpen();
         }
       };
       
@@ -164,14 +173,6 @@ export class DataChannelHandler {
           const message = JSON.parse(event.data);
           if (message.type === 'session.created' || message.type === 'session.updated') {
             console.log(`[DataChannelHandler] Received ${message.type} - session is ready`);
-            
-            // If we haven't done the context update yet and we have user info, do it now
-            if (!this.contextUpdateSent && this.baseInstructions && dataChannel.label === 'data') {
-              // Wait a brief moment to ensure session is fully initialized
-              setTimeout(() => {
-                this.initiateContextUpdate(dataChannel);
-              }, 500);
-            }
           }
         } catch (error) {
           // If we can't parse the message as JSON, just ignore it
@@ -183,15 +184,10 @@ export class DataChannelHandler {
       this.dataChannelReady = true;
       this.reconnectAttempts = 0;
       
-      // Verify we have user context before attempting to send it
-      if (!this.userId) {
-        console.warn("[DataChannelHandler] No userId available for context update - continuing with limited context");
-      }
-      
-      // If we have user ID and base instructions, trigger Phase 2 context loading
-      if (this.baseInstructions && dataChannel.label === 'data' && !this.contextUpdateSent) {
-        console.log('[DataChannelHandler] Data channel already open - triggering immediate context update');
-        this.initiateContextUpdate(dataChannel);
+      // Execute the data channel open callback if provided
+      if (this.onDataChannelOpen) {
+        console.log("[DataChannelHandler] Channel already open, executing onDataChannelOpen callback");
+        this.onDataChannelOpen();
       }
     }
   }
@@ -199,7 +195,7 @@ export class DataChannelHandler {
   /**
    * Initiate context update for Phase 2
    */
-  private initiateContextUpdate(dataChannel: RTCDataChannel): void {
+  initiateContextUpdate(dataChannel: RTCDataChannel): void {
     // Increment attempt counter
     this.contextUpdateAttempts++;
     
@@ -215,6 +211,17 @@ export class DataChannelHandler {
     
     if (this.contextUpdateSent) {
       console.log("[DataChannelHandler] Context update already sent - skipping");
+      return;
+    }
+    
+    // Verify the data channel is open before proceeding
+    if (dataChannel.readyState !== 'open') {
+      console.error(`[DataChannelHandler] Cannot update context: Data channel not open, state: ${dataChannel.readyState}`);
+      
+      // Schedule a retry if we haven't exceeded max attempts
+      if (this.contextUpdateAttempts < this.maxContextUpdateAttempts) {
+        console.log(`[DataChannelHandler] Will retry context update when channel is open (attempt ${this.contextUpdateAttempts}/${this.maxContextUpdateAttempts})`);
+      }
       return;
     }
     
@@ -310,7 +317,7 @@ export class DataChannelHandler {
         }
       }
       this.dataChannelOpenTimeout = null;
-    }, 10000); // Increased to 10s from 5s
+    }, 10000); // 10s timeout
   }
   
   /**

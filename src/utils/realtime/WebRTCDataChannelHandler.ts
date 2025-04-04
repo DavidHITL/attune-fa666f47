@@ -14,23 +14,28 @@ export function setupDataChannelListeners(
   // Set up timeout to monitor channel opening
   const channelOpenTimeout = setTimeout(() => {
     if (dc.readyState !== 'open') {
-      console.error(`[WebRTC] Data channel '${dc.label}' failed to open within timeout period`);
+      console.error(`[WebRTC] Data channel '${dc.label}' failed to open within timeout period (10 seconds)`);
       
       // Notify about the timeout issue if error handler is available
       if (options.onError) {
-        options.onError(new Error(`Data channel '${dc.label}' failed to open within timeout period`));
+        options.onError(new Error(`Data channel '${dc.label}' failed to open within 10 second timeout period`));
       }
     }
-  }, 5000); // 5 second timeout
+  }, 10000); // 10 second timeout (increased from 5s)
   
   dc.onopen = () => {
     console.log(`[WebRTC] Data channel '${dc.label}' opened, readyState: ${dc.readyState}`);
     clearTimeout(channelOpenTimeout);
     
-    // Call the onOpen callback if provided
-    if (onOpen) {
-      console.log("[WebRTC] Calling onOpen callback");
-      onOpen();
+    // Verify the channel is actually open before calling the callback
+    if (dc.readyState === 'open') {
+      // Call the onOpen callback if provided
+      if (onOpen) {
+        console.log("[WebRTC] Calling onOpen callback for data channel");
+        onOpen();
+      }
+    } else {
+      console.warn(`[WebRTC] Data channel reported open event but readyState is ${dc.readyState}`);
     }
   };
   
@@ -120,6 +125,12 @@ export function createDataChannel(
     
     const dc = pc.createDataChannel(label, dataChannelOptions);
     setupDataChannelListeners(dc, options, onOpen);
+    
+    // Check if the data channel is already open (rare but possible)
+    if (dc.readyState === 'open' && onOpen) {
+      console.log(`[WebRTC] Data channel '${label}' already open, calling onOpen callback immediately`);
+      onOpen();
+    }
     
     return dc;
   } catch (error) {

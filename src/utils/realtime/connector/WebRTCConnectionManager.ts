@@ -21,6 +21,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   private audioManager: AudioConnectionManager;
   private messageSender: MessageSender;
   private sessionManager: SessionConfigManager;
+  private sessionConfigured: boolean = false;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -77,6 +78,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.reconnectionHandler.setDisconnecting(false);
     this.timeoutManager.clearTimeout();
     this.dataChannelHandler.setDataChannelReady(false);
+    this.sessionConfigured = false;
     
     // Store user context info in the data channel handler for Phase 2 loading
     if (this.options.userId && this.options.instructions) {
@@ -101,6 +103,13 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     try {
       console.log("[WebRTCConnectionManager] Establishing connection through ConnectionEstablisher");
+      
+      // Setup data channel open callback before establishing connection
+      this.dataChannelHandler.setOnDataChannelOpen(() => {
+        console.log("[WebRTCConnectionManager] Data channel open callback triggered");
+        this.configureSessionWhenReady();
+      });
+      
       const connection = await this.connectionEstablisher.establish(
         apiKey,
         this.options,
@@ -109,7 +118,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
           // This will be called when the data channel opens
           console.log("[WebRTCConnectionManager] [DataChannelOpen] Data channel is open and ready");
           this.dataChannelHandler.setDataChannelReady(true);
-          this.configureSessionWhenReady();
+          // No need to call configureSessionWhenReady here as it's now handled in the onDataChannelOpen callback
         },
         this.handleError.bind(this),
         audioTrack // Pass the audioTrack to the connection establisher
@@ -148,12 +157,15 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Configure the session when connected
     if (state === "connected") {
-      console.log("[WebRTCConnectionManager] [ConnectionState] Connection established, configuring session");
-      this.configureSessionWhenReady();
+      console.log("[WebRTCConnectionManager] [ConnectionState] Connection established");
+      // Don't configure session here anymore - wait for data channel open event
       // Reset reconnection manager on successful connection
       this.reconnectionHandler.reset();
     } else if (state === "failed" || state === "disconnected") {
       console.error(`[WebRTCConnectionManager] [ConnectionFailure] Connection state: ${state}`);
+      
+      // Reset session configured flag
+      this.sessionConfigured = false;
     }
     
     // Handle disconnection or failure with automatic reconnection
@@ -173,6 +185,12 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
                 this.dataChannelHandler.getDataChannel() : 
                 null;
     
+    // Guard against multiple calls to configure session
+    if (this.sessionConfigured) {
+      console.log("[WebRTCConnectionManager] Session already configured, skipping");
+      return;
+    }
+    
     if (!pc) {
       console.error("[WebRTCConnectionManager] [ConfigurationError] Cannot configure session: No peer connection available");
       return;
@@ -190,11 +208,33 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     if (dc.readyState !== "open") {
       console.warn(`[WebRTCConnectionManager] [DataChannelError] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
+      
+      // Setup retry logic with a timeout if the data channel isn't open yet
+      const retryTimeout = setTimeout(() => {
+        console.log("[WebRTCConnectionManager] Retrying session configuration after timeout");
+        this.configureSessionWhenReady();
+      }, 1000);
+      
       return;
     }
     
     console.log("[WebRTCConnectionManager] All conditions met, configuring session");
+    
+    // Mark session as configured to prevent duplicate configuration
+    this.sessionConfigured = true;
+    
+    // Configure the session
     this.sessionManager.configureSession(pc, dc, this.options);
+    
+    // Set up context update after session is configured
+    // Moving the context update to the data channel handler
+    if (this.options.userId && this.options.instructions) {
+      console.log("[WebRTCConnectionManager] Context update criteria met, initiating context update");
+      // Use the data channel handler to manage the context update
+      this.dataChannelHandler.initiateContextUpdate(dc);
+    } else {
+      console.log("[WebRTCConnectionManager] No userId or instructions available, skipping context update");
+    }
   }
 
   /**
