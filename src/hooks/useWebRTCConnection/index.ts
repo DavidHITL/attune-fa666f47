@@ -6,6 +6,7 @@ import { AudioProcessor } from "@/utils/realtime/AudioProcessor";
 import { AudioRecorder } from "@/utils/realtime/audio/AudioRecorder";
 import { WebRTCMessageHandler } from "@/utils/realtime/WebRTCMessageHandler";
 import { useConnectionActions } from "./useConnectionActions";
+import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
 
 // Main hook for using WebRTC connection
 export function useWebRTCConnection(
@@ -100,6 +101,24 @@ export function useWebRTCConnection(
     }
   }, [connect]);
 
+  // Implement the missing methods required by WebRTCConnectionResult interface
+  const getActiveMediaStream = useCallback((): MediaStream | null => {
+    if (recorderRef.current) {
+      return recorderRef.current.getStream();
+    }
+    return null;
+  }, [recorderRef]);
+
+  const getActiveAudioTrack = useCallback((): MediaStreamTrack | null => {
+    return audioTrackRef.current;
+  }, [audioTrackRef]);
+
+  const setAudioPlaybackManager = useCallback((manager: AudioPlaybackManager): void => {
+    if (connectorRef.current) {
+      connectorRef.current.setAudioPlaybackManager(manager);
+    }
+  }, [connectorRef]);
+
   // Return a simplified set of actions that matches our interface
   return {
     isConnected,
@@ -115,6 +134,9 @@ export function useWebRTCConnection(
     toggleMicrophone: async () => {}, // Placeholder to match interface
     sendTextMessage,
     commitAudioBuffer,
-    isDataChannelReady: false // Placeholder to match interface
+    isDataChannelReady: false, // Placeholder to match interface
+    getActiveMediaStream,
+    getActiveAudioTrack,
+    setAudioPlaybackManager
   };
 }

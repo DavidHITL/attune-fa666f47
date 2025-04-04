@@ -94,26 +94,17 @@ export function useConnectionManagement(options: UseWebRTCConnectionOptions = {}
     }
   }, []);
 
-  // Get all connection actions with proper function handling
+  // Fixed the actions call to match the expected number of arguments
   const actions = useConnectionActions(
     isConnected,
     isConnecting,
-    isMicrophoneActive,
     connectorRef,
-    recorderRef,
     audioProcessorRef,
-    handleMessage,
-    {
-      ...options,
-      onConnectionStateChange: handleConnectionStateChange,
-      onError: handleConnectionError
-    },
-    setIsConnected,
+    recorderRef,
+    options,
     setIsConnecting,
-    setIsMicrophoneActive,
-    setCurrentTranscript,
-    setIsAiSpeaking,
-    (message: WebRTCMessage) => { /* Message handler */ }
+    handleMessage,
+    handleConnectionError
   );
 
   // Debug logging for context and config

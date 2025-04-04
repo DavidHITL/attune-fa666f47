@@ -9,12 +9,12 @@ export function useConnectionActions(
   isConnected: boolean,
   isConnecting: boolean,
   connectorRef: React.MutableRefObject<WebRTCConnector | null>,
-  audioTrackRef: React.MutableRefObject<MediaStreamTrack | null>,
+  audioProcessorRef: React.MutableRefObject<any>,
+  recorderRef: React.MutableRefObject<any>,
   options: any,
   setIsConnecting: (isConnecting: boolean) => void,
   handleMessage: (event: MessageEvent) => void,
-  handleConnectionError: (error: any) => void,
-  handleConnectionStateChange: (state: RTCPeerConnectionState) => void
+  handleConnectionError: (error: any) => void
 ) {
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
@@ -40,7 +40,14 @@ export function useConnectionActions(
       
       const connector = new WebRTCConnector({
         ...options,
-        onConnectionStateChange: handleConnectionStateChange,
+        onConnectionStateChange: (state: RTCPeerConnectionState) => {
+          console.log("[useConnectionActions] Connection state changed:", state);
+          if (state === 'connected') {
+            console.log("[useConnectionActions] Successfully connected to OpenAI");
+          } else if (['disconnected', 'failed', 'closed'].includes(state)) {
+            console.error("[useConnectionActions] Connection state changed to:", state);
+          }
+        },
         onError: handleConnectionError,
         onMessage: handleMessage
       });
@@ -48,9 +55,16 @@ export function useConnectionActions(
       connectorRef.current = connector;
       
       // Get existing audio track if available
-      const audioTrack = audioTrackRef.current;
-      if (audioTrack) {
-        console.log("[useConnectionActions] Using existing audio track:", audioTrack.label);
+      let audioTrack = null;
+      if (recorderRef.current) {
+        const stream = recorderRef.current.getStream();
+        if (stream) {
+          const tracks = stream.getAudioTracks();
+          if (tracks.length > 0) {
+            audioTrack = tracks[0];
+            console.log("[useConnectionActions] Using existing audio track:", audioTrack.label);
+          }
+        }
       }
       
       console.log("[useConnectionActions] Connecting to OpenAI");
@@ -71,14 +85,13 @@ export function useConnectionActions(
     }
   }, [
     connectorRef,
-    audioTrackRef,
     options,
     isConnected,
     isConnecting,
     setIsConnecting,
-    handleConnectionStateChange,
     handleConnectionError,
-    handleMessage
+    handleMessage,
+    recorderRef
   ]);
 
   // Send text message to AI
