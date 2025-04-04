@@ -4,11 +4,12 @@ import React from "react";
 export interface ContainerProps {
   children: React.ReactNode;
   className?: string;
+  id?: string; // Add id as an optional prop
 }
 
-export function Container({ children, className = "" }: ContainerProps) {
+export function Container({ children, className = "", id }: ContainerProps) {
   return (
-    <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 ${className}`}>
+    <div id={id} className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 ${className}`}>
       {children}
     </div>
   );
