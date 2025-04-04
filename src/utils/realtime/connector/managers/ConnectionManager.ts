@@ -1,26 +1,29 @@
 
-import { WebRTCOptions } from "../WebRTCTypes";
-import { ConnectionBase } from "./ConnectionBase";
-import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
-import { ConnectionStateManager } from "./ConnectionStateManager";
-import { DataChannelHandler } from "./DataChannelHandler";
-import { ConnectionReconnectionHandler } from "./ConnectionReconnectionHandler";
-import { IConnectionManager } from "./interfaces/IConnectionManager";
-import { ConnectionTimeoutManager } from "./ConnectionTimeoutManager";
-import { AudioConnectionManager } from "./managers/AudioConnectionManager";
-import { MessageSender } from "./messaging/MessageSender";
-import { SessionConfigManager } from "./managers/SessionConfigManager";
-import { AudioPlaybackManager } from "../audio/AudioPlaybackManager";
+import { WebRTCOptions } from "../../WebRTCTypes";
+import { ConnectionBase } from "../ConnectionBase";
+import { ConnectionStateManager } from "../ConnectionStateManager";
+import { DataChannelHandler } from "../DataChannelHandler";
+import { ConnectionReconnectionHandler } from "../ConnectionReconnectionHandler";
+import { IConnectionManager } from "../interfaces/IConnectionManager";
+import { ConnectionTimeoutManager } from "../ConnectionTimeoutManager";
+import { AudioConnectionManager } from "./AudioConnectionManager";
+import { MessageManager } from "./MessageManager";
+import { SessionManager } from "./SessionManager";
+import { AudioPlaybackManager } from "../../audio/AudioPlaybackManager";
+import { WebRTCConnectionEstablisher } from "../WebRTCConnectionEstablisher";
 
-export class WebRTCConnectionManager extends ConnectionBase implements IConnectionManager {
+/**
+ * Manages WebRTC connections to the OpenAI Realtime API
+ */
+export class ConnectionManager extends ConnectionBase implements IConnectionManager {
   private connectionEstablisher: WebRTCConnectionEstablisher;
   private connectionStateManager: ConnectionStateManager;
   private dataChannelHandler: DataChannelHandler;
   private reconnectionHandler: ConnectionReconnectionHandler;
   private timeoutManager: ConnectionTimeoutManager;
   private audioManager: AudioConnectionManager;
-  private messageSender: MessageSender;
-  private sessionManager: SessionConfigManager;
+  private messageManager: MessageManager;
+  private sessionManager: SessionManager;
   private sessionConfigured: boolean = false;
   
   constructor(options: WebRTCOptions) {
@@ -32,10 +35,10 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.reconnectionHandler = new ConnectionReconnectionHandler(options);
     this.timeoutManager = new ConnectionTimeoutManager();
     this.audioManager = new AudioConnectionManager();
-    this.messageSender = new MessageSender();
-    this.sessionManager = new SessionConfigManager();
+    this.messageManager = new MessageManager();
+    this.sessionManager = new SessionManager();
     
-    console.log("[WebRTCConnectionManager] Initialized with options:", 
+    console.log("[ConnectionManager] Initialized with options:", 
       JSON.stringify({
         model: options.model,
         voice: options.voice,
@@ -55,13 +58,12 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * Set the audio playback manager
    */
   setAudioPlaybackManager(manager: AudioPlaybackManager): void {
-    console.log("[WebRTCConnectionManager] Setting AudioPlaybackManager");
+    console.log("[ConnectionManager] Setting AudioPlaybackManager");
     this.audioManager.setAudioPlaybackManager(manager);
     this.sessionManager.setAudioPlaybackManager(manager);
     
-    // Store reference for reconnection scenarios
     if (manager) {
-      console.log("[WebRTCConnectionManager] AudioPlaybackManager configured successfully");
+      console.log("[ConnectionManager] AudioPlaybackManager configured successfully");
     }
   }
 
@@ -83,7 +85,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * Initialize and connect to OpenAI's Realtime API using WebRTC
    */
   async connect(apiKey: string, audioTrack?: MediaStreamTrack): Promise<boolean> {
-    console.log("[WebRTCConnectionManager] Starting connection process");
+    console.log("[ConnectionManager] Starting connection process");
     
     // Reset disconnecting flag when starting a new connection
     this.reconnectionHandler.setDisconnecting(false);
@@ -93,31 +95,31 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Store user context info in the data channel handler for Phase 2 loading
     if (this.options.userId && this.options.instructions) {
-      console.log("[WebRTCConnectionManager] [UserContext] Setting userId and instructions for Phase 2 context loading");
-      console.log(`[WebRTCConnectionManager] [UserContext] User ID: ${this.options.userId}`);
+      console.log("[ConnectionManager] [UserContext] Setting userId and instructions for Phase 2 context loading");
+      console.log(`[ConnectionManager] [UserContext] User ID: ${this.options.userId}`);
       this.dataChannelHandler.setUserId(this.options.userId);
       this.dataChannelHandler.setBaseInstructions(this.options.instructions);
       // Reset the context update status
       this.dataChannelHandler.resetContextUpdateStatus();
     } else {
-      console.log("[WebRTCConnectionManager] [UserContext] No userId available for context loading");
+      console.log("[ConnectionManager] [UserContext] No userId available for context loading");
     }
     
     // Store the audio track for potential reconnection
     if (audioTrack) {
-      console.log("[WebRTCConnectionManager] [AudioTrack] Setting audio track for connection:", 
+      console.log("[ConnectionManager] [AudioTrack] Setting audio track for connection:", 
         audioTrack ? `${audioTrack.label} (${audioTrack.id})` : "none");
     } else {
-      console.log("[WebRTCConnectionManager] [AudioTrack] No audio track provided");
+      console.log("[ConnectionManager] [AudioTrack] No audio track provided");
     }
     this.reconnectionHandler.setAudioTrack(audioTrack);
     
     try {
-      console.log("[WebRTCConnectionManager] Establishing connection through ConnectionEstablisher");
+      console.log("[ConnectionManager] Establishing connection through ConnectionEstablisher");
       
       // Setup data channel open callback before establishing connection
       this.dataChannelHandler.setOnDataChannelOpen(() => {
-        console.log("[WebRTCConnectionManager] Data channel open callback triggered");
+        console.log("[ConnectionManager] Data channel open callback triggered");
         this.configureSessionWhenReady();
       });
       
@@ -127,7 +129,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
         this.handleConnectionStateChange.bind(this),
         () => {
           // This will be called when the data channel opens
-          console.log("[WebRTCConnectionManager] [DataChannelOpen] Data channel is open and ready");
+          console.log("[ConnectionManager] [DataChannelOpen] Data channel is open and ready");
           this.dataChannelHandler.setDataChannelReady(true);
         },
         this.handleError.bind(this),
@@ -135,24 +137,24 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
       );
       
       if (!connection) {
-        console.error("[WebRTCConnectionManager] [ConnectionError] Failed to establish connection");
+        console.error("[ConnectionManager] [ConnectionError] Failed to establish connection");
         return false;
       }
       
-      console.log("[WebRTCConnectionManager] Setting peer connection and data channel");
+      console.log("[ConnectionManager] Setting peer connection and data channel");
       this.connectionStateManager.setPeerConnection(connection.pc);
       this.dataChannelHandler.setDataChannel(connection.dc, this.handleError.bind(this));
       
       // If we already have an AudioPlaybackManager, ensure it's properly connected
       if (this.getAudioPlaybackManager()) {
-        console.log("[WebRTCConnectionManager] Re-applying AudioPlaybackManager after connection");
+        console.log("[ConnectionManager] Re-applying AudioPlaybackManager after connection");
         this.audioManager.setAudioPlaybackManager(this.getAudioPlaybackManager());
       }
       
-      console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
+      console.log("[ConnectionManager] WebRTC connection established successfully");
       return true;
     } catch (error) {
-      console.error("[WebRTCConnectionManager] [ConnectionError] Error connecting to OpenAI:", error);
+      console.error("[ConnectionManager] [ConnectionError] Error connecting to OpenAI:", error);
       this.handleError(error);
       return false;
     }
@@ -163,7 +165,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * @param state The new connection state
    */
   protected handleConnectionStateChange(state: RTCPeerConnectionState): void {
-    console.log("[WebRTCConnectionManager] [ConnectionState] Connection state changed:", state);
+    console.log("[ConnectionManager] [ConnectionState] Connection state changed:", state);
     this.connectionStateManager.setConnectionState(state);
     
     // Notify the state change through callback
@@ -173,11 +175,11 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Configure the session when connected
     if (state === "connected") {
-      console.log("[WebRTCConnectionManager] [ConnectionState] Connection established");
+      console.log("[ConnectionManager] [ConnectionState] Connection established");
       // Reset reconnection manager on successful connection
       this.reconnectionHandler.reset();
     } else if (state === "failed" || state === "disconnected") {
-      console.error(`[WebRTCConnectionManager] [ConnectionFailure] Connection state: ${state}`);
+      console.error(`[ConnectionManager] [ConnectionFailure] Connection state: ${state}`);
       
       // Reset session configured flag
       this.sessionConfigured = false;
@@ -202,38 +204,38 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Guard against multiple calls to configure session
     if (this.sessionConfigured) {
-      console.log("[WebRTCConnectionManager] Session already configured, skipping");
+      console.log("[ConnectionManager] Session already configured, skipping");
       return;
     }
     
     if (!pc) {
-      console.error("[WebRTCConnectionManager] [ConfigurationError] Cannot configure session: No peer connection available");
+      console.error("[ConnectionManager] [ConfigurationError] Cannot configure session: No peer connection available");
       return;
     }
     
     if (!dc) {
-      console.error("[WebRTCConnectionManager] [ConfigurationError] Cannot configure session: Data channel not ready");
+      console.error("[ConnectionManager] [ConfigurationError] Cannot configure session: Data channel not ready");
       return;
     }
     
     if (pc.connectionState !== "connected") {
-      console.warn(`[WebRTCConnectionManager] [ConfigurationError] Cannot configure session: Peer connection not connected (state: ${pc.connectionState})`);
+      console.warn(`[ConnectionManager] [ConfigurationError] Cannot configure session: Peer connection not connected (state: ${pc.connectionState})`);
       return;
     }
     
     if (dc.readyState !== "open") {
-      console.warn(`[WebRTCConnectionManager] [DataChannelError] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
+      console.warn(`[ConnectionManager] [DataChannelError] Cannot configure session: Data channel not open (state: ${dc.readyState})`);
       
       // Setup retry logic with a timeout if the data channel isn't open yet
       const retryTimeout = setTimeout(() => {
-        console.log("[WebRTCConnectionManager] Retrying session configuration after timeout");
+        console.log("[ConnectionManager] Retrying session configuration after timeout");
         this.configureSessionWhenReady();
       }, 1000);
       
       return;
     }
     
-    console.log("[WebRTCConnectionManager] All conditions met, configuring session");
+    console.log("[ConnectionManager] All conditions met, configuring session");
     
     // Mark session as configured to prevent duplicate configuration
     this.sessionConfigured = true;
@@ -243,18 +245,18 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // If we have an AudioPlaybackManager, ensure it's properly connected after session is configured
     if (this.getAudioPlaybackManager()) {
-      console.log("[WebRTCConnectionManager] Applying AudioPlaybackManager after session configuration");
+      console.log("[ConnectionManager] Applying AudioPlaybackManager after session configuration");
       this.audioManager.setAudioPlaybackManager(this.getAudioPlaybackManager());
       this.sessionManager.setAudioPlaybackManager(this.getAudioPlaybackManager());
     }
     
     // Set up context update after session is configured
     if (this.options.userId && this.options.instructions) {
-      console.log("[WebRTCConnectionManager] Context update criteria met, initiating context update");
+      console.log("[ConnectionManager] Context update criteria met, initiating context update");
       // Use the data channel handler to manage the context update
       this.dataChannelHandler.initiateContextUpdate(dc);
     } else {
-      console.log("[WebRTCConnectionManager] No userId or instructions available, skipping context update");
+      console.log("[ConnectionManager] No userId or instructions available, skipping context update");
     }
   }
 
@@ -262,7 +264,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * Handle errors in the WebRTC connection
    */
   protected handleError(error: any): void {
-    console.error("[WebRTCConnectionManager] [ConnectionError] Error occurred:", error);
+    console.error("[ConnectionManager] [ConnectionError] Error occurred:", error);
     
     // Dispatch custom error event for global handling
     const errorEvent = new CustomEvent("webrtc-error", {
@@ -281,7 +283,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    */
   sendTextMessage(text: string): boolean {
     const dataChannel = this.dataChannelHandler.getDataChannel();
-    return this.messageSender.sendTextMessage(
+    return this.messageManager.sendTextMessage(
       dataChannel, 
       text, 
       this.handleError.bind(this)
@@ -293,7 +295,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    */
   commitAudioBuffer(): boolean {
     const dataChannel = this.dataChannelHandler.getDataChannel();
-    return this.messageSender.commitAudioBuffer(
+    return this.messageManager.commitAudioBuffer(
       dataChannel, 
       this.handleError.bind(this)
     );
@@ -319,11 +321,11 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   disconnect(): void {
     // If already disconnecting, don't repeat the process
     if (this.reconnectionHandler.isCurrentlyDisconnecting()) {
-      console.log("[WebRTCConnectionManager] Already disconnecting, ignoring repeat call");
+      console.log("[ConnectionManager] Already disconnecting, ignoring repeat call");
       return;
     }
     
-    console.log("[WebRTCConnectionManager] Disconnecting");
+    console.log("[ConnectionManager] Disconnecting");
     this.reconnectionHandler.setDisconnecting(true);
     
     // Stop any reconnection attempts

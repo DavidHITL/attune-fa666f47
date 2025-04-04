@@ -65,7 +65,7 @@ export function useWebRTCConnection(
     setIsMicrophoneActive
   );
 
-  // Set up connection manager
+  // Set up connection manager with the correct return type
   const { 
     connect,
     disconnect,
@@ -91,7 +91,7 @@ export function useWebRTCConnection(
   // Track data channel status
   const { isDataChannelReady } = useDataChannelStatus(isConnected, connectorRef);
 
-  // Return the complete WebRTC connection result
+  // Return the complete WebRTCConnection result
   return {
     // State
     isConnected,

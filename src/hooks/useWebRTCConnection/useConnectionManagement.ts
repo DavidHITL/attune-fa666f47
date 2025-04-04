@@ -95,17 +95,22 @@ export function useConnectionManagement(options: UseWebRTCConnectionOptions = {}
     }
   }, []);
 
-  // Fixed the actions call to match the expected number of arguments
+  // Fixed the actions call to include getActiveAudioTrack
+  const getActiveAudioTrack = useCallback(() => {
+    return audioTrackRef.current;
+  }, [audioTrackRef]);
+
   const actions = useConnectionActions(
     isConnected,
     isConnecting,
     connectorRef,
-    audioTrackRef,
+    audioProcessorRef,
     options,
     setIsConnecting,
     handleMessage,
     handleConnectionError,
-    handleConnectionStateChange
+    handleConnectionStateChange,
+    getActiveAudioTrack
   );
 
   // Debug logging for context and config
