@@ -1,4 +1,3 @@
-
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";

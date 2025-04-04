@@ -142,7 +142,6 @@ export function createDataChannel(
     return dc;
   } catch (error) {
     console.error(`[WebRTC] [DataChannel] [ERROR] Error creating data channel '${label}':`, error);
-    console.error("[WebRTC] [DataChannel] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
     throw error;
   }
 }
