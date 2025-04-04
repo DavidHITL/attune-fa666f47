@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -23,6 +22,13 @@ export default {
 				sans: ['-apple-system', 'BlinkMacSystemFont', 'San Francisco', 'Helvetica Neue', 'sans-serif'],
 			},
 			colors: {
+				// Serene Tech - Warm Variant palette
+				'sky-mist': '#EAF3F1',
+				'dusty-blue': '#A9BDC4',
+				'charcoal': '#333333',
+				'warm-grey': '#D8D6D2',
+				'peach-beige': '#F6E7DC',
+				// Keeping the original colors from the config
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

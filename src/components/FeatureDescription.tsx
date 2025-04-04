@@ -15,9 +15,9 @@ const FeatureDescription = ({
   children 
 }: FeatureDescriptionProps) => {
   return (
-    <div className={`${bgColor} p-8 rounded-xl`}>
-      <h3 className="text-2xl font-bold mb-4">{title}</h3>
-      <p className="text-gray-700 mb-8">{description}</p>
+    <div className={`${bgColor} p-8 rounded-xl shadow-sm`}>
+      <h3 className="text-2xl font-bold mb-4 text-charcoal">{title}</h3>
+      <p className="text-charcoal/80 mb-8">{description}</p>
       {children}
     </div>
   );
