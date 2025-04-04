@@ -1,27 +1,17 @@
 
-// Re-export all connection manager hooks
-export { useConnectionInitiation } from './useConnectionInitiation';
-export { useConnectionDisconnection } from './useConnectionDisconnection';
-export { useTrackEventHandler } from './useTrackEventHandler';
-export { useAudioPlaybackManager } from './useAudioPlaybackManager';
-export { useConnectionSetup } from './useConnectionSetup';
-
-// Main hook that combines all the focused hooks
-import { useConnectionInitiation } from './useConnectionInitiation';
-import { useConnectionDisconnection } from './useConnectionDisconnection';
-import { useTrackEventHandler } from './useTrackEventHandler';
-import { useAudioPlaybackManager } from './useAudioPlaybackManager';
-import { useConnectionSetup } from './useConnectionSetup';
-import { UseWebRTCConnectionOptions } from '../../types';
-import { useCallback, useRef } from 'react';
-import { WebRTCConnector } from '@/utils/realtime/WebRTCConnector';
-import { useConnectionErrorHandler } from '../../useConnectionErrorHandler';
-import { useConnectionStateHandler } from '../../useConnectionStateHandler';
+import { useConnectionDisconnection } from "./useConnectionDisconnection";
+import { useConnectionSetup } from "./useConnectionSetup";
+import { useAudioPlaybackManager } from "./useAudioPlaybackManager";
+import { useTrackEventHandler } from "./useTrackEventHandler";
+import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
+import { WebRTCConnector } from "@/utils/realtime/WebRTCConnector";
+import { UseWebRTCConnectionOptions } from "../../types";
+import { useCallback, useRef } from "react";
 
 export function useConnectionManager(
   isConnected: boolean,
   isConnecting: boolean,
-  connectorRef: React.MutableRefObject<any>,
+  connectorRef: React.MutableRefObject<WebRTCConnector | null>,
   audioProcessorRef: React.MutableRefObject<any>,
   recorderRef: React.MutableRefObject<any>,
   handleMessage: (event: MessageEvent) => void,
@@ -34,47 +24,46 @@ export function useConnectionManager(
   toggleMicrophone: () => Promise<boolean>,
   getActiveAudioTrack: () => MediaStreamTrack | null
 ) {
-  // Track reference for audio
+  // Track ref to hold the active audio track
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
+  
+  // Update audioTrackRef when the audio track changes
+  const updateAudioTrack = useCallback(() => {
+    audioTrackRef.current = getActiveAudioTrack();
+  }, [getActiveAudioTrack]);
 
-  // Use connection error handler
-  const { handleConnectionError } = useConnectionErrorHandler(
-    () => disconnect(), 
-    setIsConnecting
-  );
-
-  // Use connection state handler
-  const { handleConnectionStateChange } = useConnectionStateHandler(
-    isConnected,
-    connectorRef,
-    options,
-    setIsConnected,
-    setIsConnecting,
-    () => disconnect(),
-    toggleMicrophone
-  );
-
-  // Create a function to create and configure connector
-  const createAndConfigureConnector = useCallback(async () => {
-    try {
-      const connector = new WebRTCConnector({
-        model: options.model || "gpt-4o-realtime-preview-2024-12-17",
-        voice: options.voice || "alloy",
-        instructions: options.instructions,
-        userId: options.userId,
-        onMessage: handleMessage,
-        onConnectionStateChange: handleConnectionStateChange,
-        onError: handleConnectionError
-      });
-      return connector;
-    } catch (error) {
-      handleConnectionError(error);
-      return null;
+  // Handle connection state changes
+  const handleConnectionStateChange = useCallback((state: RTCPeerConnectionState) => {
+    console.log(`[useConnectionManager] Connection state changed to: ${state}`);
+    
+    if (state === "connected") {
+      setIsConnected(true);
+      setIsConnecting(false);
+    } else if (state === "connecting") {
+      setIsConnecting(true);
+    } else if (state === "closed" || state === "disconnected" || state === "failed") {
+      setIsConnected(false);
+      setIsConnecting(false);
     }
-  }, [options, handleMessage, handleConnectionStateChange, handleConnectionError]);
+    
+    // Call the original onConnectionStateChange if provided
+    if (options.onConnectionStateChange) {
+      options.onConnectionStateChange(state);
+    }
+  }, [options, setIsConnected, setIsConnecting]);
 
-  // Use connection setup hook - pass all 7 required arguments
-  const { connect: setupConnect, initializeConnector } = useConnectionSetup(
+  // Handle connection errors
+  const handleConnectionError = useCallback((error: any) => {
+    console.error("[useConnectionManager] Connection error:", error);
+    
+    // Call the original onError if provided
+    if (options.onError) {
+      options.onError(error);
+    }
+  }, [options]);
+
+  // Use connection setup hook
+  const { connect, initializeConnector } = useConnectionSetup(
     connectorRef,
     options,
     setIsConnected,
@@ -84,42 +73,32 @@ export function useConnectionManager(
     handleConnectionError
   );
 
-  // Use connection initiation hook
-  const { connect } = useConnectionInitiation(
-    isConnected,
-    isConnecting,
-    connectorRef,
-    createAndConfigureConnector,
-    setIsConnecting,
-    handleConnectionError,
-    getActiveAudioTrack,
-    options
-  );
-
   // Use disconnection hook
   const { disconnect } = useConnectionDisconnection(
-    connectorRef, 
-    recorderRef, 
-    audioProcessorRef, 
+    connectorRef,
+    recorderRef,
+    audioProcessorRef,
     setIsConnected,
-    setIsConnecting, 
+    setIsConnecting,
     setIsMicrophoneActive,
     setCurrentTranscript,
-    setIsAiSpeaking
-  );
-  
-  // Use track event handler for audio processing
-  const { handleTrackEvent } = useTrackEventHandler(
-    audioProcessorRef,
     setIsAiSpeaking
   );
 
   // Use audio playback manager hook
   const { setAudioPlaybackManager } = useAudioPlaybackManager(connectorRef);
 
+  // Update the audio track reference when the microphone is toggled
+  const enhancedToggleMicrophone = useCallback(async () => {
+    const result = await toggleMicrophone();
+    updateAudioTrack();
+    return result;
+  }, [toggleMicrophone, updateAudioTrack]);
+
   return {
     connect,
     disconnect,
+    toggleMicrophone: enhancedToggleMicrophone,
     setAudioPlaybackManager
   };
 }

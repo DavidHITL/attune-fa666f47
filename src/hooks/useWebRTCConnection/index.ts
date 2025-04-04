@@ -94,7 +94,7 @@ export function useWebRTCConnection(
     }
   );
 
-  // Fix the type in the return statement to match WebRTCConnectionResult
+  // Return the WebRTCConnectionResult with the correct types
   return {
     isConnected,
     isConnecting,
@@ -105,12 +105,12 @@ export function useWebRTCConnection(
     transcriptProgress,
     messages,
     isDataChannelReady,
-    // Make connect return Promise<void> to match the interface
+    // Fix the connect function to return Promise<void>
     connect: async () => { 
       await connect();
     },
     disconnect,
-    // Make toggleMicrophone return Promise<void> to match the interface 
+    // Fix the toggleMicrophone function to return Promise<void>
     toggleMicrophone: async () => {
       await toggleMicrophone();
     },

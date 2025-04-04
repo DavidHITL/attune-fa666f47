@@ -1,4 +1,3 @@
-
 // Export the useConnectionActions function so it can be imported elsewhere
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useConnectionActions } from './useConnectionActions';
@@ -136,9 +135,15 @@ export function useConnectionManagement(options: UseWebRTCConnectionOptions = {}
   useEffect(() => {
     if (options.autoConnect && !isConnected && !isConnecting && connectionAttempts === 0) {
       console.log("[useConnectionManagement] [AutoConnect] Auto-connecting to WebRTC...");
-      actions.connect().catch(error => {
-        console.error("[useConnectionManagement] [AutoConnect] [ERROR] Auto-connect failed:", error);
-      });
+      // Fix the connect function call to use async/await properly
+      const connectAsync = async () => {
+        try {
+          await actions.connect();
+        } catch (error) {
+          console.error("[useConnectionManagement] [AutoConnect] [ERROR] Auto-connect failed:", error);
+        }
+      };
+      connectAsync();
     }
   }, [options.autoConnect, isConnected, isConnecting, connectionAttempts, actions]);
 
