@@ -1,130 +1,93 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
-interface EphemeralKeyResponse {
-  client_secret: {
-    value: string;
-    expires_at: number; // Unix timestamp in seconds
-  };
-  session_id?: string;
-  model?: string;
-}
-
-/**
- * Get an ephemeral OpenAI API key from Supabase Edge Function
- * @param options Optional parameters for session creation
- * @returns Promise with the ephemeral key
- */
-export async function getEphemeralKey(options: {
+interface EphemeralKeyOptions {
   model?: string;
   voice?: string;
   instructions?: string;
-  userId?: string;  // Add userId to the options type
-} = {}): Promise<string> {
+  userId?: string;
+}
+
+/**
+ * Get an ephemeral API key from the server
+ */
+export async function getEphemeralKey(options: EphemeralKeyOptions = {}): Promise<string> {
   try {
-    console.log("[ephemeralKeyService] Requesting ephemeral key from Supabase");
+    console.log("[EphemeralKey] [TokenFetch] Requesting ephemeral OpenAI API key");
+    console.time("[EphemeralKey] [TokenFetch] Token fetch duration");
     
-    // Verify we have an authenticated session before making the request
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    
-    // Still proceed even if there's no authenticated session
-    // This allows anonymous sessions to work
-    if (sessionError) {
-      console.warn("[ephemeralKeyService] Auth session warning (proceeding anyway):", sessionError);
-    }
-    
-    if (!sessionData?.session) {
-      console.warn("[ephemeralKeyService] No active session found, proceeding with anonymous access");
+    // Log if user ID is provided
+    if (options.userId) {
+      console.log(`[EphemeralKey] [TokenFetch] Request includes userId: ${options.userId.substring(0, 8)}...`);
     } else {
-      console.log("[ephemeralKeyService] User authenticated:", 
-        sessionData.session.user?.id ? 
-        `${sessionData.session.user.id.substring(0, 8)}...` : 
-        "unknown user");
+      console.log("[EphemeralKey] [TokenFetch] No userId provided, anonymous session");
     }
     
-    // Default parameters for the token request
-    const params = {
-      model: options.model || "gpt-4o-realtime-preview-2024-12-17",
-      voice: options.voice || "alloy",
-      instructions: options.instructions || "You are a helpful assistant. Be concise in your responses."
-    };
-    
-    console.log("[ephemeralKeyService] Requesting token with params:", 
-      JSON.stringify({
-        model: params.model,
-        voice: params.voice, 
-        hasInstructions: !!params.instructions,
-        isAuthenticated: !!sessionData?.session
-      })
-    );
-    
-    console.time("[ephemeralKeyService] Token request duration");
-    
-    // Now make the request, with or without an authenticated session
-    const { data, error } = await supabase.functions.invoke('generate-ephemeral-key', {
-      body: params
+    // Request an ephemeral key from the edge function
+    const response = await supabase.functions.invoke('generate-ephemeral-key', {
+      body: {
+        model: options.model || 'gpt-4o-realtime-preview-2024-12-17',
+        voice: options.voice || 'alloy',
+        instructions: options.instructions || 'You are a helpful, conversational AI assistant.',
+        userId: options.userId
+      }
     });
     
-    console.timeEnd("[ephemeralKeyService] Token request duration");
-    
-    if (error) {
-      console.error("[ephemeralKeyService] [TokenFetchError] Error fetching ephemeral key:", error);
-      throw new Error(`Failed to get ephemeral key: ${error.message}`);
+    console.timeEnd("[EphemeralKey] [TokenFetch] Token fetch duration");
+
+    // Check for errors
+    if (response.error) {
+      console.error("[EphemeralKey] [TokenFetch] [ERROR] Error fetching ephemeral key from edge function:", response.error);
+      throw new Error(`Failed to get ephemeral API key: ${response.error.message || 'Unknown error'}`);
     }
-    
-    if (!data || !data.client_secret?.value) {
-      console.error("[ephemeralKeyService] [TokenFetchError] Invalid response format:", data);
-      throw new Error("Invalid ephemeral key response format");
+
+    // Extract data
+    const data = response.data;
+    if (!data) {
+      console.error("[EphemeralKey] [TokenFetch] [ERROR] No data returned from edge function");
+      throw new Error('No data returned from ephemeral key function');
     }
-    
-    // Validate token expiration (should be valid for at least 5 seconds)
-    const expiresAt = data.client_secret.expires_at;
-    const currentTimestamp = Math.floor(Date.now() / 1000);
-    const timeUntilExpiration = expiresAt - currentTimestamp;
-    
-    if (timeUntilExpiration < 5) {
-      console.error("[ephemeralKeyService] [TokenFetchError] Token expiring too soon:", timeUntilExpiration);
-      throw new Error(`Ephemeral key expiring too soon (${timeUntilExpiration}s)`);
+
+    // Get the token
+    const apiKey = data.key;
+    if (!apiKey) {
+      console.error("[EphemeralKey] [TokenFetch] [ERROR] No API key in response:", data);
+      throw new Error('No API key in response from ephemeral key function');
     }
-    
-    // Log the token preview (first few characters) for debugging
-    console.log(`[ephemeralKeyService] Successfully obtained ephemeral key: ${data.client_secret.value.substring(0, 8)}..., valid for ${timeUntilExpiration} seconds`);
-    return data.client_secret.value;
+
+    console.log(`[EphemeralKey] [TokenFetch] Successfully retrieved ephemeral key of length: ${apiKey.length}`);
+    console.log(`[EphemeralKey] [TokenFetch] Key prefix: ${apiKey.substring(0, 5)}...`);
+
+    return apiKey;
   } catch (error) {
-    console.error("[ephemeralKeyService] [TokenFetchError] Exception getting ephemeral key:", error);
-    toast.error(`Connection error: Please try again in a moment.`);
-    throw new Error(`Failed to get ephemeral key: ${error instanceof Error ? error.message : String(error)}`);
+    console.error("[EphemeralKey] [TokenFetch] [ERROR] Error getting ephemeral key:", error);
+    console.error("[EphemeralKey] [TokenFetch] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
+    throw error;
   }
 }
 
 /**
- * Helper function to wrap API calls with secure OpenAI authentication
- * @param apiCallback Function that requires an API key
- * @returns Promise with the result of the API call
+ * Securely execute a function with an ephemeral OpenAI API key
+ * This is used to avoid storing API keys in the client
  */
 export async function withSecureOpenAI<T>(
-  apiCallback: (apiKey: string) => Promise<T>,
-  options: {
-    model?: string;
-    voice?: string;
-    instructions?: string;
-    userId?: string;  // Add userId to the options type
-  } = {}
+  fn: (apiKey: string) => Promise<T>,
+  options: EphemeralKeyOptions = {}
 ): Promise<T> {
   try {
-    console.log("[ephemeralKeyService] Starting secure OpenAI API call");
-    const ephemeralKey = await getEphemeralKey(options);
+    console.log("[SecureOpenAI] [TokenFetch] Starting secure OpenAI operation");
     
-    if (!ephemeralKey) {
-      console.error("[ephemeralKeyService] [TokenFetchError] No valid ephemeral key returned");
-      throw new Error("Failed to get valid ephemeral key");
-    }
+    // Get an ephemeral key
+    const apiKey = await getEphemeralKey(options);
     
-    console.log("[ephemeralKeyService] Executing API callback with ephemeral key");
-    return await apiCallback(ephemeralKey);
+    // Log the operation details
+    console.log("[SecureOpenAI] [TokenFetch] Ephemeral key received, executing secure operation");
+    
+    // Execute the function with the key
+    return await fn(apiKey);
   } catch (error) {
-    console.error("[ephemeralKeyService] [TokenFetchError] Error in secure API call:", error);
-    throw new Error(`Secure API call failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error("[SecureOpenAI] [TokenFetch] [ERROR] Error executing with secure OpenAI:", error);
+    console.error("[SecureOpenAI] [TokenFetch] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
+    throw error;
   }
 }

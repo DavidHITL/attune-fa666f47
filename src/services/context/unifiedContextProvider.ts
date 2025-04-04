@@ -16,19 +16,22 @@ export async function getMinimalInstructions(
   }
 ): Promise<string> {
   try {
+    console.log(`[UnifiedContext] [Phase1] [ContextLoad] Starting minimal instruction load`);
+    
     // For a quick connection, just add some minimal context
     // This ensures the connection isn't blocked by heavy context loading
     if (params.userId) {
-      console.log(`[UnifiedContext] [Phase1] Getting minimal instructions for user: ${params.userId.substring(0, 8)}...`);
+      console.log(`[UnifiedContext] [Phase1] [ContextLoad] Getting minimal instructions for user: ${params.userId.substring(0, 8)}...`);
       // If we have a userId, add a slight enhancement to the base instructions
       return `${baseInstructions}\n\nYou are speaking with user ${params.userId.substring(0, 8)}... Additional context will be loaded shortly.`;
     } else {
-      console.log(`[UnifiedContext] [Phase1] Getting minimal instructions for guest session (no userId)`);
+      console.log(`[UnifiedContext] [Phase1] [ContextLoad] Getting minimal instructions for guest session (no userId)`);
       // Return the basic instructions with a note about guest session
       return `${baseInstructions}\n\nThis is a guest session with limited context.`;
     }
   } catch (error) {
-    console.error("[UnifiedContext] [ContextLoadError] [Phase1] Error getting minimal instructions:", error);
+    console.error("[UnifiedContext] [Phase1] [ContextLoad] [ERROR] Error getting minimal instructions:", error);
+    console.error("[UnifiedContext] [Phase1] [ContextLoad] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
     // Even on error, return something rather than failing
     return baseInstructions;
   }
@@ -48,8 +51,10 @@ export async function getUnifiedEnhancedInstructions(
   }
 ): Promise<string> {
   try {
+    console.log(`[UnifiedContext] [Phase2] [ContextLoad] Starting enhanced instruction load`);
+    
     if (params.userId) {
-      console.log(`[UnifiedContext] [Phase2] Loading full context for user: ${params.userId.substring(0, 8)}...`);
+      console.log(`[UnifiedContext] [Phase2] [ContextLoad] Loading full context for user: ${params.userId.substring(0, 8)}...`);
       
       // Use the enhanceInstructionsWithContext function to add context to the instructions
       // Add a timeout to prevent blocking if context enhancement takes too long
@@ -58,32 +63,35 @@ export async function getUnifiedEnhancedInstructions(
       // Set a timeout to prevent blocking
       const timeoutPromise = new Promise<string>((resolve) => {
         setTimeout(() => {
-          console.warn("[UnifiedContext] [ContextLoadError] [Phase2] Context enhancement timed out, using basic instructions");
+          console.warn("[UnifiedContext] [Phase2] [ContextLoad] [WARNING] Context enhancement timed out, using basic instructions");
           resolve(baseInstructions);
         }, 3000); // 3 second timeout (increased from 2.5s)
       });
       
       // Race the enhancement against the timeout
+      console.log("[UnifiedContext] [Phase2] [ContextLoad] Waiting for context enhancement (with 3s timeout)");
       const enhancedInstructions = await Promise.race([enhancementPromise, timeoutPromise]);
       
       // Log that we enhanced the instructions for this user
-      console.log(`[UnifiedContext] [Phase2] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
+      console.log(`[UnifiedContext] [Phase2] [ContextLoad] Enhanced instructions for user ${params.userId} in ${params.activeMode} mode`);
+      console.log(`[UnifiedContext] [Phase2] [ContextLoad] Instructions size: ${enhancedInstructions.length} characters`);
       
       // Log context verification without awaiting it
       logContextVerification(params, baseInstructions).catch(err => {
         // Don't let logging errors disrupt the main flow
-        console.error("[UnifiedContext] [ContextLoadError] Error in context verification logging:", err);
+        console.error("[UnifiedContext] [ContextLoad] [ERROR] Error in context verification logging:", err);
       });
       
       return enhancedInstructions;
     } else {
-      console.log("[UnifiedContext] [Phase2] No userId provided, using base instructions for guest mode");
+      console.log("[UnifiedContext] [Phase2] [ContextLoad] No userId provided, using base instructions for guest mode");
       
       // For guest users without userId, just use the base instructions
       return `${baseInstructions}\n\nThis is a guest session with limited personalization.`;
     }
   } catch (error) {
-    console.error("[UnifiedContext] [ContextLoadError] [Phase2] Error enhancing instructions with unified context:", error);
+    console.error("[UnifiedContext] [Phase2] [ContextLoad] [ERROR] Error enhancing instructions with unified context:", error);
+    console.error("[UnifiedContext] [Phase2] [ContextLoad] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
     // Return the original instructions if enhancement fails
     return baseInstructions;
   }
@@ -210,23 +218,26 @@ export async function updateSessionWithFullContext(
   }
 ): Promise<boolean> {
   try {
+    console.log("[UnifiedContext] [Phase2] [DataChannel] Starting context update process");
+    
     // Early validation checks
     if (dataChannel.readyState !== 'open') {
-      console.warn("[UnifiedContext] [DataChannelError] Cannot update context: Data channel not open, state:", dataChannel.readyState);
+      console.error(`[UnifiedContext] [Phase2] [DataChannel] [ERROR] Cannot update context: Data channel not open, state: ${dataChannel.readyState}`);
       return false;
     }
     
-    console.log("[UnifiedContext] [Phase2] Data channel is open, loading full context update");
+    console.log(`[UnifiedContext] [Phase2] [DataChannel] Data channel is open (${dataChannel.label}), ready for context update`);
     
     // Log whether we have a userId for context enrichment
     if (params.userId) {
-      console.log(`[UnifiedContext] [Phase2] Loading full context for user: ${params.userId.substring(0, 8)}...`);
+      console.log(`[UnifiedContext] [Phase2] [ContextLoad] Loading full context for user: ${params.userId.substring(0, 8)}...`);
     } else {
-      console.log("[UnifiedContext] [Phase2] No userId available - proceeding with guest session");
+      console.log("[UnifiedContext] [Phase2] [ContextLoad] No userId available - proceeding with guest session");
     }
     
     try {
       // Get the enhanced instructions with full context
+      console.log("[UnifiedContext] [Phase2] [ContextLoad] Getting enhanced instructions");
       const fullEnhancedInstructions = await getUnifiedEnhancedInstructions(
         baseInstructions,
         {
@@ -247,20 +258,25 @@ export async function updateSessionWithFullContext(
       // Double-check the channel is still open before attempting to send
       if (dataChannel.readyState === 'open') {
         try {
-          console.log("[UnifiedContext] [Phase2] Sending context update through data channel");
-          console.log("[UnifiedContext] [Phase2] Context size:", fullEnhancedInstructions.length, "characters");
+          console.log(`[UnifiedContext] [Phase2] [ContextSend] Sending context update through data channel (${dataChannel.label})`);
+          console.log(`[UnifiedContext] [Phase2] [ContextSend] Context size: ${fullEnhancedInstructions.length} characters`);
+          console.log(`[UnifiedContext] [Phase2] [ContextSend] Data channel buffer amount: ${dataChannel.bufferedAmount} bytes`);
           
-          dataChannel.send(JSON.stringify(contextUpdateMessage));
+          const messageJson = JSON.stringify(contextUpdateMessage);
+          console.log(`[UnifiedContext] [Phase2] [ContextSend] Message size: ${messageJson.length} bytes`);
+          
+          dataChannel.send(messageJson);
+          console.log("[UnifiedContext] [Phase2] [ContextSend] Context update sent successfully");
           
           // Create a promise that resolves on message acknowledgement or timeout
           const contextUpdateSuccessful = await new Promise<boolean>((resolve) => {
             // We'll resolve after a short timeout as there's no direct ack
             setTimeout(() => {
               if (dataChannel.readyState === 'open') {
-                console.log("[UnifiedContext] [Phase2] Full context update sent successfully");
+                console.log("[UnifiedContext] [Phase2] [ContextSend] Full context update presumed successful (no errors)");
                 resolve(true);
               } else {
-                console.warn("[UnifiedContext] [Phase2] Data channel closed after sending context");
+                console.warn("[UnifiedContext] [Phase2] [ContextSend] [WARNING] Data channel closed after sending context");
                 resolve(false);
               }
             }, 1000); // Increased delay to ensure message is processed
@@ -270,7 +286,7 @@ export async function updateSessionWithFullContext(
               try {
                 const response = JSON.parse(event.data);
                 if (response.type === 'session.updated') {
-                  console.log("[UnifiedContext] [Phase2] Received session.updated confirmation");
+                  console.log("[UnifiedContext] [Phase2] [ContextSend] Received session.updated confirmation");
                   dataChannel.removeEventListener('message', messageHandler);
                   resolve(true);
                 }
@@ -292,19 +308,22 @@ export async function updateSessionWithFullContext(
           
           return contextUpdateSuccessful;
         } catch (error) {
-          console.error("[UnifiedContext] [DataChannelError] Error sending context through data channel:", error);
+          console.error("[UnifiedContext] [Phase2] [ContextSend] [ERROR] Error sending context through data channel:", error);
+          console.error("[UnifiedContext] [Phase2] [ContextSend] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
           return false;
         }
       } else {
-        console.warn(`[UnifiedContext] [DataChannelError] Data channel closed (${dataChannel.readyState}) before context could be sent`);
+        console.warn(`[UnifiedContext] [Phase2] [DataChannel] [ERROR] Data channel closed (${dataChannel.readyState}) before context could be sent`);
         return false;
       }
     } catch (error) {
-      console.error("[UnifiedContext] [ContextLoadError] [Phase2] Error loading and sending full context:", error);
+      console.error("[UnifiedContext] [Phase2] [ContextSend] [ERROR] Error loading and sending full context:", error);
+      console.error("[UnifiedContext] [Phase2] [ContextSend] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
       return false;
     }
   } catch (error) {
-    console.error("[UnifiedContext] [DataChannelError] Error updating session with full context:", error);
+    console.error("[UnifiedContext] [Phase2] [ContextSend] [ERROR] Error updating session with full context:", error);
+    console.error("[UnifiedContext] [Phase2] [ContextSend] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
     return false;
   }
 }

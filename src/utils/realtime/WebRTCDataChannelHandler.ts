@@ -9,12 +9,13 @@ export function setupDataChannelListeners(
   options: WebRTCOptions,
   onOpen?: () => void
 ): void {
-  console.log(`[WebRTC] Setting up listeners for data channel: ${dc.label}`);
+  console.log(`[WebRTC] [DataChannel] Setting up listeners for data channel: ${dc.label}, readyState: ${dc.readyState}`);
   
   // Set up timeout to monitor channel opening
   const channelOpenTimeout = setTimeout(() => {
     if (dc.readyState !== 'open') {
-      console.error(`[WebRTC] Data channel '${dc.label}' failed to open within timeout period (10 seconds)`);
+      console.error(`[WebRTC] [DataChannel] [ERROR] Data channel '${dc.label}' failed to open within timeout period (10 seconds)`);
+      console.error(`[WebRTC] [DataChannel] [ERROR] Current readyState: ${dc.readyState}`);
       
       // Notify about the timeout issue if error handler is available
       if (options.onError) {
@@ -24,29 +25,29 @@ export function setupDataChannelListeners(
   }, 10000); // 10 second timeout (increased from 5s)
   
   dc.onopen = () => {
-    console.log(`[WebRTC] Data channel '${dc.label}' opened, readyState: ${dc.readyState}`);
+    console.log(`[WebRTC] [DataChannel] Data channel '${dc.label}' opened, readyState: ${dc.readyState}`);
     clearTimeout(channelOpenTimeout);
     
     // Verify the channel is actually open before calling the callback
     if (dc.readyState === 'open') {
       // Call the onOpen callback if provided
       if (onOpen) {
-        console.log("[WebRTC] Calling onOpen callback for data channel");
+        console.log(`[WebRTC] [DataChannel] Calling onOpen callback for data channel '${dc.label}'`);
         onOpen();
       }
     } else {
-      console.warn(`[WebRTC] Data channel reported open event but readyState is ${dc.readyState}`);
+      console.warn(`[WebRTC] [DataChannel] [WARNING] Data channel reported open event but readyState is ${dc.readyState}`);
     }
   };
   
   dc.onclose = () => {
-    console.log(`[WebRTC] Data channel '${dc.label}' closed, readyState: ${dc.readyState}`);
+    console.log(`[WebRTC] [DataChannel] Data channel '${dc.label}' closed, readyState: ${dc.readyState}`);
     clearTimeout(channelOpenTimeout);
     
     // Only report unexpected closures as errors when the connection is still active
     if ((dc.readyState === 'closing' || dc.readyState === 'closed') && 
         (dc.label === 'oai-events' || dc.label === 'data')) {
-      console.warn(`[WebRTC] Data channel '${dc.label}' was closed unexpectedly`);
+      console.warn(`[WebRTC] [DataChannel] [WARNING] Data channel '${dc.label}' was closed unexpectedly`);
       
       if (options.onError) {
         options.onError(new Error(`Data channel '${dc.label}' closed unexpectedly`));
@@ -55,12 +56,12 @@ export function setupDataChannelListeners(
   };
   
   dc.onerror = (event) => {
-    console.error(`[WebRTC] Data channel '${dc.label}' error:`);
+    console.error(`[WebRTC] [DataChannel] [ERROR] Data channel '${dc.label}' error:`);
     clearTimeout(channelOpenTimeout);
     
     // Extract detailed error information if available
     if (event instanceof RTCErrorEvent) {
-      console.error("[WebRTC] Error details:", {
+      console.error("[WebRTC] [DataChannel] [ERROR] Error details:", {
         errorType: event.error.errorDetail,
         message: event.error.message || "No message provided",
         receivedAlert: event.error.receivedAlert,
@@ -68,7 +69,7 @@ export function setupDataChannelListeners(
         sdpLineNumber: event.error.sdpLineNumber
       });
     } else {
-      console.error("[WebRTC] Error event:", event);
+      console.error("[WebRTC] [DataChannel] [ERROR] Error event:", event);
     }
     
     // Propagate the error
@@ -81,13 +82,17 @@ export function setupDataChannelListeners(
     try {
       // Parse the message and log for debugging
       const message = JSON.parse(event.data);
-      console.log(`[WebRTC] Received message on '${dc.label}' channel:`, message.type || "unknown type");
+      console.log(`[WebRTC] [DataChannel] Received message on '${dc.label}' channel:`, message.type || "unknown type");
       
       // Log specific message types in more detail
       if (message.type === 'input_audio_buffer.commit') {
-        console.log("[WebRTC] Voice activity detected end - Audio buffer committed");
+        console.log("[WebRTC] [DataChannel] Voice activity detected end - Audio buffer committed");
       } else if (message.type === 'session.created') {
-        console.log("[WebRTC] Session created successfully:", message.session?.id);
+        console.log("[WebRTC] [DataChannel] Session created successfully:", message.session?.id);
+      } else if (message.type === 'session.updated') {
+        console.log("[WebRTC] [DataChannel] Session updated successfully");
+      } else if (message.type === 'error') {
+        console.error(`[WebRTC] [DataChannel] [ERROR] Received error from server: ${message.error?.message || "Unknown error"}`);
       }
       
       // Forward the message to the callback if provided
@@ -95,7 +100,7 @@ export function setupDataChannelListeners(
         options.onMessage(event);
       }
     } catch (error) {
-      console.warn(`[WebRTC] Could not parse message as JSON on '${dc.label}' channel:`, event.data);
+      console.warn(`[WebRTC] [DataChannel] Could not parse message as JSON on '${dc.label}' channel:`, event.data);
       
       // Try to forward the raw message anyway
       if (options.onMessage) {
@@ -115,7 +120,7 @@ export function createDataChannel(
   onOpen?: () => void
 ): RTCDataChannel {
   try {
-    console.log(`[WebRTC] Creating data channel: ${label}`);
+    console.log(`[WebRTC] [DataChannel] Creating data channel: ${label}`);
     
     // Improved data channel options for reliability
     const dataChannelOptions: RTCDataChannelInit = {
@@ -124,17 +129,20 @@ export function createDataChannel(
     };
     
     const dc = pc.createDataChannel(label, dataChannelOptions);
+    console.log(`[WebRTC] [DataChannel] Data channel created with id: ${dc.id}, initial readyState: ${dc.readyState}`);
+    
     setupDataChannelListeners(dc, options, onOpen);
     
     // Check if the data channel is already open (rare but possible)
     if (dc.readyState === 'open' && onOpen) {
-      console.log(`[WebRTC] Data channel '${label}' already open, calling onOpen callback immediately`);
+      console.log(`[WebRTC] [DataChannel] Data channel '${label}' already open, calling onOpen callback immediately`);
       onOpen();
     }
     
     return dc;
   } catch (error) {
-    console.error(`[WebRTC] Error creating data channel '${label}':`, error);
+    console.error(`[WebRTC] [DataChannel] [ERROR] Error creating data channel '${label}':`, error);
+    console.error("[WebRTC] [DataChannel] [ERROR] Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
     throw error;
   }
 }
