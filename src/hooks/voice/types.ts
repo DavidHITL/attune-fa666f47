@@ -1,20 +1,7 @@
-import { ReactNode } from "react";
-import { User } from "@supabase/supabase-js";
 import { AudioPlaybackManager } from "@/utils/realtime/audio/AudioPlaybackManager";
+import { User } from "@supabase/supabase-js";
+import React from "react";
 
-/**
- * Props for the VoiceChatProvider component
- */
-export interface VoiceChatProviderProps {
-  children: ReactNode;
-  systemPrompt?: string;
-  voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
-  onClose?: () => void;
-}
-
-/**
- * Context interface for the VoiceChatContext
- */
 export interface VoiceChatContextProps {
   // Connection state
   isConnected: boolean;
@@ -47,12 +34,19 @@ export interface VoiceChatContextProps {
   user: User | null;
 }
 
-/**
- * Context verification parameters
- */
-export interface ContextVerificationParams {
+export interface UseConnectionErrorHandlerProps {
   userId?: string;
-  activeMode: 'text' | 'voice';
-  sessionStarted: boolean;
-  sessionProgress?: number;
+  connectionAttempts: number;
+  maxConnectionAttempts: number;
+  setConnectionAttempts: React.Dispatch<React.SetStateAction<number>>;
+  connect: () => Promise<void>;
+}
+
+export interface UseVoiceChatEffectsProps {
+  isConnected: boolean;
+  isAiSpeaking: boolean;
+  currentTranscript: string;
+  user: User | null;
+  systemPrompt?: string;
+  disconnect: () => void;
 }

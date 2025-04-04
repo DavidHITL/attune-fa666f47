@@ -1,15 +1,22 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { UseConnectionErrorHandlerProps } from "./types";
 
 /**
- * Hook to handle WebRTC connection errors and attempt reconnection
+ * Hook to handle connection errors and retry logic
  */
-export function useConnectionErrorHandler(
-  connectionAttempts: number,
-  maxConnectionAttempts: number,
-  setConnectionAttempts: (attempts: number) => void
-) {
+export function useConnectionErrorHandler({
+  userId,
+  connectionAttempts,
+  maxConnectionAttempts,
+  setConnectionAttempts,
+  connect
+}: UseConnectionErrorHandlerProps) {
+  
+  /**
+   * Handle connection errors with smart retry logic
+   */
   const handleConnectionError = useCallback((error: any) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     
@@ -26,13 +33,14 @@ export function useConnectionErrorHandler(
       
       // Wait a moment before reconnecting
       setTimeout(() => {
-        // Note: connect function will be passed in the parent component
-        console.log("[VoiceChat] Attempting reconnection...");
+        if (connect) connect().catch(console.error);
       }, 1500);
     } else {
       toast.error("Connection failed after multiple attempts. Please try again later.");
     }
-  }, [connectionAttempts, maxConnectionAttempts, setConnectionAttempts]);
+  }, [connectionAttempts, maxConnectionAttempts, connect, setConnectionAttempts, userId]);
 
-  return handleConnectionError;
+  return {
+    handleConnectionError
+  };
 }
