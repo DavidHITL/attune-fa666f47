@@ -1,4 +1,3 @@
-
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
@@ -22,6 +21,7 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
   private messageSender: MessageSender;
   private sessionManager: SessionConfigManager;
   private sessionConfigured: boolean = false;
+  private _audioPlaybackManager: AudioPlaybackManager | null = null;
   
   constructor(options: WebRTCOptions) {
     super(options);
@@ -55,8 +55,22 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
    * Set the audio playback manager
    */
   setAudioPlaybackManager(manager: AudioPlaybackManager): void {
+    console.log("[WebRTCConnectionManager] Setting AudioPlaybackManager");
+    this._audioPlaybackManager = manager;
     this.audioManager.setAudioPlaybackManager(manager);
     this.sessionManager.setAudioPlaybackManager(manager);
+    
+    // Store reference for reconnection scenarios
+    if (manager) {
+      console.log("[WebRTCConnectionManager] AudioPlaybackManager configured successfully");
+    }
+  }
+
+  /**
+   * Get the audio playback manager for internal use
+   */
+  get _audioPlaybackManager(): AudioPlaybackManager | null {
+    return this._audioPlaybackManager;
   }
 
   /**
@@ -68,8 +82,6 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
 
   /**
    * Initialize and connect to OpenAI's Realtime API using WebRTC
-   * @param apiKey Ephemeral API key for authenticating with OpenAI
-   * @param audioTrack Optional MediaStreamTrack to add to the peer connection
    */
   async connect(apiKey: string, audioTrack?: MediaStreamTrack): Promise<boolean> {
     console.log("[WebRTCConnectionManager] Starting connection process");
@@ -132,6 +144,12 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
       console.log("[WebRTCConnectionManager] Setting peer connection and data channel");
       this.connectionStateManager.setPeerConnection(connection.pc);
       this.dataChannelHandler.setDataChannel(connection.dc, this.handleError.bind(this));
+      
+      // If we already have an AudioPlaybackManager, ensure it's properly connected
+      if (this._audioPlaybackManager) {
+        console.log("[WebRTCConnectionManager] Re-applying AudioPlaybackManager after connection");
+        this.audioManager.setAudioPlaybackManager(this._audioPlaybackManager);
+      }
       
       console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
       return true;
@@ -225,6 +243,13 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     
     // Configure the session
     this.sessionManager.configureSession(pc, dc, this.options);
+    
+    // If we have an AudioPlaybackManager, ensure it's properly connected after session is configured
+    if (this._audioPlaybackManager) {
+      console.log("[WebRTCConnectionManager] Applying AudioPlaybackManager after session configuration");
+      this.audioManager.setAudioPlaybackManager(this._audioPlaybackManager);
+      this.sessionManager.setAudioPlaybackManager(this._audioPlaybackManager);
+    }
     
     // Set up context update after session is configured
     // Moving the context update to the data channel handler
