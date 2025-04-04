@@ -1,7 +1,7 @@
 
 import { useEffect } from "react";
 import { saveMessage } from "@/services/messages/messageStorage";
-import { User } from "@supabase/supabase-js"; // Import User type directly from supabase
+import { User } from "@supabase/supabase-js"; 
 import { logContextVerification } from "@/services/context/unifiedContextProvider";
 
 interface UseVoiceChatEffectsProps {
@@ -13,6 +13,10 @@ interface UseVoiceChatEffectsProps {
   disconnect: () => void;
 }
 
+/**
+ * Hook to handle side effects for voice chat
+ * Manages saving transcripts and cleanup on unmount
+ */
 export function useVoiceChatEffects({
   isConnected,
   isAiSpeaking,

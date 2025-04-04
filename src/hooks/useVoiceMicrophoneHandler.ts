@@ -5,10 +5,13 @@ import { toast } from "sonner";
 interface UseVoiceMicrophoneHandlerProps {
   isConnected: boolean;
   isMicrophoneActive: boolean;
-  commitAudioBuffer: () => boolean; // Changed to match expected signature
+  commitAudioBuffer: () => boolean;
   toggleMicrophone: () => Promise<boolean>;
 }
 
+/**
+ * Hook to handle microphone interactions including permissions and keyboard shortcuts
+ */
 export function useVoiceMicrophoneHandler({
   isConnected,
   isMicrophoneActive,
