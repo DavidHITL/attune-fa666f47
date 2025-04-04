@@ -4,6 +4,7 @@ import { useConnectionDisconnection } from "./useConnectionDisconnection";
 import { useConnectionInitiation } from "./useConnectionInitiation";
 import { useTrackEventHandler } from "./useTrackEventHandler";
 import { useAudioPlaybackManager } from "./useAudioPlaybackManager";
+import { useConnectionSetup } from "./useConnectionSetup";
 
 /**
  * Hook to manage WebRTC connection and related operations
@@ -30,18 +31,17 @@ export function useConnectionManager(
     setIsAiSpeaking
   );
   
-  // Use the connection initiation hook
-  const { connect, sendTextMessage, commitAudioBuffer } = useConnectionInitiation(
+  // Use the connection setup hook - this properly returns sendTextMessage and commitAudioBuffer
+  const { connect, sendTextMessage, commitAudioBuffer } = useConnectionSetup(
     connectorRef,
     audioProcessorRef,
-    recorderRef,
+    handleMessage,
     options,
     isConnected,
     isConnecting,
     setIsConnecting,
-    handleMessage,
-    handleTrackEvent,
-    getActiveAudioTrack
+    getActiveAudioTrack,
+    handleTrackEvent
   );
   
   // Use the connection disconnection hook

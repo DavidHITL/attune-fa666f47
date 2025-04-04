@@ -78,7 +78,7 @@ export function useConnectionActions(
   
   // Fix the connect function to ensure it's properly typed as an async function
   const connectAsync = useCallback(async () => {
-    if (connect) {
+    if (connect && typeof connect === 'function') {
       return await connect();
     }
     return false;

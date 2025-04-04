@@ -1,3 +1,4 @@
+
 import { WebRTCOptions } from "../WebRTCTypes";
 import { ConnectionBase } from "./ConnectionBase";
 import { WebRTCConnectionEstablisher } from "./WebRTCConnectionEstablisher";
@@ -146,9 +147,9 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
       this.dataChannelHandler.setDataChannel(connection.dc, this.handleError.bind(this));
       
       // If we already have an AudioPlaybackManager, ensure it's properly connected
-      if (this._audioPlaybackManager) {
+      if (this._audioPlaybackManagerRef) {
         console.log("[WebRTCConnectionManager] Re-applying AudioPlaybackManager after connection");
-        this.audioManager.setAudioPlaybackManager(this._audioPlaybackManager);
+        this.audioManager.setAudioPlaybackManager(this._audioPlaybackManagerRef);
       }
       
       console.log("[WebRTCConnectionManager] WebRTC connection established successfully");
@@ -245,10 +246,10 @@ export class WebRTCConnectionManager extends ConnectionBase implements IConnecti
     this.sessionManager.configureSession(pc, dc, this.options);
     
     // If we have an AudioPlaybackManager, ensure it's properly connected after session is configured
-    if (this._audioPlaybackManager) {
+    if (this._audioPlaybackManagerRef) {
       console.log("[WebRTCConnectionManager] Applying AudioPlaybackManager after session configuration");
-      this.audioManager.setAudioPlaybackManager(this._audioPlaybackManager);
-      this.sessionManager.setAudioPlaybackManager(this._audioPlaybackManager);
+      this.audioManager.setAudioPlaybackManager(this._audioPlaybackManagerRef);
+      this.sessionManager.setAudioPlaybackManager(this._audioPlaybackManagerRef);
     }
     
     // Set up context update after session is configured

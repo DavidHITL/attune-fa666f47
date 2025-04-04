@@ -140,7 +140,7 @@ export function useConnectionManagement(options: UseWebRTCConnectionOptions = {}
       // Fix the connect function call to use async/await properly
       const connectAsync = async () => {
         try {
-          if (actions && actions.connect) {
+          if (actions && actions.connect && typeof actions.connect === 'function') {
             await actions.connect();
           }
         } catch (error) {
