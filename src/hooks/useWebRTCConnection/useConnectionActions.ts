@@ -12,8 +12,9 @@ export function useConnectionActions(
   audioTrackRef: React.MutableRefObject<MediaStreamTrack | null>,
   options: any,
   setIsConnecting: (isConnecting: boolean) => void,
-  handleConnectionStateChange: (state: RTCPeerConnectionState) => void,
-  handleConnectionError: (error: any) => void
+  handleMessage: (event: MessageEvent) => void,
+  handleConnectionError: (error: any) => void,
+  handleConnectionStateChange: (state: RTCPeerConnectionState) => void
 ) {
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
@@ -40,7 +41,8 @@ export function useConnectionActions(
       const connector = new WebRTCConnector({
         ...options,
         onConnectionStateChange: handleConnectionStateChange,
-        onError: handleConnectionError
+        onError: handleConnectionError,
+        onMessage: handleMessage
       });
       
       connectorRef.current = connector;
@@ -52,10 +54,11 @@ export function useConnectionActions(
       }
       
       console.log("[useConnectionActions] Connecting to OpenAI");
-      const connected = await connector.connect(apiKey, audioTrack || undefined);
+      const connected = await connector.connect(audioTrack || undefined);
       
       if (!connected) {
         console.error("[useConnectionActions] Failed to connect");
+        handleConnectionError(new Error("Failed to establish WebRTC connection"));
         setIsConnecting(false);
         return;
       }
@@ -74,7 +77,8 @@ export function useConnectionActions(
     isConnecting,
     setIsConnecting,
     handleConnectionStateChange,
-    handleConnectionError
+    handleConnectionError,
+    handleMessage
   ]);
 
   // Send text message to AI

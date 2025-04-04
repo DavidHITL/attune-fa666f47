@@ -4,12 +4,14 @@ import { WebRTCConnectionManager } from "./connector/WebRTCConnectionManager";
 import { withSecureOpenAI } from "@/services/api/ephemeralKeyService";
 import { IConnectionManager } from "./connector/interfaces/IConnectionManager";
 import { AudioPlaybackManager } from "./audio/AudioPlaybackManager";
+import { toast } from "sonner";
 
 /**
  * Main class for handling WebRTC connections to OpenAI's API
  */
 export class WebRTCConnector {
   private connectionManager: IConnectionManager;
+  private connectionInProgress: boolean = false;
 
   constructor(options: WebRTCOptions) {
     // Validate userId if provided
@@ -33,32 +35,55 @@ export class WebRTCConnector {
    */
   async connect(audioTrack?: MediaStreamTrack): Promise<boolean> {
     try {
-      // Use the ephemeral key service to get a secure API key
-      return await withSecureOpenAI(async (apiKey) => {
-        if (!apiKey) {
-          console.error("[WebRTCConnector] OpenAI API key is required");
-          return false;
-        }
-        
-        console.log("[WebRTCConnector] Connecting with ephemeral API key");
-        
-        // Log userId for debugging connection issues
-        const options = this.getOptions();
-        if (options.userId) {
-          console.log(`[WebRTCConnector] Using userId in connection: ${options.userId.substring(0, 8)}...`);
-        } else {
-          console.log("[WebRTCConnector] Connecting without userId (guest mode)");
-        }
-        
-        return this.connectionManager.connect(apiKey, audioTrack);
-      }, {
-        model: this.getOptions().model,
-        voice: this.getOptions().voice,
-        instructions: this.getOptions().instructions,
-        userId: this.getOptions().userId // This is causing the TypeScript error
-      });
+      // Prevent multiple simultaneous connection attempts
+      if (this.connectionInProgress) {
+        console.warn("[WebRTCConnector] Connection already in progress, ignoring duplicate request");
+        return false;
+      }
+      
+      this.connectionInProgress = true;
+      
+      try {
+        // Use the ephemeral key service to get a secure API key with proper await
+        return await withSecureOpenAI(async (apiKey) => {
+          if (!apiKey) {
+            console.error("[WebRTCConnector] OpenAI API key is required");
+            toast.error("Connection failed: No API key available");
+            return false;
+          }
+          
+          console.log("[WebRTCConnector] Connecting with ephemeral API key");
+          
+          // Log userId for debugging connection issues
+          const options = this.getOptions();
+          if (options.userId) {
+            console.log(`[WebRTCConnector] Using userId in connection: ${options.userId.substring(0, 8)}...`);
+          } else {
+            console.log("[WebRTCConnector] Connecting without userId (guest mode)");
+          }
+          
+          const success = await this.connectionManager.connect(apiKey, audioTrack);
+          
+          if (!success) {
+            console.error("[WebRTCConnector] Connection failed");
+            toast.error("Connection to AI failed. Please try again.");
+          }
+          
+          return success;
+        }, {
+          model: this.getOptions().model,
+          voice: this.getOptions().voice,
+          instructions: this.getOptions().instructions,
+          userId: this.getOptions().userId
+        });
+      } finally {
+        // Always reset the connection flag regardless of outcome
+        this.connectionInProgress = false;
+      }
     } catch (error) {
+      this.connectionInProgress = false;
       console.error("[WebRTCConnector] Error connecting:", error);
+      toast.error("Connection error. Please try again later.");
       return false;
     }
   }

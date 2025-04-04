@@ -6,6 +6,8 @@ import { DataChannelCreator } from "./DataChannelCreator";
 import { setupPeerConnectionListeners } from "../WebRTCConnectionListeners";
 
 export class ConnectionEstablisher {
+  private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
+
   /**
    * Establish a connection to OpenAI's Realtime API
    */
@@ -18,8 +20,19 @@ export class ConnectionEstablisher {
     try {
       console.log("[ConnectionEstablisher] Starting connection establishment process");
       
+      // Clear any existing connection timeout
+      this.clearConnectionTimeout();
+      
+      // Set a global timeout for the entire connection process
+      this.connectionTimeout = setTimeout(() => {
+        console.error("[ConnectionEstablisher] [ConnectionTimeout] Connection establishment timed out after 20 seconds");
+        callbacks.onError(new Error("Connection establishment timed out"));
+        this.clearConnectionTimeout();
+      }, 20000); // Increased from previous value
+      
       // Verify API key is present
       if (!apiKey || apiKey.trim() === '') {
+        this.clearConnectionTimeout();
         console.error("[ConnectionEstablisher] [ApiKeyError] Empty or invalid API key provided");
         callbacks.onError(new Error("No valid API key provided"));
         return null;
@@ -84,6 +97,7 @@ export class ConnectionEstablisher {
       console.log("[ConnectionEstablisher] Creating data channel");
       const dc = DataChannelCreator.createDataChannel(pc, "data", options, callbacks.onDataChannelOpen);
       if (!dc) {
+        this.clearConnectionTimeout();
         console.error("[ConnectionEstablisher] [DataChannelError] Failed to create data channel");
         throw new Error("Failed to create data channel");
       }
@@ -100,6 +114,7 @@ export class ConnectionEstablisher {
         offer = await pc.createOffer(offerOptions);
         console.log("[ConnectionEstablisher] [OfferCreation] Successfully created offer");
       } catch (offerError) {
+        this.clearConnectionTimeout();
         console.error("[ConnectionEstablisher] [OfferCreationError] Failed to create offer:", offerError);
         throw new Error(`Failed to create WebRTC offer: ${offerError.message}`);
       }
@@ -110,11 +125,13 @@ export class ConnectionEstablisher {
         await pc.setLocalDescription(offer);
         console.log("[ConnectionEstablisher] [LocalDescription] Local description set successfully");
       } catch (sdpError) {
+        this.clearConnectionTimeout();
         console.error("[ConnectionEstablisher] [LocalDescriptionError] Failed to set local description:", sdpError);
         throw new Error(`Failed to set local description: ${sdpError.message}`);
       }
       
       if (!pc.localDescription || !pc.localDescription.sdp) {
+        this.clearConnectionTimeout();
         console.error("[ConnectionEstablisher] [LocalDescriptionError] No SDP in local description");
         throw new Error("Failed to set local description - no SDP available");
       }
@@ -126,17 +143,29 @@ export class ConnectionEstablisher {
 
       try {
         console.time("[ConnectionEstablisher] [ApiRequest] SDP exchange duration");
+        
+        // Set a specific timeout just for the API request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+        }, 15000); // 15 second timeout
+        
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/sdp"
           },
-          body: pc.localDescription.sdp
+          body: pc.localDescription.sdp,
+          signal: controller.signal
+        }).finally(() => {
+          clearTimeout(timeoutId);
         });
+        
         console.timeEnd("[ConnectionEstablisher] [ApiRequest] SDP exchange duration");
 
         if (!response.ok) {
+          this.clearConnectionTimeout();
           const errorText = await response.text();
           console.error(`[ConnectionEstablisher] [ApiRequestError] API request failed with status ${response.status}:`, errorText);
           
@@ -153,6 +182,7 @@ export class ConnectionEstablisher {
         console.log("[ConnectionEstablisher] [ApiRequest] Received SDP answer from API");
 
         if (!answerSdp || answerSdp.trim().length < 10) {
+          this.clearConnectionTimeout();
           console.error("[ConnectionEstablisher] [ApiRequestError] Received empty or invalid SDP answer");
           throw new Error("Received empty or invalid SDP answer from OpenAI");
         }
@@ -167,7 +197,10 @@ export class ConnectionEstablisher {
         await pc.setRemoteDescription(answerDesc);
         console.log("[ConnectionEstablisher] [RemoteDescription] Remote description set successfully");
 
+        // Clear the timeout since we've successfully established connection
+        this.clearConnectionTimeout();
       } catch (apiError) {
+        this.clearConnectionTimeout();
         console.error("[ConnectionEstablisher] [ApiRequestError] Error in API communication:", apiError);
         throw apiError;
       }
@@ -175,10 +208,21 @@ export class ConnectionEstablisher {
       console.log("[ConnectionEstablisher] Connection established successfully");
       return { pc, dc };
     } catch (error) {
+      this.clearConnectionTimeout();
       console.error("[ConnectionEstablisher] [ConnectionError] Error establishing connection:", error);
       console.error("[ConnectionEstablisher] [ConnectionError] Stack trace:", error?.stack);
       callbacks.onError(error);
       return null;
+    }
+  }
+
+  /**
+   * Clear connection timeout if it exists
+   */
+  private clearConnectionTimeout(): void {
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
     }
   }
 

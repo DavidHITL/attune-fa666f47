@@ -76,94 +76,125 @@ serve(async (req: Request) => {
     
     console.time('OpenAI Session Creation');
     
-    // FIXED: Use the correct endpoint for realtime sessions
-    const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: model,
-        voice: voice,
-        instructions: instructions
-      }),
-    })
+    // Use a longer timeout for the OpenAI API request
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 12000); // 12-second timeout
     
-    console.timeEnd('OpenAI Session Creation');
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`OpenAI API error (${response.status}):`, errorText);
+    try {
+      // Use the correct endpoint for realtime sessions
+      const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: model,
+          voice: voice,
+          instructions: instructions
+        }),
+        signal: controller.signal
+      });
       
-      // Provide more specific error message for common errors
-      let errorMessage = `Failed to generate ephemeral key: ${response.status} ${response.statusText}`;
+      clearTimeout(timeoutId);
       
-      if (response.status === 401 || response.status === 403) {
-        errorMessage = "Authentication failed with OpenAI API. Please check your API key.";
-      } else if (response.status === 429) {
-        errorMessage = "OpenAI API rate limit exceeded. Please try again later.";
-      } else if (response.status >= 500) {
-        errorMessage = "OpenAI API service error. Please try again later.";
+      console.timeEnd('OpenAI Session Creation');
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`OpenAI API error (${response.status}):`, errorText);
+        
+        // Provide more specific error message for common errors
+        let errorMessage = `Failed to generate ephemeral key: ${response.status} ${response.statusText}`;
+        
+        if (response.status === 401 || response.status === 403) {
+          errorMessage = "Authentication failed with OpenAI API. Please check your API key.";
+        } else if (response.status === 429) {
+          errorMessage = "OpenAI API rate limit exceeded. Please try again later.";
+        } else if (response.status >= 500) {
+          errorMessage = "OpenAI API service error. Please try again later.";
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            error: errorMessage,
+            details: errorText
+          }),
+          { 
+            status: response.status, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
       
+      const data = await response.json();
+      
+      // Validate the response contains a valid client_secret
+      if (!data.client_secret?.value || !data.client_secret?.expires_at) {
+        console.error('Invalid response format from OpenAI:', data);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid response format from OpenAI',
+            details: 'Missing client_secret or expires_at',
+            responseData: data
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
+      const expiresAt = new Date(data.client_secret.expires_at * 1000).toISOString();
+      console.log('Successfully generated ephemeral key, expires at:', expiresAt);
+      
+      // Check expiration time is at least 30 seconds in the future
+      const expiresInSeconds = Math.floor((data.client_secret.expires_at * 1000 - Date.now()) / 1000);
+      if (expiresInSeconds < 30) {
+        console.warn(`Warning: Ephemeral key expires soon (${expiresInSeconds} seconds)`);
+      }
+      
+      // Log partial key for debugging (first 5 chars only for security)
+      const keyPreview = data.client_secret.value.substring(0, 5);
+      console.log(`Generated key preview: ${keyPreview}..., length: ${data.client_secret.value.length}, valid for: ${expiresInSeconds}s`);
+      
+      // Expose the key properly in the response
       return new Response(
-        JSON.stringify({ 
-          error: errorMessage,
-          details: errorText
+        JSON.stringify({
+          key: data.client_secret.value,
+          expires_at: expiresAt,
+          metadata: {
+            expires_in_seconds: expiresInSeconds,
+            created_for: effectiveUserId,
+            created_at: new Date().toISOString(),
+            model: model,
+            voice: voice
+          }
         }),
-        { 
-          status: response.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      // Handle AbortController timeout specifically
+      if (fetchError.name === 'AbortError') {
+        console.error('Fetch request timed out after 12 seconds');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Request to OpenAI timed out after 12 seconds',
+            message: 'The OpenAI API did not respond within the timeout period. Please try again.'
+          }),
+          { 
+            status: 504, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
+      throw fetchError;
     }
-    
-    const data = await response.json();
-    
-    // FIXED: Validate the response contains a valid client_secret
-    if (!data.client_secret?.value || !data.client_secret?.expires_at) {
-      console.error('Invalid response format from OpenAI:', data);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid response format from OpenAI',
-          details: 'Missing client_secret or expires_at'
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-    
-    const expiresAt = new Date(data.client_secret.expires_at * 1000).toISOString();
-    console.log('Successfully generated ephemeral key, expires at:', expiresAt);
-    
-    // Check expiration time is at least 30 seconds in the future
-    const expiresInSeconds = Math.floor((data.client_secret.expires_at * 1000 - Date.now()) / 1000);
-    if (expiresInSeconds < 30) {
-      console.warn(`Warning: Ephemeral key expires soon (${expiresInSeconds} seconds)`);
-    }
-    
-    // Log partial key for debugging (first 5 chars only for security)
-    const keyPreview = data.client_secret.value.substring(0, 5);
-    console.log(`Generated key preview: ${keyPreview}..., length: ${data.client_secret.value.length}, valid for: ${expiresInSeconds}s`);
-    
-    // FIXED: Expose the key properly in the response
-    return new Response(
-      JSON.stringify({
-        key: data.client_secret.value,
-        expires_at: expiresAt,
-        metadata: {
-          expires_in_seconds: expiresInSeconds,
-          created_for: effectiveUserId,
-          created_at: new Date().toISOString(),
-          model: model,
-          voice: voice
-        }
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Error generating ephemeral key:', error);
     
