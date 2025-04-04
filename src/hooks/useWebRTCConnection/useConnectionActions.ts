@@ -9,12 +9,12 @@ export function useConnectionActions(
   isConnected: boolean,
   isConnecting: boolean,
   connectorRef: React.MutableRefObject<WebRTCConnector | null>,
-  audioProcessorRef: React.MutableRefObject<any>,
-  recorderRef: React.MutableRefObject<any>,
+  audioTrackRef: React.MutableRefObject<MediaStreamTrack | null>,
   options: any,
   setIsConnecting: (isConnecting: boolean) => void,
   handleMessage: (event: MessageEvent) => void,
-  handleConnectionError: (error: any) => void
+  handleConnectionError: (error: any) => void,
+  handleConnectionStateChange: (state: RTCPeerConnectionState) => void
 ) {
   // Connect to OpenAI Realtime API
   const connect = useCallback(async () => {
@@ -40,14 +40,7 @@ export function useConnectionActions(
       
       const connector = new WebRTCConnector({
         ...options,
-        onConnectionStateChange: (state: RTCPeerConnectionState) => {
-          console.log("[useConnectionActions] Connection state changed:", state);
-          if (state === 'connected') {
-            console.log("[useConnectionActions] Successfully connected to OpenAI");
-          } else if (['disconnected', 'failed', 'closed'].includes(state)) {
-            console.error("[useConnectionActions] Connection state changed to:", state);
-          }
-        },
+        onConnectionStateChange: handleConnectionStateChange,
         onError: handleConnectionError,
         onMessage: handleMessage
       });
@@ -55,17 +48,7 @@ export function useConnectionActions(
       connectorRef.current = connector;
       
       // Get existing audio track if available
-      let audioTrack = null;
-      if (recorderRef.current) {
-        const stream = recorderRef.current.getStream();
-        if (stream) {
-          const tracks = stream.getAudioTracks();
-          if (tracks.length > 0) {
-            audioTrack = tracks[0];
-            console.log("[useConnectionActions] Using existing audio track:", audioTrack.label);
-          }
-        }
-      }
+      const audioTrack = audioTrackRef.current;
       
       console.log("[useConnectionActions] Connecting to OpenAI");
       const connected = await connector.connect(audioTrack || undefined);
@@ -90,8 +73,9 @@ export function useConnectionActions(
     isConnecting,
     setIsConnecting,
     handleConnectionError,
+    handleConnectionStateChange,
     handleMessage,
-    recorderRef
+    audioTrackRef
   ]);
 
   // Send text message to AI

@@ -22,6 +22,7 @@ export function useConnectionManagement(options: UseWebRTCConnectionOptions = {}
   const connectorRef = useRef<WebRTCConnector | null>(null);
   const audioProcessorRef = useRef<AudioProcessor | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
+  const audioTrackRef = useRef<MediaStreamTrack | null>(null);
 
   // WebRTC message handler
   const messageHandlerRef = useRef<WebRTCMessageHandler>(new WebRTCMessageHandler({
@@ -99,12 +100,12 @@ export function useConnectionManagement(options: UseWebRTCConnectionOptions = {}
     isConnected,
     isConnecting,
     connectorRef,
-    audioProcessorRef,
-    recorderRef,
+    audioTrackRef,
     options,
     setIsConnecting,
     handleMessage,
-    handleConnectionError
+    handleConnectionError,
+    handleConnectionStateChange
   );
 
   // Debug logging for context and config

@@ -104,7 +104,7 @@ export function useWebRTCConnection(
   // Implement the missing methods required by WebRTCConnectionResult interface
   const getActiveMediaStream = useCallback((): MediaStream | null => {
     if (recorderRef.current) {
-      return recorderRef.current.getStream();
+      return recorderRef.current.getMediaStream();
     }
     return null;
   }, [recorderRef]);
@@ -119,6 +119,69 @@ export function useWebRTCConnection(
     }
   }, [connectorRef]);
 
+  // Implement disconnect method
+  const disconnect = useCallback((): void => {
+    if (connectorRef.current) {
+      connectorRef.current.disconnect();
+      connectorRef.current = null;
+    }
+    
+    if (recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+    }
+    
+    setIsConnected(false);
+    setIsConnecting(false);
+    setIsMicrophoneActive(false);
+  }, []);
+
+  // Implement toggleMicrophone method
+  const toggleMicrophone = useCallback(async (): Promise<void> => {
+    console.log("Toggle microphone called, current state:", isMicrophoneActive);
+    
+    if (isMicrophoneActive && recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+      setIsMicrophoneActive(false);
+      return;
+    }
+    
+    if (!isConnected) {
+      console.warn("Cannot toggle microphone: not connected");
+      return;
+    }
+    
+    try {
+      const recorder = new AudioRecorder({
+        onAudioData: () => {
+          // WebRTC connection handles audio data directly
+        },
+        silenceThreshold: 0.01,
+        silenceDuration: 3000
+      });
+      
+      const success = await recorder.start();
+      
+      if (success) {
+        recorderRef.current = recorder;
+        
+        // Get and store the audio track
+        const stream = recorder.getMediaStream();
+        if (stream) {
+          const tracks = stream.getAudioTracks();
+          if (tracks.length > 0) {
+            audioTrackRef.current = tracks[0];
+          }
+        }
+        
+        setIsMicrophoneActive(true);
+      }
+    } catch (error) {
+      console.error("Error toggling microphone:", error);
+    }
+  }, [isConnected, isMicrophoneActive]);
+
   // Return a simplified set of actions that matches our interface
   return {
     isConnected,
@@ -130,8 +193,8 @@ export function useWebRTCConnection(
     transcriptProgress,
     messages,
     connect: connectAsync,
-    disconnect: () => {}, // Placeholder to match interface
-    toggleMicrophone: async () => {}, // Placeholder to match interface
+    disconnect,
+    toggleMicrophone,
     sendTextMessage,
     commitAudioBuffer,
     isDataChannelReady: false, // Placeholder to match interface
