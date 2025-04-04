@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { saveMessage } from "@/services/messages/messageStorage";
 import { User } from "@supabase/supabase-js"; 
-import { logContextVerification } from "@/services/context/unifiedContextProvider";
+import { logContextVerification } from "@/services/context/contextVerification";
 
 interface UseVoiceChatEffectsProps {
   isConnected: boolean;

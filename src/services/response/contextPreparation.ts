@@ -2,7 +2,7 @@
 import { fetchUserContext } from "@/services/context";
 import { ApiContextData } from "./types";
 import { supabase } from "@/integrations/supabase/client";
-import { logContextVerification } from "@/services/context/unifiedContextProvider";
+import { logContextVerification } from "@/services/context/contextVerification";
 
 /**
  * Prepare context data for the API request

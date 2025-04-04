@@ -1,6 +1,8 @@
 
 import { WebRTCOptions } from "./WebRTCTypes";
-import { getMinimalInstructions, getUnifiedEnhancedInstructions, updateSessionWithFullContext } from "@/services/context/unifiedContextProvider";
+import { getMinimalInstructions } from "@/services/context/initialContextLoader";
+import { getUnifiedEnhancedInstructions } from "@/services/context/enhancedContextLoader";
+import { updateSessionWithFullContext } from "@/services/context/sessionContextUpdater";
 import { supabase } from "@/integrations/supabase/client";
 import { prepareContextData } from "@/services/response/contextPreparation";
 

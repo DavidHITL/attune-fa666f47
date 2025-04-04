@@ -1,7 +1,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { trackModeTransition, getRecentContextSummary } from "@/services/context/unifiedContextProvider";
+import { trackModeTransition } from "@/services/context/contextVerification";
+import { getRecentContextSummary } from "@/services/context/contextSummary";
 import { toast } from "sonner";
 
 interface UseInterfaceTransitionProps {
