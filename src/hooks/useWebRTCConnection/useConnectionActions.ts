@@ -51,7 +51,7 @@ export function useConnectionActions(
     setIsMicrophoneActive
   );
   
-  // Initialize message sending hooks
+  // Initialize message sending hooks - this will return the sendTextMessage and commitAudioBuffer functions
   const { sendTextMessage, commitAudioBuffer } = useMessageManager(
     isConnected,
     connectorRef,
@@ -78,7 +78,7 @@ export function useConnectionActions(
   
   // Fix the connect function to ensure it's properly typed as an async function
   const connectAsync = useCallback(async () => {
-    if (connect && typeof connect === 'function') {
+    if (connect) {
       return await connect();
     }
     return false;

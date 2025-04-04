@@ -1,83 +1,66 @@
 
 /**
- * Handles sending messages over WebRTC data channels
+ * Handles sending messages through WebRTC data channel
  */
 export class MessageSender {
   /**
-   * Send a text message over a data channel
-   * @param dataChannel The data channel to send the message over
-   * @param text The text to send
-   * @param errorHandler Optional error handler function
-   * @returns Whether the send was successful
+   * Send a text message to OpenAI
    */
   sendTextMessage(
     dataChannel: RTCDataChannel | null, 
     text: string, 
-    errorHandler?: (error: any) => void
+    onError: (error: any) => void
   ): boolean {
     if (!dataChannel || dataChannel.readyState !== "open") {
-      const error = new Error(`Data channel not ready for sending text, state: ${dataChannel?.readyState || 'null'}`);
-      console.error("[MessageSender]", error.message);
-      if (errorHandler) errorHandler(error);
+      console.warn("[MessageSender] Cannot send text message: data channel not open");
       return false;
     }
     
     try {
-      console.log("[MessageSender] Sending text message");
-      const event = {
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text
-            }
-          ]
-        }
+      console.log("[MessageSender] Sending text message:", text);
+      
+      // Create message object
+      const message = {
+        type: "text",
+        text
       };
       
-      dataChannel.send(JSON.stringify(event));
-      dataChannel.send(JSON.stringify({ type: "response.create" }));
-      console.log("[MessageSender] Text message sent successfully");
+      // Send as JSON string
+      dataChannel.send(JSON.stringify(message));
       return true;
     } catch (error) {
       console.error("[MessageSender] Error sending text message:", error);
-      if (errorHandler) errorHandler(error);
+      onError(error);
       return false;
     }
   }
 
   /**
-   * Commit the audio buffer over a data channel
-   * @param dataChannel The data channel to send the commit over
-   * @param errorHandler Optional error handler function
-   * @returns Whether the commit was successful
+   * Commit the audio buffer to signal end of speech
    */
   commitAudioBuffer(
     dataChannel: RTCDataChannel | null, 
-    errorHandler?: (error: any) => void
+    onError: (error: any) => void
   ): boolean {
     if (!dataChannel || dataChannel.readyState !== "open") {
-      const error = new Error(`Data channel not ready for committing audio, state: ${dataChannel?.readyState || 'null'}`);
-      console.error("[MessageSender]", error.message);
-      if (errorHandler) errorHandler(error);
+      console.warn("[MessageSender] Cannot commit audio buffer: data channel not open");
       return false;
     }
     
     try {
       console.log("[MessageSender] Committing audio buffer");
-      const event = {
-        type: "input_audio_buffer.commit"
+      
+      // Create message object
+      const message = {
+        type: "audio_commit"
       };
       
-      dataChannel.send(JSON.stringify(event));
-      console.log("[MessageSender] Audio buffer committed successfully");
+      // Send as JSON string
+      dataChannel.send(JSON.stringify(message));
       return true;
     } catch (error) {
       console.error("[MessageSender] Error committing audio buffer:", error);
-      if (errorHandler) errorHandler(error);
+      onError(error);
       return false;
     }
   }

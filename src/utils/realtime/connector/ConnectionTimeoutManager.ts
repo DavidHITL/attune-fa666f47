@@ -1,29 +1,28 @@
 
 /**
- * Manages connection timeout for WebRTC connections
+ * Manages connection timeouts
  */
 export class ConnectionTimeoutManager {
-  private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
+  private timeout: ReturnType<typeof setTimeout> | null = null;
   
   /**
-   * Clear any pending connection timeout
+   * Set a timeout
    */
-  clearTimeout(): void {
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
-    }
+  setTimeout(callback: () => void, ms: number): void {
+    // Clear any existing timeout
+    this.clearTimeout();
+    
+    // Set a new timeout
+    this.timeout = setTimeout(callback, ms);
   }
   
   /**
-   * Set a connection timeout
+   * Clear the timeout
    */
-  setTimeout(callback: () => void, duration: number = 30000): void {
-    this.clearTimeout();
-    
-    this.connectionTimeout = setTimeout(() => {
-      console.error(`[ConnectionTimeoutManager] Connection timeout reached after ${duration}ms`);
-      callback();
-    }, duration);
+  clearTimeout(): void {
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = null;
+    }
   }
 }
